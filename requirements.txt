@@ -1,0 +1,17 @@
+# Scrapers dependencies
+minio==7.2.7
+psycopg2-binary==2.9.9
+playwright==1.48.0
+scrapy==2.11.0
+scrapy-playwright==0.0.34
+
+# Dagster
+dagster==1.5.12
+dagster-webserver==1.5.12
+dagster-postgres==0.21.12
+dagster-docker==0.21.12
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0

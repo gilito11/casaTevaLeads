@@ -1,0 +1,4 @@
+load_from:
+  - python_package:
+      package_name: casa_teva_pipeline
+      location_name: casa_teva_pipeline
