@@ -1,0 +1,61 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw data layer containing scraped listings from various portals"
+    database: casa_teva_db
+    schema: raw
+    tables:
+      - name: raw_listings
+        description: "Raw listings scraped from real estate portals (Fotocasa, Milanuncios, Wallapop)"
+        columns:
+          - name: id
+            description: "Primary key - auto-incrementing ID"
+            tests:
+              - unique
+              - not_null
+
+          - name: tenant_id
+            description: "Tenant identifier for multi-tenancy support"
+            tests:
+              - not_null
+
+          - name: portal
+            description: "Source portal name (fotocasa, milanuncios, wallapop)"
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['fotocasa', 'milanuncios', 'wallapop']
+
+          - name: data_lake_path
+            description: "Path to the JSON file in MinIO Data Lake"
+            tests:
+              - not_null
+
+          - name: raw_data
+            description: "JSONB column containing the raw scraped data"
+            tests:
+              - not_null
+
+          - name: scraping_timestamp
+            description: "Timestamp when the listing was scraped"
+            tests:
+              - not_null
+
+          - name: created_at
+            description: "Timestamp when the record was created in the database"
+
+        # Freshness check: data should be updated at least every 6 hours
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 12, period: hour}
+
+        # Loaded at field for incremental models
+        loaded_at_field: scraping_timestamp
+
+        # Tests for the entire table
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "scraping_timestamp <= created_at"
+              config:
+                severity: warn

@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: dim_leads
+    description: |
+      Lead dimension table containing deduplicated leads from all portals.
+
+      This table is the single source of truth for leads in the CRM system.
+      It combines data from Fotocasa, Milanuncios, and Wallapop, deduplicating
+      by tenant_id + telefono_norm and keeping the most recent information.
+
+      Materialized incrementally for performance.
+
+    columns:
+      - name: lead_id
+        description: "Unique identifier for the lead (MD5 hash of tenant_id + telefono_norm)"
+        tests:
+          - unique
+          - not_null
+
+      - name: tenant_id
+        description: "Tenant identifier for multi-tenancy"
+        tests:
+          - not_null
+
+      - name: telefono_norm
+        description: "Normalized phone number (unique per tenant)"
+        tests:
+          - not_null
+
+      - name: source_portal
+        description: "Origin portal (fotocasa, milanuncios, wallapop)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['fotocasa', 'milanuncios', 'wallapop']
+
+      - name: estado
+        description: "CRM status of the lead"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'NEGOCIACION', 'CERRADO_GANADO', 'CERRADO_PERDIDO', 'DESCARTADO']
+
+      - name: lead_score
+        description: "Quality score from 0-100"
+        tests:
+          - not_null
+
+      - name: zona_clasificada
+        description: "Geographic zone classification"
+
+      - name: precio
+        description: "Property price in EUR"
+
+      - name: email
+        description: "Contact email address"
+
+      - name: nombre_contacto
+        description: "Contact person name"
+
+      - name: asignado_a
+        description: "User ID of assigned sales person"
+
+      - name: fecha_primera_captura
+        description: "Timestamp when lead was first captured"
+        tests:
+          - not_null
+
+      - name: ultima_actualizacion
+        description: "Timestamp of last update"
+        tests:
+          - not_null
+
+    tests:
+      # Ensure unique combination of tenant + phone
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - tenant_id
+            - telefono_norm
+
+      # Ensure timestamps are logical
+      - dbt_utils.expression_is_true:
+          expression: "fecha_primera_captura <= ultima_actualizacion"
+          config:
+            severity: warn

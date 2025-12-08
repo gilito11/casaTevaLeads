@@ -1,0 +1,75 @@
+# dbt project configuration for Casa Teva Lead System
+name: 'casa_teva'
+version: '1.0.0'
+config-version: 2
+
+# Profile to use for this project
+profile: 'casa_teva'
+
+# Directories
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+models:
+  casa_teva:
+    # Staging models: views for initial transformations
+    staging:
+      +materialized: view
+      +schema: staging
+      +tags: ["staging"]
+      +docs:
+        node_color: "#4CAF50"
+
+    # Marts models: tables for business logic
+    marts:
+      +materialized: table
+      +schema: marts
+      +tags: ["marts"]
+      +docs:
+        node_color: "#2196F3"
+
+    # Analytics models: tables for reporting
+    analytics:
+      +materialized: table
+      +schema: analytics
+      +tags: ["analytics"]
+      +docs:
+        node_color: "#FF9800"
+
+# Test configurations
+tests:
+  +store_failures: true
+  +schema: dbt_test_failures
+
+# Documentation
+vars:
+  # Default tenant for development
+  default_tenant_id: 1
+
+  # Phone number normalization patterns
+  phone_patterns:
+    spain_mobile: '^(\\+34|0034)?[67]\\d{8}$'
+    spain_landline: '^(\\+34|0034)?[89]\\d{8}$'
+
+# Seeds configuration
+seeds:
+  casa_teva:
+    +schema: seeds
+    +quote_columns: false
+
+# Snapshots configuration
+snapshots:
+  casa_teva:
+    +target_schema: snapshots
+    +strategy: timestamp
+    +updated_at: updated_at

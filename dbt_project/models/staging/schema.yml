@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: stg_fotocasa
+    description: "Staging model for Fotocasa listings - extracts and normalizes raw data"
+    columns:
+      - name: raw_listing_id
+        description: "ID from raw.raw_listings table"
+        tests:
+          - not_null
+
+      - name: tenant_id
+        description: "Tenant identifier"
+        tests:
+          - not_null
+
+      - name: telefono_norm
+        description: "Normalized phone number (digits only, no country code)"
+        tests:
+          - not_null
+
+      - name: precio
+        description: "Property price in EUR"
+        tests:
+          - not_null
+
+      - name: zona_clasificada
+        description: "Classified zone based on ubicacion field"
+
+      - name: es_particular
+        description: "Boolean flag - true if seller is a private individual"
+        tests:
+          - not_null
+
+      - name: permite_inmobiliarias
+        description: "Boolean flag - true if seller allows real estate agencies"
+        tests:
+          - not_null
+
+      - name: precio_por_m2
+        description: "Calculated price per square meter"
+
+    tests:
+      # Ensure no duplicates per tenant + phone + timestamp
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - tenant_id
+            - telefono_norm
+            - scraping_timestamp

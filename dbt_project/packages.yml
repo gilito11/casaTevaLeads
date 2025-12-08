@@ -1,0 +1,10 @@
+# dbt packages for Casa Teva project
+
+packages:
+  # dbt-utils: Helpful macros for testing and data transformations
+  - package: dbt-labs/dbt_utils
+    version: 1.3.2
+
+  # Codegen: Helpful for generating boilerplate YAML
+  - package: dbt-labs/codegen
+    version: 0.14.0

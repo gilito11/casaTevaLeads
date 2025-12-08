@@ -1,0 +1,28 @@
+# dbt specific
+target/
+dbt_packages/
+logs/
+*.log
+
+# Python
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+profiles.yml
+
+# Documentation
+site/
