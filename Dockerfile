@@ -1,0 +1,75 @@
+# Dockerfile para Casa Teva Lead System
+# Multi-stage build para optimizar tamaño
+
+# Stage 1: Base con Python y dependencias del sistema
+FROM python:3.11-slim as base
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crear usuario no-root
+RUN useradd -m -u 1000 casateva
+
+# Stage 2: Builder - instalar dependencias Python
+FROM base as builder
+
+WORKDIR /app
+
+# Copiar requirements
+COPY requirements.txt requirements-dev.txt ./
+
+# Instalar dependencias en un virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Stage 3: Runtime - imagen final
+FROM base as runtime
+
+# Copiar virtual environment desde builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Crear directorios
+WORKDIR /app
+RUN mkdir -p /app/backend /app/dagster /app/dbt_project /app/scrapers
+
+# Crear directorios para Dagster con permisos correctos
+RUN mkdir -p /tmp/dagster /opt/dagster/dagster_home && \
+    chown -R casateva:casateva /tmp/dagster /opt/dagster
+
+# Copiar código de la aplicación
+COPY --chown=casateva:casateva backend/ /app/backend/
+COPY --chown=casateva:casateva dagster/ /app/dagster/
+COPY --chown=casateva:casateva dbt_project/ /app/dbt_project/
+COPY --chown=casateva:casateva scrapers/ /app/scrapers/
+COPY --chown=casateva:casateva scripts/ /app/scripts/
+COPY --chown=casateva:casateva run_fotocasa_scraper.py /app/
+COPY --chown=casateva:casateva scrapy.cfg /app/
+
+# Cambiar a usuario no-root
+USER casateva
+
+# Variables de entorno
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV DJANGO_SETTINGS_MODULE=casa_teva.settings
+ENV DAGSTER_HOME=/opt/dagster/dagster_home
+ENV TMPDIR=/tmp/dagster
+
+# Exponer puertos
+EXPOSE 8000 3000
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health/ || exit 1
+
+# Comando por defecto (puede ser override en docker-compose)
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--chdir", "/app/backend", "casa_teva.wsgi:application"]

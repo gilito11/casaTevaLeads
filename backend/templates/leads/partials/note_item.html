@@ -1,0 +1,20 @@
+<div class="p-6">
+    <div class="flex items-start justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
+                <span class="text-primary-600 dark:text-primary-400 text-sm font-medium">
+                    {{ nota.autor.first_name|slice:":1"|upper }}{{ nota.autor.last_name|slice:":1"|upper }}
+                </span>
+            </div>
+            <div>
+                <p class="font-medium text-gray-900 dark:text-white">
+                    {{ nota.autor.get_full_name|default:nota.autor.username }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ nota.created_at|date:"d/m/Y H:i" }}
+                </p>
+            </div>
+        </div>
+    </div>
+    <p class="mt-3 text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ nota.texto }}</p>
+</div>

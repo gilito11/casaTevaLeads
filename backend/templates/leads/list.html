@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Leads - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Leads</h1>
+            <p class="text-gray-600 dark:text-gray-400">{{ total_leads }} leads en total</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <form hx-get="{% url 'leads:list' %}"
+              hx-target="#leads-table-container"
+              hx-trigger="change, keyup delay:300ms from:#search-input"
+              hx-push-url="true"
+              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+
+            <!-- Search -->
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar</label>
+                <div class="relative">
+                    <input type="text" name="q" id="search-input" value="{{ request.GET.q }}"
+                           placeholder="Telefono, nombre, direccion..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Estado Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+                <select name="estado"
+                        class="w-full py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="">Todos los estados</option>
+                    <option value="NUEVO" {% if request.GET.estado == 'NUEVO' %}selected{% endif %}>Nuevo</option>
+                    <option value="EN_PROCESO" {% if request.GET.estado == 'EN_PROCESO' %}selected{% endif %}>En Proceso</option>
+                    <option value="CONTACTADO_SIN_RESPUESTA" {% if request.GET.estado == 'CONTACTADO_SIN_RESPUESTA' %}selected{% endif %}>Contactado Sin Respuesta</option>
+                    <option value="INTERESADO" {% if request.GET.estado == 'INTERESADO' %}selected{% endif %}>Interesado</option>
+                    <option value="NO_INTERESADO" {% if request.GET.estado == 'NO_INTERESADO' %}selected{% endif %}>No Interesado</option>
+                    <option value="EN_ESPERA" {% if request.GET.estado == 'EN_ESPERA' %}selected{% endif %}>En Espera</option>
+                    <option value="CLIENTE" {% if request.GET.estado == 'CLIENTE' %}selected{% endif %}>Cliente</option>
+                    <option value="YA_VENDIDO" {% if request.GET.estado == 'YA_VENDIDO' %}selected{% endif %}>Ya Vendido</option>
+                    <option value="NO_CONTACTAR" {% if request.GET.estado == 'NO_CONTACTAR' %}selected{% endif %}>No Contactar</option>
+                </select>
+            </div>
+
+            <!-- Portal Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Portal</label>
+                <select name="portal"
+                        class="w-full py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="">Todos los portales</option>
+                    <option value="fotocasa" {% if request.GET.portal == 'fotocasa' %}selected{% endif %}>Fotocasa</option>
+                    <option value="milanuncios" {% if request.GET.portal == 'milanuncios' %}selected{% endif %}>Milanuncios</option>
+                    <option value="wallapop" {% if request.GET.portal == 'wallapop' %}selected{% endif %}>Wallapop</option>
+                </select>
+            </div>
+
+            <!-- Zona Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Zona</label>
+                <select name="zona"
+                        class="w-full py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="">Todas las zonas</option>
+                    {% for zona in zonas %}
+                    <option value="{{ zona }}" {% if request.GET.zona == zona %}selected{% endif %}>{{ zona }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        <!-- Quick Filters -->
+        <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <span class="text-sm text-gray-500 dark:text-gray-400 mr-2">Filtros rapidos:</span>
+            <a href="{% url 'leads:list' %}?estado=NUEVO"
+               class="px-3 py-1 text-xs rounded-full {% if request.GET.estado == 'NUEVO' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity">
+                Nuevos
+            </a>
+            <a href="{% url 'leads:list' %}?estado=EN_PROCESO"
+               class="px-3 py-1 text-xs rounded-full {% if request.GET.estado == 'EN_PROCESO' %}bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity">
+                En Proceso
+            </a>
+            <a href="{% url 'leads:list' %}?estado=INTERESADO"
+               class="px-3 py-1 text-xs rounded-full {% if request.GET.estado == 'INTERESADO' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity">
+                Interesados
+            </a>
+            <a href="{% url 'leads:list' %}?estado=EN_ESPERA"
+               class="px-3 py-1 text-xs rounded-full {% if request.GET.estado == 'EN_ESPERA' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity">
+                En Espera
+            </a>
+            <a href="{% url 'leads:list' %}"
+               class="px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:opacity-80 transition-opacity">
+                Limpiar filtros
+            </a>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div id="leads-table-container">
+        {% include 'leads/partials/lead_table.html' %}
+    </div>
+</div>
+{% endblock %}

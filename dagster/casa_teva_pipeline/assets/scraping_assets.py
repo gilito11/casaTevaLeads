@@ -109,7 +109,6 @@ def bronze_fotocasa_listings(
     description="Carga listings desde MinIO a PostgreSQL raw.raw_listings",
     compute_kind="python",
     group_name="scraping",
-    deps=[bronze_fotocasa_listings],
 )
 def raw_postgres_listings(
     context: AssetExecutionContext,
@@ -239,7 +238,6 @@ def bronze_wallapop_listings(
     description="Estadísticas de scraping consolidadas",
     compute_kind="python",
     group_name="reporting",
-    deps=[raw_postgres_listings],
 )
 def scraping_stats(
     context: AssetExecutionContext,

@@ -1,7 +1,8 @@
 from django.urls import path
+from core import views
 
 app_name = 'core'
 
 urlpatterns = [
-    # URLs para la app core se agregarán aquí
+    path('profile/', views.profile_view, name='profile'),
 ]

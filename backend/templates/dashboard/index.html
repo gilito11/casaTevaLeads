@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+            <p class="text-gray-600 dark:text-gray-400">Bienvenido, {{ user.first_name|default:user.username }}. Aqui tienes el resumen de hoy.</p>
+        </div>
+        <div class="mt-4 md:mt-0">
+            <a href="{% url 'leads:list' %}?estado=NUEVO"
+               class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Ver Leads Nuevos
+            </a>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Leads Nuevos Hoy -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Leads Nuevos Hoy</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.leads_nuevos_hoy|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                {% if stats.leads_nuevos_cambio >= 0 %}
+                <span class="text-green-600 dark:text-green-400 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    +{{ stats.leads_nuevos_cambio|default:0 }}%
+                </span>
+                {% else %}
+                <span class="text-red-600 dark:text-red-400 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    {{ stats.leads_nuevos_cambio|default:0 }}%
+                </span>
+                {% endif %}
+                <span class="text-gray-500 dark:text-gray-400 ml-2">vs ayer</span>
+            </div>
+        </div>
+
+        <!-- Pendientes de Llamar -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Pendientes de Llamar</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.pendientes_llamar|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                    </svg>
+                </div>
+            </div>
+            <a href="{% url 'leads:list' %}?estado=NUEVO&estado=EN_PROCESO" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
+                Ver todos
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+
+        <!-- Interesados -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Leads Interesados</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.interesados|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <a href="{% url 'leads:list' %}?estado=INTERESADO" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
+                Ver interesados
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+
+        <!-- Tasa de Conversion -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Tasa de Conversion</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.tasa_conversion|default:"0" }}%</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                {{ stats.clientes_total|default:0 }} clientes de {{ stats.leads_total|default:0 }} leads
+            </p>
+        </div>
+    </div>
+
+    <!-- Charts and Recent Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Leads por Estado (Chart) -->
+        <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Leads por Estado</h3>
+            <div class="h-64">
+                <canvas id="estadosChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Leads por Portal -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Leads por Portal</h3>
+            <div class="space-y-4">
+                {% for portal in stats.leads_por_portal %}
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">{{ portal.nombre }}</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ portal.count }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div class="bg-primary-600 h-2 rounded-full" style="width: {{ portal.porcentaje }}%"></div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 dark:text-gray-400 text-sm">No hay datos de portales</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Leads -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Ultimos Leads</h3>
+                <a href="{% url 'leads:list' %}" class="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+                    Ver todos
+                </a>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Lead</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Direccion</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Precio</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Portal</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for lead in recent_leads %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div>
+                                <p class="font-medium text-gray-900 dark:text-white">{{ lead.nombre|default:"Sin nombre" }}</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ lead.telefono_norm }}</p>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="text-sm text-gray-900 dark:text-white truncate max-w-xs">{{ lead.direccion|truncatechars:40 }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ lead.zona_geografica }}</p>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="font-medium text-gray-900 dark:text-white">{{ lead.precio|floatformat:0|default:"-" }} &euro;</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% include 'components/estado_badge.html' with estado=lead.estado %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {{ lead.portal|title }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <a href="{% url 'leads:detail' lead.lead_id %}"
+                               class="text-primary-600 dark:text-primary-400 hover:underline text-sm">
+                                Ver detalle
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                            </svg>
+                            <p>No hay leads todavia</p>
+                            <p class="text-sm mt-1">Los leads apareceran aqui cuando se ejecute el scraper</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Chart.js - Leads por Estado
+    const ctx = document.getElementById('estadosChart');
+    if (ctx) {
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#9CA3AF' : '#6B7280';
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Nuevos', 'En Proceso', 'Contactados', 'Interesados', 'No Interesados', 'En Espera', 'Clientes'],
+                datasets: [{
+                    data: [
+                        {{ stats.por_estado.NUEVO|default:0 }},
+                        {{ stats.por_estado.EN_PROCESO|default:0 }},
+                        {{ stats.por_estado.CONTACTADO_SIN_RESPUESTA|default:0 }},
+                        {{ stats.por_estado.INTERESADO|default:0 }},
+                        {{ stats.por_estado.NO_INTERESADO|default:0 }},
+                        {{ stats.por_estado.EN_ESPERA|default:0 }},
+                        {{ stats.por_estado.CLIENTE|default:0 }}
+                    ],
+                    backgroundColor: [
+                        '#3B82F6', // blue
+                        '#06B6D4', // cyan
+                        '#F97316', // orange
+                        '#22C55E', // green
+                        '#EF4444', // red
+                        '#EAB308', // yellow
+                        '#10B981'  // emerald
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: textColor,
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+</script>
+{% endblock %}

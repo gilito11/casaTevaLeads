@@ -12,6 +12,7 @@ class Lead(models.Model):
         ('CONTACTADO_SIN_RESPUESTA', 'Contactado sin respuesta'),
         ('INTERESADO', 'Interesado'),
         ('NO_INTERESADO', 'No interesado'),
+        ('EN_ESPERA', 'En espera'),
         ('NO_CONTACTAR', 'No contactar'),
         ('CLIENTE', 'Cliente'),
         ('YA_VENDIDO', 'Ya vendido'),

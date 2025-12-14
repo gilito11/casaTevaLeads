@@ -16,10 +16,32 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+
+from core.views import login_view, logout_view, dashboard_view, profile_view
+
+
+def health_check(request):
+    return JsonResponse({'status': 'ok'})
+
 
 urlpatterns = [
+    # Admin
     path('admin/', admin.site.urls),
-    path('api/core/', include('core.urls')),
-    path('api/leads/', include('leads.urls')),
+
+    # Health check
+    path('health/', health_check, name='health_check'),
+
+    # Auth
+    path('login/', login_view, name='login'),
+    path('logout/', logout_view, name='logout'),
+
+    # Frontend
+    path('', dashboard_view, name='dashboard'),
+    path('profile/', profile_view, name='profile'),
+    path('leads/', include('leads.urls', namespace='leads')),
+
+    # API (for future use)
+    path('api/core/', include('core.urls', namespace='core')),
     path('api/analytics/', include('analytics.urls')),
 ]

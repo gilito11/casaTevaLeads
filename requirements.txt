@@ -1,6 +1,16 @@
+# Django & Web Framework
+Django==5.1
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+gunicorn==21.2.0
+
+# Database
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+python-decouple==3.8
+
 # Scrapers dependencies
 minio==7.2.7
-psycopg2-binary==2.9.9
 playwright==1.48.0
 scrapy==2.11.0
 scrapy-playwright==0.0.34
@@ -10,6 +20,10 @@ dagster==1.5.12
 dagster-webserver==1.5.12
 dagster-postgres==0.21.12
 dagster-docker==0.21.12
+
+# dbt
+dbt-core==1.7.4
+dbt-postgres==1.7.4
 
 # Testing
 pytest==7.4.3

@@ -1,4 +1,4 @@
- Fija# Casa Teva - Sistema de Captación de Propietarios v2.0
+# Casa Teva - Sistema de Captación de Propietarios v2.0
 ## Especificación Técnica Completa - Modern Data Stack 2025
 
 ---

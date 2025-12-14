@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block title %}Mi Perfil - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h1>
+        <p class="text-gray-600 dark:text-gray-400">Informacion de tu cuenta y estadisticas</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- User Info Card -->
+        <div class="lg:col-span-2">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div class="flex items-start space-x-4">
+                    <!-- Avatar -->
+                    <div class="w-20 h-20 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span class="text-primary-600 dark:text-primary-400 text-3xl font-bold">
+                            {{ user.first_name|slice:":1"|upper|default:user.username|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                        </span>
+                    </div>
+
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">
+                            {{ user.get_full_name|default:user.username }}
+                        </h2>
+                        <p class="text-gray-500 dark:text-gray-400">{{ user.email }}</p>
+
+                        {% if tenant_user %}
+                        <div class="mt-3 flex items-center space-x-2">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if tenant_user.rol == 'admin' %}
+                                bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200
+                                {% elif tenant_user.rol == 'comercial' %}
+                                bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                                {% else %}
+                                bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
+                                {% endif %}">
+                                {{ tenant_user.get_rol_display }}
+                            </span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">
+                                en {{ tenant_user.tenant.nombre }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- User Details -->
+                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+                        Detalles de la cuenta
+                    </h3>
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Usuario</dt>
+                            <dd class="text-gray-900 dark:text-white font-medium">{{ user.username }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Email</dt>
+                            <dd class="text-gray-900 dark:text-white font-medium">{{ user.email|default:"-" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Nombre</dt>
+                            <dd class="text-gray-900 dark:text-white font-medium">{{ user.first_name|default:"-" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Apellido</dt>
+                            <dd class="text-gray-900 dark:text-white font-medium">{{ user.last_name|default:"-" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Fecha de registro</dt>
+                            <dd class="text-gray-900 dark:text-white font-medium">{{ user.date_joined|date:"d/m/Y" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm text-gray-500 dark:text-gray-400">Ultimo acceso</dt>
+                            <dd class="text-gray-900 dark:text-white font-medium">{{ user.last_login|date:"d/m/Y H:i"|default:"Nunca" }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Card -->
+        <div class="space-y-6">
+            {% if tenant_user %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mis Estadisticas</h3>
+
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Leads asignados</span>
+                        <span class="text-2xl font-bold text-gray-900 dark:text-white">
+                            {{ user_stats.leads_asignados|default:0 }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Clientes convertidos</span>
+                        <span class="text-2xl font-bold text-green-600 dark:text-green-400">
+                            {{ user_stats.clientes_convertidos|default:0 }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Total leads (empresa)</span>
+                        <span class="text-lg font-medium text-gray-600 dark:text-gray-300">
+                            {{ user_stats.total_leads|default:0 }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tenant Info -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mi Empresa</h3>
+
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Nombre</p>
+                        <p class="font-medium text-gray-900 dark:text-white">{{ tenant_user.tenant.nombre }}</p>
+                    </div>
+                    {% if tenant_user.tenant.email_contacto %}
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Email contacto</p>
+                        <p class="font-medium text-gray-900 dark:text-white">{{ tenant_user.tenant.email_contacto }}</p>
+                    </div>
+                    {% endif %}
+                    {% if tenant_user.tenant.telefono %}
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Telefono</p>
+                        <p class="font-medium text-gray-900 dark:text-white">{{ tenant_user.tenant.telefono }}</p>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Limite mensual</p>
+                        <p class="font-medium text-gray-900 dark:text-white">{{ tenant_user.tenant.max_leads_mes }} leads</p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-6">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Sin empresa asignada</h3>
+                        <p class="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+                            Contacta al administrador para que te asigne a una empresa.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
