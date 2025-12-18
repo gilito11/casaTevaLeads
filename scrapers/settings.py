@@ -30,10 +30,18 @@ DEFAULT_REQUEST_HEADERS = {
     'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
 }
 
-# Enable or disable downloader middlewares
-DOWNLOADER_MIDDLEWARES = {
-    'scrapy_playwright.middleware.ScrapyPlaywrightDownloadHandler': 543,
+# Enable Playwright download handlers
+DOWNLOAD_HANDLERS = {
+    'http': 'scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler',
+    'https': 'scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler',
 }
+
+# Playwright settings
+PLAYWRIGHT_LAUNCH_OPTIONS = {
+    'headless': True,
+    'timeout': 60000,
+}
+PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 60000
 
 # Configure item pipelines
 # ITEM_PIPELINES = {

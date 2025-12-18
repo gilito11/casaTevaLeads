@@ -3,6 +3,35 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 
 
+# Zonas preestablecidas disponibles para todos los tenants
+ZONAS_PREESTABLECIDAS = {
+    # Lleida
+    'la_bordeta': {'nombre': 'La Bordeta, Lleida', 'lat': 41.6168393, 'lon': 0.6204561, 'provincia_id': 25},
+    'lleida_ciudad': {'nombre': 'Lleida Ciudad', 'lat': 41.6175899, 'lon': 0.6200146, 'provincia_id': 25},
+    # Tarragona / Costa Dorada
+    'tarragona_ciudad': {'nombre': 'Tarragona Ciudad', 'lat': 41.1188827, 'lon': 1.2444909, 'provincia_id': 43},
+    'salou': {'nombre': 'Salou', 'lat': 41.0747326, 'lon': 1.1413905, 'provincia_id': 43},
+    'cambrils': {'nombre': 'Cambrils', 'lat': 41.0670881, 'lon': 1.0570748, 'provincia_id': 43},
+    'reus': {'nombre': 'Reus', 'lat': 41.1548727, 'lon': 1.1069153, 'provincia_id': 43},
+    # Barcelona
+    'barcelona_centro': {'nombre': 'Barcelona Centro', 'lat': 41.3873974, 'lon': 2.168568, 'provincia_id': 8},
+    'hospitalet': {'nombre': "L'Hospitalet de Llobregat", 'lat': 41.3596944, 'lon': 2.0994377, 'provincia_id': 8},
+    'badalona': {'nombre': 'Badalona', 'lat': 41.4501833, 'lon': 2.2475194, 'provincia_id': 8},
+    # Madrid
+    'madrid_centro': {'nombre': 'Madrid Centro', 'lat': 40.4167754, 'lon': -3.7037902, 'provincia_id': 28},
+    'madrid_norte': {'nombre': 'Madrid Norte', 'lat': 40.4893538, 'lon': -3.6827461, 'provincia_id': 28},
+    'madrid_sur': {'nombre': 'Madrid Sur', 'lat': 40.3539823, 'lon': -3.6941673, 'provincia_id': 28},
+    # Valencia
+    'valencia_ciudad': {'nombre': 'Valencia Ciudad', 'lat': 39.4699075, 'lon': -0.3762881, 'provincia_id': 46},
+    # Málaga / Costa del Sol
+    'malaga_ciudad': {'nombre': 'Málaga Ciudad', 'lat': 36.721261, 'lon': -4.4212655, 'provincia_id': 29},
+    'marbella': {'nombre': 'Marbella', 'lat': 36.5097845, 'lon': -4.8868565, 'provincia_id': 29},
+    # Alicante / Costa Blanca
+    'alicante_ciudad': {'nombre': 'Alicante Ciudad', 'lat': 38.3459963, 'lon': -0.4906855, 'provincia_id': 3},
+    'benidorm': {'nombre': 'Benidorm', 'lat': 38.5410566, 'lon': -0.1224373, 'provincia_id': 3},
+}
+
+
 class Tenant(models.Model):
     """Modelo para gestionar inquilinos/clientes del sistema"""
     tenant_id = models.AutoField(primary_key=True)
@@ -50,3 +79,177 @@ class TenantUser(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.tenant.nombre} ({self.rol})"
+
+
+class ZonaGeografica(models.Model):
+    """
+    Zonas geográficas configuradas por cada tenant para scraping.
+    Pueden ser zonas preestablecidas o personalizadas.
+    """
+    TIPO_CHOICES = [
+        ('preestablecida', 'Zona Preestablecida'),
+        ('personalizada', 'Zona Personalizada'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='zonas')
+    nombre = models.CharField(max_length=255, help_text="Nombre descriptivo de la zona")
+    slug = models.SlugField(max_length=100, help_text="Identificador único de la zona")
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='preestablecida')
+
+    # Coordenadas para búsqueda geolocalizada
+    latitud = models.DecimalField(max_digits=10, decimal_places=7)
+    longitud = models.DecimalField(max_digits=10, decimal_places=7)
+    radio_km = models.IntegerField(default=20, help_text="Radio de búsqueda en kilómetros")
+    provincia_id = models.IntegerField(null=True, blank=True, help_text="ID de provincia para Milanuncios")
+
+    # Configuración de scraping
+    activa = models.BooleanField(default=True)
+    precio_minimo = models.IntegerField(default=5000, help_text="Precio mínimo para filtrar alquileres")
+
+    # Portales a scrapear en esta zona
+    scrapear_milanuncios = models.BooleanField(default=True)
+    scrapear_fotocasa = models.BooleanField(default=True)
+    scrapear_wallapop = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'zonas_geograficas'
+        unique_together = ['tenant', 'slug']
+        verbose_name = 'Zona Geográfica'
+        verbose_name_plural = 'Zonas Geográficas'
+        ordering = ['tenant', 'nombre']
+
+    def __str__(self):
+        return f"{self.nombre} ({self.tenant.nombre})"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.nombre)
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def crear_desde_preestablecida(cls, tenant, zona_key):
+        """Crea una zona a partir de una zona preestablecida."""
+        if zona_key not in ZONAS_PREESTABLECIDAS:
+            raise ValueError(f"Zona '{zona_key}' no encontrada en zonas preestablecidas")
+
+        zona_data = ZONAS_PREESTABLECIDAS[zona_key]
+        return cls.objects.create(
+            tenant=tenant,
+            nombre=zona_data['nombre'],
+            slug=zona_key,
+            tipo='preestablecida',
+            latitud=zona_data['lat'],
+            longitud=zona_data['lon'],
+            provincia_id=zona_data.get('provincia_id'),
+        )
+
+
+class UsuarioBlacklist(models.Model):
+    """
+    Usuarios de portales detectados como inmobiliarias encubiertas.
+    Si un usuario aparece en múltiples anuncios, se marca automáticamente.
+    """
+    PORTAL_CHOICES = [
+        ('wallapop', 'Wallapop'),
+        ('milanuncios', 'Milanuncios'),
+        ('fotocasa', 'Fotocasa'),
+    ]
+
+    MOTIVO_CHOICES = [
+        ('manual', 'Añadido manualmente'),
+        ('automatico', 'Detectado automáticamente (múltiples anuncios)'),
+        ('reportado', 'Reportado por usuario'),
+    ]
+
+    portal = models.CharField(max_length=50, choices=PORTAL_CHOICES)
+    usuario_id = models.CharField(max_length=255, help_text="ID del usuario en el portal")
+    nombre_usuario = models.CharField(max_length=255, help_text="Nombre mostrado en el portal")
+
+    # Puede ser global (todos los tenants) o específico de un tenant
+    tenant = models.ForeignKey(
+        Tenant, on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='usuarios_blacklist',
+        help_text="Si es null, aplica a todos los tenants"
+    )
+
+    motivo = models.CharField(max_length=20, choices=MOTIVO_CHOICES, default='manual')
+    num_anuncios_detectados = models.IntegerField(default=1)
+    notas = models.TextField(blank=True)
+
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'usuarios_blacklist'
+        unique_together = ['portal', 'usuario_id', 'tenant']
+        verbose_name = 'Usuario Blacklist'
+        verbose_name_plural = 'Usuarios Blacklist'
+
+    def __str__(self):
+        scope = f"Tenant: {self.tenant.nombre}" if self.tenant else "Global"
+        return f"{self.nombre_usuario} ({self.portal}) - {scope}"
+
+    @classmethod
+    def esta_en_blacklist(cls, portal, usuario_id, tenant=None):
+        """Verifica si un usuario está en la blacklist."""
+        # Buscar en blacklist global o del tenant específico
+        return cls.objects.filter(
+            portal=portal,
+            usuario_id=usuario_id,
+            activo=True
+        ).filter(
+            models.Q(tenant__isnull=True) | models.Q(tenant=tenant)
+        ).exists()
+
+
+class ContadorUsuarioPortal(models.Model):
+    """
+    Contador de anuncios por usuario de portal.
+    Cuando supera el umbral, se añade automáticamente a blacklist.
+    """
+    UMBRAL_BLACKLIST = 5  # Si un usuario tiene 5+ anuncios, es inmobiliaria
+
+    portal = models.CharField(max_length=50)
+    usuario_id = models.CharField(max_length=255)
+    nombre_usuario = models.CharField(max_length=255)
+    num_anuncios = models.IntegerField(default=0)
+    ultimo_anuncio_url = models.TextField(blank=True)
+    primera_deteccion = models.DateTimeField(auto_now_add=True)
+    ultima_deteccion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'contador_usuarios_portal'
+        unique_together = ['portal', 'usuario_id']
+        verbose_name = 'Contador Usuario Portal'
+        verbose_name_plural = 'Contadores Usuarios Portal'
+
+    def __str__(self):
+        return f"{self.nombre_usuario} ({self.portal}): {self.num_anuncios} anuncios"
+
+    def incrementar(self, url_anuncio=''):
+        """Incrementa el contador y añade a blacklist si supera umbral."""
+        self.num_anuncios += 1
+        self.ultimo_anuncio_url = url_anuncio
+        self.save()
+
+        # Si supera el umbral, añadir a blacklist global
+        if self.num_anuncios >= self.UMBRAL_BLACKLIST:
+            UsuarioBlacklist.objects.get_or_create(
+                portal=self.portal,
+                usuario_id=self.usuario_id,
+                tenant=None,  # Global
+                defaults={
+                    'nombre_usuario': self.nombre_usuario,
+                    'motivo': 'automatico',
+                    'num_anuncios_detectados': self.num_anuncios,
+                    'notas': f'Detectado automáticamente con {self.num_anuncios} anuncios',
+                }
+            )
+            return True  # Indica que fue añadido a blacklist
+
+        return False

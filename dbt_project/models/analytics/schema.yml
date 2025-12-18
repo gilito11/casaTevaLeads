@@ -1,0 +1,74 @@
+version: 2
+
+models:
+  - name: analytics_leads_por_dia
+    description: "Leads captados por día - gráfico de línea temporal"
+    columns:
+      - name: tenant_id
+        description: "ID del tenant"
+      - name: fecha
+        description: "Fecha de captación"
+      - name: portal
+        description: "Portal de origen (fotocasa, milanuncios)"
+      - name: leads_captados
+        description: "Número de leads captados"
+
+  - name: analytics_embudo_conversion
+    description: "Embudo de conversión - gráfico funnel"
+    columns:
+      - name: estado
+        description: "Estado del lead en el CRM"
+      - name: total_leads
+        description: "Cantidad de leads en este estado"
+      - name: porcentaje
+        description: "Porcentaje sobre el total"
+
+  - name: analytics_precios_por_zona
+    description: "Análisis de precios por zona - barras y mapas de calor"
+    columns:
+      - name: zona_clasificada
+        description: "Zona geográfica"
+      - name: precio_medio
+        description: "Precio medio de los inmuebles"
+      - name: precio_m2_medio
+        description: "Precio medio por metro cuadrado"
+
+  - name: analytics_comparativa_portales
+    description: "Comparativa entre portales - rendimiento de cada fuente"
+    columns:
+      - name: portal
+        description: "Nombre del portal"
+      - name: total_leads
+        description: "Leads totales del portal"
+      - name: tasa_conversion
+        description: "Porcentaje de conversión a cliente"
+
+  - name: analytics_kpis_tenant
+    description: "KPIs principales por tenant - cards de resumen"
+    columns:
+      - name: total_leads
+        description: "Total de leads"
+      - name: tasa_conversion
+        description: "Tasa de conversión global"
+      - name: valor_pipeline
+        description: "Valor total del pipeline activo"
+
+  - name: analytics_evolucion_precios
+    description: "Evolución de precios en el tiempo - tendencias semanales"
+    columns:
+      - name: semana
+        description: "Semana de referencia"
+      - name: precio_medio
+        description: "Precio medio de la semana"
+      - name: precio_mediana
+        description: "Mediana de precios"
+
+  - name: analytics_tipologia_inmuebles
+    description: "Distribución por tipo de inmueble - pie/donut charts"
+    columns:
+      - name: tipo_propiedad
+        description: "Tipo de inmueble (Piso, Casa, Local...)"
+      - name: total
+        description: "Cantidad de inmuebles"
+      - name: porcentaje
+        description: "Porcentaje sobre el total"
