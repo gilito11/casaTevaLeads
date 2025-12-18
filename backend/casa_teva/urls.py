@@ -41,7 +41,8 @@ urlpatterns = [
     path('profile/', profile_view, name='profile'),
     path('leads/', include('leads.urls', namespace='leads')),
 
-    # API (for future use)
-    path('api/core/', include('core.urls', namespace='core')),
+    # REST API
+    path('api/leads/', include('leads.api_urls')),
+    path('api/core/', include('core.api_urls')),
     path('api/analytics/', include('analytics.urls')),
 ]
