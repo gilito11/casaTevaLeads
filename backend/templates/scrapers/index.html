@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Scrapers - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Scrapers</h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Configura las zonas y ejecuta los scrapers de portales inmobiliarios
+            </p>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+    <div class="space-y-2">
+        {% for message in messages %}
+        <div class="p-4 rounded-lg {% if message.tags == 'success' %}bg-green-50 text-green-800 dark:bg-green-900/50 dark:text-green-400{% elif message.tags == 'error' %}bg-red-50 text-red-800 dark:bg-red-900/50 dark:text-red-400{% elif message.tags == 'warning' %}bg-yellow-50 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-400{% else %}bg-blue-50 text-blue-800 dark:bg-blue-900/50 dark:text-blue-400{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Zonas Activas -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Mis Zonas</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Zonas configuradas para scraping</p>
+            </div>
+            <div class="p-6">
+                {% if zonas %}
+                <ul class="space-y-3">
+                    {% for zona in zonas %}
+                    <li class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-900 dark:text-white">{{ zona.nombre }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Radio: {{ zona.radio_km }}km |
+                                {% if zona.scrapear_milanuncios %}Milanuncios{% endif %}
+                                {% if zona.scrapear_wallapop %}Wallapop{% endif %}
+                                {% if zona.scrapear_fotocasa %}Fotocasa{% endif %}
+                            </p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <!-- Run Scraper Button -->
+                            <form action="{% url 'run_scraper' %}" method="post" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="zona_slug" value="{{ zona.slug }}">
+                                <div class="flex space-x-1">
+                                    {% if zona.scrapear_milanuncios %}
+                                    <button type="submit" name="scraper_id" value="milanuncios"
+                                            class="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900">
+                                        MA
+                                    </button>
+                                    {% endif %}
+                                    {% if zona.scrapear_wallapop %}
+                                    <button type="submit" name="scraper_id" value="wallapop"
+                                            class="px-2 py-1 text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900">
+                                        WP
+                                    </button>
+                                    {% endif %}
+                                    {% if zona.scrapear_fotocasa %}
+                                    <button type="submit" name="scraper_id" value="fotocasa"
+                                            class="px-2 py-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900">
+                                        FC
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </form>
+                            <!-- Delete Button -->
+                            <a href="{% url 'remove_zona' zona.id %}"
+                               onclick="return confirm('Eliminar zona {{ zona.nombre }}?')"
+                               class="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center py-8">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No hay zonas configuradas</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500">Selecciona una zona de la lista de disponibles</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Zonas Disponibles -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Zonas Disponibles</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Zonas preestablecidas para anadir</p>
+            </div>
+            <div class="p-6 max-h-96 overflow-y-auto">
+                <form action="{% url 'add_zona' %}" method="post">
+                    {% csrf_token %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {% for zona in zonas_disponibles %}
+                        <button type="submit" name="zona_slug" value="{{ zona.slug }}"
+                                {% if zona.activa %}disabled{% endif %}
+                                class="flex items-center justify-between p-3 text-left rounded-lg border transition-colors
+                                {% if zona.activa %}
+                                bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 cursor-not-allowed
+                                {% else %}
+                                border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700
+                                {% endif %}">
+                            <div>
+                                <p class="text-sm font-medium {% if zona.activa %}text-green-700 dark:text-green-400{% else %}text-gray-900 dark:text-white{% endif %}">
+                                    {{ zona.nombre }}
+                                </p>
+                            </div>
+                            {% if zona.activa %}
+                            <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            {% else %}
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                            {% endif %}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scrapers Info -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Scrapers Disponibles</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Portales inmobiliarios soportados</p>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {% for scraper in scrapers %}
+                <div class="p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center
+                            {% if scraper.id == 'milanuncios' %}bg-blue-100 text-blue-600
+                            {% elif scraper.id == 'wallapop' %}bg-green-100 text-green-600
+                            {% else %}bg-purple-100 text-purple-600{% endif %}">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-900 dark:text-white">{{ scraper.nombre }}</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ scraper.descripcion }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6">
+        <h3 class="font-medium text-blue-800 dark:text-blue-400 mb-2">Como usar</h3>
+        <ol class="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
+            <li>Anade las zonas geograficas que quieres scrapear desde "Zonas Disponibles"</li>
+            <li>En "Mis Zonas", haz clic en los botones MA (Milanuncios), WP (Wallapop) o FC (Fotocasa) para ejecutar el scraper</li>
+            <li>Los leads encontrados apareceran automaticamente en la seccion de Leads</li>
+        </ol>
+        <p class="mt-3 text-xs text-blue-600 dark:text-blue-400">
+            <strong>Nota:</strong> Los scrapers se ejecutan en segundo plano y pueden tardar varios minutos.
+            En produccion (Azure), los scrapers necesitan Playwright instalado.
+        </p>
+    </div>
+</div>
+{% endblock %}

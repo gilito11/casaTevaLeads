@@ -18,7 +18,10 @@ from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
 
-from core.views import login_view, logout_view, dashboard_view, profile_view
+from core.views import (
+    login_view, logout_view, dashboard_view, profile_view,
+    scrapers_view, add_zona_view, remove_zona_view, run_scraper_view, scraper_status_view
+)
 
 
 def health_check(request):
@@ -40,6 +43,13 @@ urlpatterns = [
     path('', dashboard_view, name='dashboard'),
     path('profile/', profile_view, name='profile'),
     path('leads/', include('leads.urls', namespace='leads')),
+
+    # Scrapers
+    path('scrapers/', scrapers_view, name='scrapers'),
+    path('scrapers/add-zona/', add_zona_view, name='add_zona'),
+    path('scrapers/remove-zona/<int:zona_id>/', remove_zona_view, name='remove_zona'),
+    path('scrapers/run/', run_scraper_view, name='run_scraper'),
+    path('scrapers/status/', scraper_status_view, name='scraper_status'),
 
     # REST API
     path('api/leads/', include('leads.api_urls')),

@@ -1,16 +1,20 @@
 """
 Vistas principales de la aplicacion Core.
-Dashboard, login, perfil, etc.
+Dashboard, login, perfil, scrapers, etc.
 """
-from django.shortcuts import render, redirect
+import subprocess
+import threading
+import os
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Count, Q
 from django.utils import timezone
+from django.http import JsonResponse
 from datetime import timedelta
 
-from core.models import Tenant, TenantUser
+from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS
 from leads.models import Lead
 
 
@@ -140,3 +144,161 @@ def profile_view(request):
     }
 
     return render(request, 'profile/index.html', context)
+
+
+# Variable global para rastrear scrapers en ejecución
+_running_scrapers = {}
+
+
+@login_required
+def scrapers_view(request):
+    """Vista para gestionar scrapers y zonas"""
+    tenant_id = request.session.get('tenant_id')
+    tenant = None
+    zonas = []
+
+    if tenant_id:
+        tenant = Tenant.objects.filter(tenant_id=tenant_id).first()
+        if tenant:
+            zonas = ZonaGeografica.objects.filter(tenant=tenant)
+
+    # Zonas preestablecidas disponibles
+    zonas_disponibles = []
+    zonas_activas_slugs = [z.slug for z in zonas]
+    for slug, data in ZONAS_PREESTABLECIDAS.items():
+        zonas_disponibles.append({
+            'slug': slug,
+            'nombre': data['nombre'],
+            'lat': data['lat'],
+            'lon': data['lon'],
+            'provincia_id': data.get('provincia_id'),
+            'activa': slug in zonas_activas_slugs,
+        })
+
+    # Scrapers disponibles
+    scrapers = [
+        {'id': 'milanuncios', 'nombre': 'Milanuncios', 'descripcion': 'Portal de anuncios clasificados'},
+        {'id': 'wallapop', 'nombre': 'Wallapop', 'descripcion': 'Marketplace de segunda mano'},
+        {'id': 'fotocasa', 'nombre': 'Fotocasa', 'descripcion': 'Portal inmobiliario'},
+    ]
+
+    context = {
+        'tenant': tenant,
+        'zonas': zonas,
+        'zonas_disponibles': zonas_disponibles,
+        'scrapers': scrapers,
+        'running_scrapers': _running_scrapers,
+    }
+
+    return render(request, 'scrapers/index.html', context)
+
+
+@login_required
+def add_zona_view(request):
+    """Añadir una zona preestablecida al tenant"""
+    if request.method == 'POST':
+        zona_slug = request.POST.get('zona_slug')
+        tenant_id = request.session.get('tenant_id')
+
+        if tenant_id and zona_slug:
+            tenant = Tenant.objects.filter(tenant_id=tenant_id).first()
+            if tenant:
+                try:
+                    # Verificar si ya existe
+                    if not ZonaGeografica.objects.filter(tenant=tenant, slug=zona_slug).exists():
+                        ZonaGeografica.crear_desde_preestablecida(tenant, zona_slug)
+                        messages.success(request, f'Zona "{zona_slug}" añadida correctamente')
+                    else:
+                        messages.warning(request, f'La zona "{zona_slug}" ya está configurada')
+                except ValueError as e:
+                    messages.error(request, str(e))
+
+    return redirect('scrapers')
+
+
+@login_required
+def remove_zona_view(request, zona_id):
+    """Eliminar una zona del tenant"""
+    tenant_id = request.session.get('tenant_id')
+    if tenant_id:
+        zona = get_object_or_404(ZonaGeografica, id=zona_id, tenant_id=tenant_id)
+        nombre = zona.nombre
+        zona.delete()
+        messages.success(request, f'Zona "{nombre}" eliminada')
+
+    return redirect('scrapers')
+
+
+def _run_scraper_process(scraper_id, zona_slug, scraper_key):
+    """Ejecuta el scraper en un proceso separado"""
+    try:
+        # Determinar el script a ejecutar
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+        script_path = os.path.join(project_root, f'run_{scraper_id}_scraper.py')
+
+        if os.path.exists(script_path):
+            # Ejecutar el scraper
+            result = subprocess.run(
+                ['python', script_path, '--zones', zona_slug, '--max-items', '10'],
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutos timeout
+                cwd=project_root
+            )
+            _running_scrapers[scraper_key] = {
+                'status': 'completed' if result.returncode == 0 else 'error',
+                'output': result.stdout[:1000] if result.stdout else '',
+                'error': result.stderr[:500] if result.stderr else '',
+                'returncode': result.returncode,
+            }
+        else:
+            _running_scrapers[scraper_key] = {
+                'status': 'error',
+                'error': f'Script no encontrado: {script_path}',
+            }
+    except subprocess.TimeoutExpired:
+        _running_scrapers[scraper_key] = {
+            'status': 'timeout',
+            'error': 'El scraper tardó demasiado tiempo',
+        }
+    except Exception as e:
+        _running_scrapers[scraper_key] = {
+            'status': 'error',
+            'error': str(e),
+        }
+
+
+@login_required
+def run_scraper_view(request):
+    """Ejecutar un scraper para una zona específica"""
+    if request.method == 'POST':
+        scraper_id = request.POST.get('scraper_id')
+        zona_slug = request.POST.get('zona_slug')
+
+        if scraper_id and zona_slug:
+            scraper_key = f'{scraper_id}_{zona_slug}'
+
+            # Verificar si ya está corriendo
+            if scraper_key in _running_scrapers and _running_scrapers[scraper_key].get('status') == 'running':
+                messages.warning(request, f'El scraper {scraper_id} ya está ejecutándose para la zona {zona_slug}')
+            else:
+                # Marcar como corriendo
+                _running_scrapers[scraper_key] = {'status': 'running', 'started': timezone.now().isoformat()}
+
+                # Ejecutar en un thread separado
+                thread = threading.Thread(
+                    target=_run_scraper_process,
+                    args=(scraper_id, zona_slug, scraper_key)
+                )
+                thread.daemon = True
+                thread.start()
+
+                messages.success(request, f'Scraper {scraper_id} iniciado para zona {zona_slug}')
+
+    return redirect('scrapers')
+
+
+@login_required
+def scraper_status_view(request):
+    """API para obtener el estado de los scrapers"""
+    return JsonResponse(_running_scrapers)
