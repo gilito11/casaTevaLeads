@@ -6,17 +6,56 @@ aplicando filtros para rechazar inmobiliarias y anuncios que no permiten contact
 """
 
 import logging
-from typing import Dict, Any, Optional
+import re
+from typing import Dict, Any, Optional, List
 from urllib.parse import urlencode
 
 import scrapy
 from scrapy.http import Response
+from scrapy_playwright.page import PageMethod
 
 from scrapers.base_scraper import BaseScraper
 from scrapers.utils.particular_filter import debe_scrapear
 
 
 logger = logging.getLogger(__name__)
+
+
+# Zonas predefinidas con sus URLs de Fotocasa
+FOTOCASA_ZONES = {
+    'tarragona_ciudad': {
+        'slug': 'tarragona-capital',
+        'nombre': 'Tarragona Ciudad',
+    },
+    'tarragona_provincia': {
+        'slug': 'tarragona-provincia',
+        'nombre': 'Tarragona Provincia',
+    },
+    'lleida_ciudad': {
+        'slug': 'lleida-capital',
+        'nombre': 'Lleida Ciudad',
+    },
+    'lleida_provincia': {
+        'slug': 'lleida-provincia',
+        'nombre': 'Lleida Provincia',
+    },
+    'barcelona_ciudad': {
+        'slug': 'barcelona-capital',
+        'nombre': 'Barcelona Ciudad',
+    },
+    'barcelona_provincia': {
+        'slug': 'barcelona-provincia',
+        'nombre': 'Barcelona Provincia',
+    },
+    'girona_provincia': {
+        'slug': 'girona-provincia',
+        'nombre': 'Girona Provincia',
+    },
+    'espana': {
+        'slug': 'espana',
+        'nombre': 'España',
+    },
+}
 
 
 class FotocasaScraper(scrapy.Spider):
@@ -72,7 +111,7 @@ class FotocasaScraper(scrapy.Spider):
     def __init__(
         self,
         tenant_id: int = 1,
-        zones: Optional[Dict[str, Any]] = None,
+        zones: Optional[List[str]] = None,
         filters: Optional[Dict[str, Any]] = None,
         minio_config: Optional[Dict[str, str]] = None,
         postgres_config: Optional[Dict[str, str]] = None,
@@ -84,7 +123,7 @@ class FotocasaScraper(scrapy.Spider):
 
         Args:
             tenant_id: ID del tenant
-            zones: Zonas geográficas a scrapear
+            zones: Lista de claves de zona de FOTOCASA_ZONES (ej: ['tarragona_ciudad'])
             filters: Filtros de búsqueda (precio, habitaciones, etc.)
             minio_config: Configuración de MinIO
             postgres_config: Configuración de PostgreSQL
@@ -92,13 +131,14 @@ class FotocasaScraper(scrapy.Spider):
         super().__init__(*args, **kwargs)
 
         self.tenant_id = tenant_id
-        self.zones = zones or {}
+        # Zonas como lista de claves
+        self.zone_keys = zones or ['tarragona_provincia']
         self.filters = filters or {}
 
         # Inicializar BaseScraper para persistencia
         self.base_scraper = BaseScraper(
             tenant_id=tenant_id,
-            zones=zones or {},
+            zones={},
             filters=filters or {},
             minio_config=minio_config,
             postgres_config=postgres_config
@@ -112,21 +152,19 @@ class FotocasaScraper(scrapy.Spider):
             'errors': 0
         }
 
-        logger.info(f"FotocasaScraper inicializado para tenant_id={tenant_id}")
+        zone_names = [FOTOCASA_ZONES.get(z, {}).get('nombre', z) for z in self.zone_keys]
+        logger.info(f"FotocasaScraper inicializado para tenant_id={tenant_id}, zonas={zone_names}")
 
     def start_requests(self):
         """
         Genera las URLs iniciales para scrapear.
 
-        Crea URLs para cada zona configurada en self.zones,
+        Crea URLs para cada zona configurada en self.zone_keys,
         aplicando los filtros de precio configurados.
 
         Yields:
             scrapy.Request con metadata de Playwright
         """
-        # URL base de Fotocasa para comprar viviendas de particulares en Lleida
-        base_url = 'https://www.fotocasa.es/es/comprar/vivienda/lleida-capital/particulares/todas/l'
-
         # Construir parámetros de query según filtros
         params = {}
 
@@ -139,31 +177,45 @@ class FotocasaScraper(scrapy.Spider):
             if precio_max:
                 params['maxPrice'] = precio_max
 
-        # Construir URL completa
-        if params:
-            url = f"{base_url}?{urlencode(params)}"
-        else:
-            url = base_url
+        # Generar request para cada zona
+        for zone_key in self.zone_keys:
+            zone_config = FOTOCASA_ZONES.get(zone_key)
+            if not zone_config:
+                logger.warning(f"Zona desconocida: {zone_key}")
+                continue
 
-        logger.info(f"Iniciando scraping de: {url}")
+            zone_slug = zone_config['slug']
 
-        # Request con Playwright
-        yield scrapy.Request(
-            url=url,
-            callback=self.parse,
-            meta={
-                'playwright': True,
-                'playwright_include_page': True,  # Incluir page object
-                'playwright_page_methods': [
-                    # Esperar a que se carguen las cards
-                    {'method': 'wait_for_selector', 'args': ['.re-Card'], 'kwargs': {'timeout': 30000}},
-                    # Scroll para cargar lazy loading
-                    {'method': 'evaluate', 'args': ['window.scrollTo(0, document.body.scrollHeight)']},
-                    {'method': 'wait_for_timeout', 'args': [2000]},  # Esperar 2 segundos
-                ],
-            },
-            errback=self.errback_close_page,
-        )
+            # URL de Fotocasa actualizada (2024/2025)
+            # Formato: /es/comprar/viviendas/{zona}/todas-las-zonas/l
+            base_url = f'https://www.fotocasa.es/es/comprar/viviendas/{zone_slug}/todas-las-zonas/l'
+
+            # Construir URL completa
+            if params:
+                url = f"{base_url}?{urlencode(params)}"
+            else:
+                url = base_url
+
+            logger.info(f"Iniciando scraping de: {url}")
+
+            # Request con Playwright usando PageMethod objects
+            yield scrapy.Request(
+                url=url,
+                callback=self.parse,
+                meta={
+                    'playwright': True,
+                    'playwright_include_page': True,
+                    'playwright_page_methods': [
+                        # Esperar a que se carguen los listings (buscar article dentro de section)
+                        PageMethod('wait_for_selector', 'section article', timeout=30000),
+                        # Scroll para cargar lazy loading
+                        PageMethod('evaluate', 'window.scrollTo(0, document.body.scrollHeight)'),
+                        PageMethod('wait_for_timeout', 2000),
+                    ],
+                    'zone_key': zone_key,
+                },
+                errback=self.errback_close_page,
+            )
 
     async def parse(self, response: Response):
         """
@@ -179,12 +231,74 @@ class FotocasaScraper(scrapy.Spider):
             Dict con datos del listing (para estadísticas)
         """
         page = response.meta.get('playwright_page')
+        zone_key = response.meta.get('zone_key', 'unknown')
 
         logger.info(f"Parseando página: {response.url}")
 
-        # Extraer todas las cards de listings
-        # NOTA: Estos selectores son aproximados y deben ajustarse según la estructura real de Fotocasa
-        listing_cards = response.css('.re-Card')
+        # Detectar si estamos bloqueados o hay error
+        if response.status == 404:
+            logger.error(f"Página no encontrada (404): {response.url}")
+            if page:
+                await page.close()
+            return
+
+        if response.status != 200:
+            logger.error(f"Error HTTP {response.status} en {response.url}")
+            if page:
+                await page.close()
+            return
+
+        # Detectar si estamos bloqueados por bot detection
+        bot_detection_patterns = [
+            'sentimos la interrupci',
+            'pardon our interruption',
+            'captcha',
+            'verificación',
+            'robot',
+            'bot detection',
+        ]
+
+        page_title = response.css('title::text').get() or ''
+        page_text = response.text.lower()
+
+        for pattern in bot_detection_patterns:
+            if pattern in page_title.lower() or pattern in page_text[:5000]:
+                logger.error(
+                    f"BLOQUEADO: Fotocasa ha detectado el scraper como bot. "
+                    f"Page title: '{page_title}'. "
+                    f"Considera usar proxies residenciales o reducir la frecuencia de scraping."
+                )
+                if page:
+                    await page.close()
+                return
+
+        # Probar múltiples selectores para extraer las cards
+        listing_cards = []
+        selectors_to_try = [
+            'section article',
+            'article',
+            'article[data-type="ad"]',
+            '.re-Card',
+            'article.re-SearchResult',
+            '[data-testid="listing-card"]',
+            '.sui-AtomCard',
+            'article[class*="Card"]',
+        ]
+
+        for selector in selectors_to_try:
+            listing_cards = response.css(selector)
+            if listing_cards:
+                logger.info(f"Usando selector: {selector} - Encontrados {len(listing_cards)} listings")
+                break
+
+        if not listing_cards:
+            # Debug: guardar HTML para análisis
+            logger.warning(f"No se encontraron listings con ningún selector. Guardando HTML para debug...")
+            html_preview = response.text[:2000]
+            logger.debug(f"HTML preview: {html_preview}")
+            if page:
+                await page.close()
+            return
 
         logger.info(f"Encontrados {len(listing_cards)} listings en la página")
 
@@ -256,7 +370,19 @@ class FotocasaScraper(scrapy.Spider):
         )
 
         # Buscar siguiente página (paginación)
-        next_page = response.css('a.sui-AtomButton--link[aria-label*="Siguiente"]::attr(href)').get()
+        next_page_selectors = [
+            'a[rel="next"]::attr(href)',
+            'a.sui-AtomButton--link[aria-label*="Siguiente"]::attr(href)',
+            'a[aria-label*="siguiente"]::attr(href)',
+            'a[title*="Siguiente"]::attr(href)',
+        ]
+
+        next_page = None
+        for sel in next_page_selectors:
+            next_page = response.css(sel).get()
+            if next_page:
+                break
+
         if next_page:
             logger.info(f"Siguiente página encontrada: {next_page}")
             yield response.follow(
@@ -266,8 +392,9 @@ class FotocasaScraper(scrapy.Spider):
                     'playwright': True,
                     'playwright_include_page': True,
                     'playwright_page_methods': [
-                        {'method': 'wait_for_selector', 'args': ['.re-Card'], 'kwargs': {'timeout': 30000}},
+                        PageMethod('wait_for_selector', 'section article', timeout=30000),
                     ],
+                    'zone_key': zone_key,
                 },
                 errback=self.errback_close_page,
             )
@@ -276,8 +403,8 @@ class FotocasaScraper(scrapy.Spider):
         """
         Extrae datos de un listing card.
 
-        IMPORTANTE: Estos selectores son aproximados y deben ajustarse
-        según la estructura real actual de Fotocasa.
+        Intenta múltiples selectores para adaptarse a cambios en la estructura
+        del HTML de Fotocasa.
 
         Args:
             card: Selector de Scrapy con la card del listing
@@ -286,23 +413,93 @@ class FotocasaScraper(scrapy.Spider):
         Returns:
             Dict con datos extraídos del listing
         """
+        # Extraer URL del anuncio (primero para obtener anuncio_id)
+        url_anuncio = None
+        url_selectors = [
+            'a.re-Card-link::attr(href)',
+            'a[href*="/inmueble/"]::attr(href)',
+            'a::attr(href)',
+        ]
+        for sel in url_selectors:
+            url_anuncio = card.css(sel).get()
+            if url_anuncio and '/inmueble/' in url_anuncio:
+                url_anuncio = response.urljoin(url_anuncio)
+                break
+
+        # Extraer anuncio_id de la URL para deduplicación
+        anuncio_id = None
+        if url_anuncio:
+            # URL formato: .../inmueble/12345678/
+            match = re.search(r'/inmueble/(\d+)', url_anuncio)
+            if match:
+                anuncio_id = match.group(1)
+
+        # También intentar extraer del data attribute
+        if not anuncio_id:
+            anuncio_id = card.css('::attr(data-id)').get()
+        if not anuncio_id:
+            anuncio_id = card.css('::attr(data-ad-id)').get()
+
         # Extraer título
-        titulo = card.css('.re-Card-title::text').get()
-        if not titulo:
-            titulo = card.css('a.re-Card-link::attr(title)').get()
+        titulo = None
+        titulo_selectors = [
+            '.re-Card-title::text',
+            'a.re-Card-link::attr(title)',
+            '[class*="CardTitle"]::text',
+            'h3::text',
+            'a::attr(title)',
+        ]
+        for sel in titulo_selectors:
+            titulo = card.css(sel).get()
+            if titulo and titulo.strip():
+                titulo = titulo.strip()
+                break
 
         # Extraer precio
-        precio_text = card.css('.re-Card-price::text').get()
+        precio_text = None
+        precio_selectors = [
+            '.re-Card-price::text',
+            '[class*="Price"]::text',
+            '[class*="price"]::text',
+            'span[data-testid="price"]::text',
+        ]
+        for sel in precio_selectors:
+            precio_text = card.css(sel).get()
+            if precio_text:
+                break
         precio = self._parse_price(precio_text)
 
         # Extraer dirección/ubicación
-        direccion = card.css('.re-Card-location::text').get()
+        direccion = None
+        direccion_selectors = [
+            '.re-Card-location::text',
+            '[class*="Location"]::text',
+            '[class*="location"]::text',
+            '[class*="Address"]::text',
+        ]
+        for sel in direccion_selectors:
+            direccion = card.css(sel).get()
+            if direccion and direccion.strip():
+                direccion = direccion.strip()
+                break
 
         # Extraer características (habitaciones, metros)
         habitaciones = None
         metros = None
 
-        features = card.css('.re-Card-features span::text').getall()
+        # Intentar múltiples selectores para features
+        features_selectors = [
+            '.re-Card-features span::text',
+            '[class*="Feature"] span::text',
+            '[class*="feature"]::text',
+            'li[class*="feature"]::text',
+        ]
+        features = []
+        for sel in features_selectors:
+            features = card.css(sel).getall()
+            if features:
+                break
+
         for feature in features:
             if 'hab' in feature.lower():
                 habitaciones = self._parse_number(feature)
@@ -310,21 +507,36 @@ class FotocasaScraper(scrapy.Spider):
                 metros = self._parse_number(feature)
 
         # Extraer fotos
-        fotos = card.css('.re-Card-multimedia img::attr(src)').getall()
-
-        # Extraer URL del anuncio
-        url_anuncio = card.css('a.re-Card-link::attr(href)').get()
-        if url_anuncio:
-            url_anuncio = response.urljoin(url_anuncio)
+        fotos = []
+        foto_selectors = [
+            '.re-Card-multimedia img::attr(src)',
+            'img[class*="Card"]::attr(src)',
+            'img::attr(data-src)',
+            'img::attr(src)',
+        ]
+        for sel in foto_selectors:
+            fotos = card.css(sel).getall()
+            if fotos:
+                break
 
         # Extraer descripción (si está disponible)
-        descripcion = card.css('.re-Card-description::text').get()
+        descripcion = None
+        desc_selectors = [
+            '.re-Card-description::text',
+            '[class*="Description"]::text',
+        ]
+        for sel in desc_selectors:
+            descripcion = card.css(sel).get()
+            if descripcion:
+                descripcion = descripcion.strip()
+                break
 
         # Extraer código postal de la dirección (si es posible)
         codigo_postal = self._extract_postal_code(direccion)
 
         # Construir diccionario de datos
         data = {
+            'anuncio_id': anuncio_id,
             'titulo': titulo,
             'precio': precio,
             'direccion': direccion or '',
@@ -337,7 +549,7 @@ class FotocasaScraper(scrapy.Spider):
             'portal': 'fotocasa',
             # Estos campos se rellenarán después si se puede extraer
             'telefono': None,
-            'nombre': 'Fotocasa User',  # Fotocasa no muestra nombre por defecto
+            'nombre': 'Particular',  # Fotocasa no muestra nombre por defecto
             'email': None,
         }
 

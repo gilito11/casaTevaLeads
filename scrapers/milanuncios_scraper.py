@@ -12,6 +12,7 @@ from urllib.parse import urlencode, quote
 
 import scrapy
 from scrapy.http import Response
+from scrapy_playwright.page import PageMethod
 
 from scrapers.base_scraper import BaseScraper
 from scrapers.utils.particular_filter import debe_scrapear
@@ -247,12 +248,12 @@ class MilanunciosScraper(scrapy.Spider):
                     'playwright_include_page': True,
                     'playwright_page_methods': [
                         # Anti-detección: ocultar webdriver
-                        {'method': 'add_init_script', 'args': ['Object.defineProperty(navigator, "webdriver", {get: () => undefined});']},
+                        PageMethod('add_init_script', 'Object.defineProperty(navigator, "webdriver", {get: () => undefined});'),
                         # Esperar a que carguen los anuncios (selector correcto)
-                        {'method': 'wait_for_selector', 'args': ['[data-testid="AD_CARD"]'], 'kwargs': {'timeout': 30000}},
+                        PageMethod('wait_for_selector', '[data-testid="AD_CARD"]', timeout=30000),
                         # Scroll para cargar lazy loading
-                        {'method': 'evaluate', 'args': ['window.scrollTo(0, document.body.scrollHeight)']},
-                        {'method': 'wait_for_timeout', 'args': [3000]},
+                        PageMethod('evaluate', 'window.scrollTo(0, document.body.scrollHeight)'),
+                        PageMethod('wait_for_timeout', 3000),
                     ],
                     'zona_key': zona_key,
                     'current_page': 1,
@@ -280,6 +281,16 @@ class MilanunciosScraper(scrapy.Spider):
         self.stats['pages_scraped'] += 1
         logger.info(f"Parseando página {current_page} de zona {zona_key}: {response.url}")
 
+        # Detectar si estamos bloqueados por captcha/bot detection
+        if 'Pardon Our Interruption' in response.text or 'geetest' in response.text.lower():
+            logger.error(
+                "BLOQUEADO: Milanuncios ha detectado el scraper como bot. "
+                "Considera usar proxies residenciales o reducir la frecuencia de scraping."
+            )
+            if page:
+                await page.close()
+            return
+
         # Extraer todas las cards de listings
         # Milanuncios usa data-testid="AD_CARD" para cada anuncio
         listing_cards = response.css('[data-testid="AD_CARD"]')
@@ -293,11 +304,20 @@ class MilanunciosScraper(scrapy.Spider):
                 # Extraer datos básicos del listing
                 listing_data = self._extract_listing_data(card, response, zona_key)
 
-                # Intentar extraer teléfono con Playwright
+                # Omitir listings sin anuncio_id (son anuncios patrocinados o sin enlace)
+                if not listing_data.get('anuncio_id'):
+                    logger.debug(f"Listing sin anuncio_id omitido: {listing_data.get('titulo', 'Sin título')}")
+                    self.stats['filtered_out'] += 1
+                    continue
+
+                # Intentar extraer teléfono y nombre con Playwright
                 if page and listing_data.get('detail_url'):
-                    phone = await self._extract_phone_from_detail(page, listing_data['detail_url'])
-                    if phone:
-                        listing_data['telefono'] = phone
+                    contact_info = await self._extract_phone_from_detail(page, listing_data['detail_url'])
+                    if contact_info:
+                        if contact_info.get('telefono'):
+                            listing_data['telefono'] = contact_info['telefono']
+                        if contact_info.get('nombre_vendedor'):
+                            listing_data['vendedor'] = contact_info['nombre_vendedor']
 
                 # Aplicar filtro de particulares
                 if not self.base_scraper.should_scrape(listing_data):
@@ -371,10 +391,10 @@ class MilanunciosScraper(scrapy.Spider):
                     'playwright': True,
                     'playwright_include_page': True,
                     'playwright_page_methods': [
-                        {'method': 'add_init_script', 'args': ['Object.defineProperty(navigator, "webdriver", {get: () => undefined});']},
-                        {'method': 'wait_for_selector', 'args': ['[data-testid="AD_CARD"]'], 'kwargs': {'timeout': 30000}},
-                        {'method': 'evaluate', 'args': ['window.scrollTo(0, document.body.scrollHeight)']},
-                        {'method': 'wait_for_timeout', 'args': [3000]},
+                        PageMethod('add_init_script', 'Object.defineProperty(navigator, "webdriver", {get: () => undefined});'),
+                        PageMethod('wait_for_selector', '[data-testid="AD_CARD"]', timeout=30000),
+                        PageMethod('evaluate', 'window.scrollTo(0, document.body.scrollHeight)'),
+                        PageMethod('wait_for_timeout', 3000),
                     ],
                     'zona_key': zona_key,
                     'current_page': next_page_num,
@@ -448,16 +468,49 @@ class MilanunciosScraper(scrapy.Spider):
             if match:
                 anuncio_id = match.group(1)
 
-        # Extraer imagen principal
-        imagen = card.css('.ma-AdCardV2-photo img::attr(src)').get()
-        if not imagen:
-            imagen = card.css('img::attr(src)').get()
+        # Extraer imágenes (hasta 5)
+        fotos = []
+        foto_selectors = [
+            '.ma-AdCardV2-photo img::attr(src)',
+            '.ma-AdCard-photo img::attr(src)',
+            'img[src*="images.milanuncios"]::attr(src)',
+            'img::attr(src)',
+        ]
+        for sel in foto_selectors:
+            imgs = card.css(sel).getall()
+            for img in imgs:
+                if img and 'milanuncios' in img and img not in fotos:
+                    fotos.append(img)
+                    if len(fotos) >= 5:
+                        break
+            if fotos:
+                break
+
+        imagen = fotos[0] if fotos else None
 
         # Extraer código postal de ubicación
         codigo_postal = self._extract_postal_code(ubicacion)
 
         # Info de la zona
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+
+        # Intentar extraer nombre del vendedor de la tarjeta
+        # Milanuncios a veces muestra el nombre del usuario en la card
+        vendedor_nombre = None
+        vendedor_selectors = [
+            '.ma-AdCard-sellerName::text',
+            '.ma-AdCardV2-sellerName::text',
+            '[class*="SellerName"]::text',
+            '[class*="UserName"]::text',
+            '.ma-AdCard-user::text',
+        ]
+        for selector in vendedor_selectors:
+            vendedor_nombre = card.css(selector).get()
+            if vendedor_nombre and vendedor_nombre.strip():
+                vendedor_nombre = vendedor_nombre.strip()
+                break
+        else:
+            vendedor_nombre = 'Particular'
 
         data = {
             'anuncio_id': anuncio_id,
@@ -470,10 +523,11 @@ class MilanunciosScraper(scrapy.Spider):
             'banos': banos,
             'certificado_energetico': certificado_energetico,
             'imagen_principal': imagen,
+            'fotos': fotos,  # Lista de hasta 5 fotos
             'detail_url': detail_url,
             'url_anuncio': detail_url,  # Alias para compatibilidad
             'portal': 'milanuncios',
-            'vendedor': 'Particular',  # Filtramos por particulares en la URL
+            'vendedor': vendedor_nombre,
             'zona_busqueda': zona_info.get('nombre', zona_key),
             'telefono': None,
             'email': None,
@@ -481,60 +535,154 @@ class MilanunciosScraper(scrapy.Spider):
 
         return data
 
-    async def _extract_phone_from_detail(self, page, detail_url: str) -> Optional[str]:
+    async def _extract_phone_from_detail(self, page, detail_url: str) -> Optional[dict]:
         """
-        Navega a la página de detalle para extraer el teléfono.
+        Navega a la página de detalle para extraer el teléfono y nombre del vendedor.
 
-        En Milanuncios el teléfono suele requerir hacer click en un botón.
+        En Milanuncios hay que hacer click en un botón para abrir un modal
+        con clase sui-MoleculeModal-dialog que muestra nombre y teléfono.
 
         Args:
             page: Page object de Playwright
             detail_url: URL de la página de detalle
 
         Returns:
-            str: Número de teléfono o None
+            dict: {'telefono': str, 'nombre_vendedor': str} o None
         """
+        new_page = None
         try:
+            logger.info(f"Extrayendo contacto de: {detail_url}")
+
             # Abrir nueva página para no perder el contexto
             new_page = await page.context.new_page()
-            await new_page.goto(detail_url, wait_until='networkidle', timeout=30000)
+            await new_page.goto(detail_url, wait_until='domcontentloaded', timeout=30000)
 
             # Esperar a que cargue la página
-            await new_page.wait_for_timeout(1000)
+            await new_page.wait_for_timeout(3000)
 
-            # Buscar botón de teléfono
-            phone_button = await new_page.query_selector(
-                'button[data-testid="phone-button"], '
-                '.ma-ButtonPhone, '
-                'button:has-text("Ver teléfono"), '
-                'button:has-text("Llamar")'
-            )
+            # Detectar si estamos bloqueados
+            page_content = await new_page.content()
+            if 'Pardon Our Interruption' in page_content or 'geetest' in page_content.lower():
+                logger.warning(f"Bloqueado por bot detection al visitar: {detail_url}")
+                await new_page.close()
+                return None
 
-            if phone_button:
-                await phone_button.click()
-                await new_page.wait_for_timeout(1500)
+            # Buscar botón de teléfono/contacto - selectores actualizados 2024
+            phone_button_selectors = [
+                'button[data-testid="AD_DETAIL_CONTACT_PHONE_BUTTON"]',
+                '[data-testid="PHONE_BUTTON"]',
+                '.ma-ButtonPhone',
+                'button.sui-AtomButton:has-text("Ver teléfono")',
+                'button.sui-AtomButton:has-text("Llamar")',
+                'button:has-text("Ver teléfono")',
+                'button:has-text("Llamar")',
+                '[class*="ContactButton"]',
+                '[class*="PhoneButton"]',
+            ]
 
-                # Buscar el teléfono mostrado
-                phone_element = await new_page.query_selector(
-                    '[data-testid="phone-number"], '
-                    '.ma-PhoneNumber, '
-                    'a[href^="tel:"]'
-                )
+            phone_button = None
+            for selector in phone_button_selectors:
+                try:
+                    phone_button = await new_page.query_selector(selector)
+                    if phone_button:
+                        logger.info(f"Botón de teléfono encontrado con selector: {selector}")
+                        break
+                except:
+                    continue
 
-                if phone_element:
-                    phone_text = await phone_element.text_content()
-                    if not phone_text:
-                        phone_text = await phone_element.get_attribute('href')
-                        if phone_text and phone_text.startswith('tel:'):
-                            phone_text = phone_text.replace('tel:', '')
+            if not phone_button:
+                logger.warning(f"No se encontró botón de teléfono en {detail_url}")
+                await new_page.close()
+                return None
 
-                    await new_page.close()
-                    return phone_text.strip() if phone_text else None
+            # Click en el botón
+            await phone_button.click()
+            logger.info("Click en botón de teléfono realizado")
+            await new_page.wait_for_timeout(2000)
+
+            # Esperar el modal - múltiples selectores
+            modal_selectors = [
+                '.sui-MoleculeModal-dialog',
+                '[class*="MoleculeModal-dialog"]',
+                '[class*="Modal-dialog"]',
+                '.sui-MoleculeModal',
+                '[role="dialog"]',
+            ]
+
+            modal = None
+            for selector in modal_selectors:
+                try:
+                    modal = await new_page.wait_for_selector(selector, timeout=3000)
+                    if modal:
+                        logger.info(f"Modal encontrado con selector: {selector}")
+                        break
+                except:
+                    continue
+
+            if not modal:
+                logger.warning(f"No se encontró modal en {detail_url}")
+                await new_page.close()
+                return None
+
+            # Extraer todo el texto del modal
+            modal_text = await modal.text_content()
+            logger.info(f"Texto del modal: {modal_text[:200] if modal_text else 'vacío'}...")
+
+            # Buscar teléfono (9 dígitos españoles, con o sin espacios)
+            phone = None
+            # Primero intentar enlace tel:
+            phone_link = await modal.query_selector('a[href^="tel:"]')
+            if phone_link:
+                href = await phone_link.get_attribute('href')
+                if href:
+                    phone = href.replace('tel:', '').replace('+34', '').replace(' ', '').strip()
+                    logger.info(f"Teléfono extraído de enlace tel: {phone}")
+
+            # Si no hay enlace, buscar en el texto
+            if not phone and modal_text:
+                # Buscar patrón de teléfono español (6xx xxx xxx o 9xx xxx xxx)
+                phone_patterns = [
+                    r'([679]\d{2}[\s\.]?\d{3}[\s\.]?\d{3})',  # Móvil o fijo
+                    r'(\d{3}[\s\.]?\d{3}[\s\.]?\d{3})',  # Cualquier 9 dígitos
+                    r'(\d{9})',  # 9 dígitos seguidos
+                ]
+                for pattern in phone_patterns:
+                    match = re.search(pattern, modal_text)
+                    if match:
+                        phone = re.sub(r'[\s\.]', '', match.group(1))
+                        logger.info(f"Teléfono extraído de texto: {phone}")
+                        break
+
+            # Extraer nombre del vendedor
+            nombre_vendedor = None
+            if modal_text:
+                # El nombre suele estar en las primeras líneas del modal
+                lines = [l.strip() for l in modal_text.split('\n') if l.strip()]
+                for line in lines[:5]:
+                    # Ignorar líneas que son teléfonos, botones o textos de UI
+                    if len(line) < 30 and not re.match(r'^[\d\s\.\+\-\(\)]+$', line):
+                        if not any(x in line.lower() for x in [
+                            'ver', 'llamar', 'contactar', 'teléfono', 'cerrar',
+                            'whatsapp', 'chat', 'mensaje', 'email', 'correo', 'enviar'
+                        ]):
+                            nombre_vendedor = line
+                            logger.info(f"Nombre del vendedor extraído: {nombre_vendedor}")
+                            break
 
             await new_page.close()
 
+            if phone or nombre_vendedor:
+                return {'telefono': phone, 'nombre_vendedor': nombre_vendedor}
+
+            return None
+
         except Exception as e:
-            logger.debug(f"No se pudo extraer teléfono de {detail_url}: {e}")
+            logger.warning(f"Error extrayendo contacto de {detail_url}: {e}")
+            if new_page:
+                try:
+                    await new_page.close()
+                except:
+                    pass
 
         return None
 

@@ -3,17 +3,27 @@
 Script para ejecutar el scraper de Fotocasa.
 
 Uso:
-    python run_fotocasa_scraper.py [--tenant-id=1] [--minio] [--postgres]
+    python run_fotocasa_scraper.py [--tenant-id=1] [--zones=tarragona_provincia] [--minio] [--postgres]
 
 Ejemplos:
     # Ejecutar sin guardar (solo logs)
     python run_fotocasa_scraper.py
+
+    # Ejecutar para Tarragona provincia
+    python run_fotocasa_scraper.py --zones=tarragona_provincia
+
+    # Ejecutar para múltiples zonas
+    python run_fotocasa_scraper.py --zones=tarragona_ciudad,lleida_ciudad
 
     # Ejecutar con MinIO y PostgreSQL
     python run_fotocasa_scraper.py --minio --postgres
 
     # Ejecutar para un tenant específico
     python run_fotocasa_scraper.py --tenant-id=2 --minio --postgres
+
+Zonas disponibles:
+    tarragona_ciudad, tarragona_provincia, lleida_ciudad, lleida_provincia,
+    barcelona_ciudad, barcelona_provincia, girona_provincia, espana
 """
 
 import sys
@@ -21,7 +31,7 @@ import argparse
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
 
-from scrapers.fotocasa_scraper import FotocasaScraper
+from scrapers.fotocasa_scraper import FotocasaScraper, FOTOCASA_ZONES
 
 
 def main():
@@ -36,6 +46,12 @@ def main():
         help='ID del tenant (default: 1)'
     )
     parser.add_argument(
+        '--zones',
+        type=str,
+        default='tarragona_provincia',
+        help='Zonas a scrapear separadas por coma (default: tarragona_provincia)'
+    )
+    parser.add_argument(
         '--minio',
         action='store_true',
         help='Habilitar guardado en MinIO'
@@ -48,13 +64,15 @@ def main():
 
     args = parser.parse_args()
 
-    # Configuración de zonas y filtros
-    zones = {
-        "lleida_ciudad": {
-            "enabled": True,
-            "codigos_postales": ["25001", "25002", "25003", "25004", "25005", "25006", "25007", "25008"]
-        }
-    }
+    # Parsear zonas
+    zones = [z.strip() for z in args.zones.split(',')]
+
+    # Validar zonas
+    for zone in zones:
+        if zone not in FOTOCASA_ZONES:
+            print(f"ERROR: Zona desconocida: {zone}")
+            print(f"Zonas disponibles: {', '.join(FOTOCASA_ZONES.keys())}")
+            sys.exit(1)
 
     filters = {
         "filtros_precio": {
@@ -97,9 +115,11 @@ def main():
         postgres_config=postgres_config
     )
 
+    zone_names = [FOTOCASA_ZONES[z]['nombre'] for z in zones]
     print(f"\n{'='*60}")
     print(f"Iniciando scraper de Fotocasa")
     print(f"Tenant ID: {args.tenant_id}")
+    print(f"Zonas: {', '.join(zone_names)}")
     print(f"MinIO: {'Habilitado' if args.minio else 'Deshabilitado'}")
     print(f"PostgreSQL: {'Habilitado' if args.postgres else 'Deshabilitado'}")
     print(f"{'='*60}\n")

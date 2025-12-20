@@ -306,6 +306,7 @@ class WallapopScraper(scrapy.Spider):
         zona_info = ZONAS_WALLAPOP.get(zona_key, {})
 
         return {
+            'anuncio_id': item_id,  # Para deduplicación
             'item_id': item_id,
             'titulo': titulo,
             'precio': precio,
@@ -319,6 +320,7 @@ class WallapopScraper(scrapy.Spider):
             'user_id': None,
             'telefono': None,
             'descripcion': None,
+            'fotos': [],  # Se rellenará en la página de detalle
         }
 
     def start_requests(self):
@@ -357,6 +359,30 @@ class WallapopScraper(scrapy.Spider):
         zona_key = response.meta.get('zona_key')
 
         logger.info(f"Parseando zona {zona_key}: {response.url}")
+
+        # Detectar bot detection
+        bot_detection_patterns = [
+            'captcha',
+            'robot',
+            'blocked',
+            'verificación',
+            'security check',
+            'access denied',
+        ]
+
+        page_text = response.text.lower() if response.text else ''
+        page_title = response.css('title::text').get() or ''
+
+        for pattern in bot_detection_patterns:
+            if pattern in page_text[:5000] or pattern in page_title.lower():
+                logger.error(
+                    f"BLOQUEADO: Wallapop ha detectado el scraper como bot. "
+                    f"Page title: '{page_title}'. "
+                    f"Considera usar proxies residenciales o reducir la frecuencia de scraping."
+                )
+                if page:
+                    await page.close()
+                return
 
         # Usar Playwright directamente para extraer los items (HTML dinámico)
         if page:
@@ -487,6 +513,16 @@ class WallapopScraper(scrapy.Spider):
                 hab_match = re.search(r'(\d+)\s*(?:hab|dormitorio|habitacion)', features_text, re.I)
                 if hab_match:
                     data['habitaciones'] = int(hab_match.group(1))
+
+            # Extraer fotos (thumbnails)
+            fotos = []
+            img_elements = await new_page.query_selector_all('img[src*="wallapop"]')
+            for img in img_elements[:5]:  # Máximo 5 fotos
+                src = await img.get_attribute('src')
+                if src and ('cdn.' in src or 'static.' in src):
+                    fotos.append(src)
+            if fotos:
+                data['fotos'] = fotos
 
             await new_page.close()
             return data
