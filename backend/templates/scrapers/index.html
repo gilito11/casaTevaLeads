@@ -27,32 +27,13 @@
         {% endif %}
     </div>
 
-    <!-- Running Status Banner -->
-    {% for key, status in running_scrapers.items %}
-    {% if status.status == 'running' %}
-    <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-center justify-between">
-        <div class="flex items-center">
-            <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400 mr-3" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <div>
-                <p class="font-medium text-blue-800 dark:text-blue-300">
-                    {% if 'all_scrapers' in key %}
-                    Scraping masivo en ejecución ({{ status.zonas_count }} zonas)
-                    {% else %}
-                    Scraper en ejecución: {{ key }}
-                    {% endif %}
-                </p>
-                <p class="text-sm text-blue-600 dark:text-blue-400">Iniciado: {{ status.started|slice:":19"|default:"hace un momento" }}</p>
-            </div>
-        </div>
-        <a href="{% url 'scrapers' %}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm">
-            Refrescar
-        </a>
+    <!-- Status Container with Auto-refresh -->
+    <div id="scraper-status-container"
+         hx-get="{% url 'scraper_status_partial' %}"
+         hx-trigger="every 10s"
+         hx-swap="innerHTML">
+        {% include 'scrapers/partials/status_banner.html' %}
     </div>
-    {% endif %}
-    {% endfor %}
 
     <!-- Messages -->
     {% if messages %}

@@ -304,6 +304,15 @@ def scraper_status_view(request):
     return JsonResponse(_running_scrapers)
 
 
+@login_required
+def scraper_status_partial_view(request):
+    """Vista parcial para HTMX que devuelve el banner de estado"""
+    context = {
+        'running_scrapers': _running_scrapers,
+    }
+    return render(request, 'scrapers/partials/status_banner.html', context)
+
+
 def _run_all_scrapers_process(tenant_id, zonas, scraper_key):
     """Ejecuta todos los scrapers para todas las zonas en un proceso separado"""
     try:

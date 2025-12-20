@@ -21,7 +21,7 @@ from django.http import JsonResponse
 from core.views import (
     login_view, logout_view, dashboard_view, profile_view,
     scrapers_view, add_zona_view, remove_zona_view, run_scraper_view, scraper_status_view,
-    run_all_scrapers_view
+    run_all_scrapers_view, scraper_status_partial_view
 )
 
 
@@ -52,6 +52,7 @@ urlpatterns = [
     path('scrapers/run/', run_scraper_view, name='run_scraper'),
     path('scrapers/run-all/', run_all_scrapers_view, name='run_all_scrapers'),
     path('scrapers/status/', scraper_status_view, name='scraper_status'),
+    path('scrapers/status-partial/', scraper_status_partial_view, name='scraper_status_partial'),
 
     # REST API
     path('api/leads/', include('leads.api_urls')),
