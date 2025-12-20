@@ -220,7 +220,8 @@ class BaseScraper:
         try:
             cursor = self.postgres_conn.cursor()
 
-            # SQL para insertar en raw.raw_listings
+            # SQL para insertar en raw.raw_listings con detección de duplicados
+            # Usa ON CONFLICT DO NOTHING para ignorar duplicados silenciosamente
             sql = """
                 INSERT INTO raw.raw_listings (
                     tenant_id,
@@ -229,6 +230,9 @@ class BaseScraper:
                     raw_data,
                     scraping_timestamp
                 ) VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
+                WHERE raw_data->>'anuncio_id' IS NOT NULL
+                DO NOTHING
             """
 
             # Ejecutar insert
@@ -243,11 +247,15 @@ class BaseScraper:
                 )
             )
 
+            rows_affected = cursor.rowcount
             self.postgres_conn.commit()
             cursor.close()
 
-            logger.info(f"Datos guardados en PostgreSQL: {portal} - {data_lake_path}")
-            return True
+            if rows_affected > 0:
+                logger.info(f"Datos guardados en PostgreSQL: {portal} - {data_lake_path}")
+            else:
+                logger.debug(f"Duplicado ignorado: {portal} - {listing_data.get('anuncio_id', 'N/A')}")
+            return rows_affected > 0
 
         except Exception as e:
             logger.error(f"Error al guardar en PostgreSQL: {e}")

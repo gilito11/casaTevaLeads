@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',  # For number formatting (intcomma)
     # Third party apps
     'rest_framework',
     'django_filters',
@@ -136,6 +137,10 @@ LANGUAGE_CODE = 'es-es'
 TIME_ZONE = 'Europe/Madrid'
 
 USE_I18N = True
+
+USE_L10N = True
+
+USE_THOUSAND_SEPARATOR = True
 
 USE_TZ = True
 
