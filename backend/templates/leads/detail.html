@@ -23,7 +23,7 @@
 
         <div class="flex items-center space-x-3">
             <!-- Estado Badge -->
-            {% include 'components/estado_badge.html' with estado=lead.estado %}
+            {% include 'components/estado_badge.html' with estado=estado_actual %}
 
             <!-- Actions -->
             <a href="tel:{{ lead.telefono_norm }}"
@@ -136,8 +136,14 @@
                 {% endif %}
 
                 <div class="p-6">
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Informacion de la Propiedad</h2>
+                    <!-- Título del anuncio -->
+                    {% if lead.titulo %}
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">{{ lead.titulo }}</h2>
+                    {% else %}
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Información de la Propiedad</h2>
+                    {% endif %}
 
+                    <!-- Datos básicos -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
                             <p class="text-2xl font-bold text-primary-600 dark:text-primary-400">
@@ -163,17 +169,61 @@
                         </div>
                     </div>
 
+                    <!-- Datos extras -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        {% if lead.banos %}
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ lead.banos }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Baños</p>
+                        </div>
+                        {% endif %}
+                        {% if lead.certificado_energetico %}
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ lead.certificado_energetico }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Cert. Energético</p>
+                        </div>
+                        {% endif %}
+                        {% if lead.precio and lead.metros %}
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ lead.precio|divisibleby:lead.metros|floatformat:0 }}&euro;</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Precio/m²</p>
+                        </div>
+                        {% endif %}
+                        {% if lead.fecha_publicacion %}
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ lead.fecha_publicacion }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Publicado</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Ubicación -->
                     <div class="space-y-4">
-                        <div>
-                            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Direccion</h3>
-                            <p class="text-gray-900 dark:text-white">{{ lead.direccion }}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ lead.zona_geografica }} {% if lead.codigo_postal %}({{ lead.codigo_postal }}){% endif %}</p>
+                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                Ubicación
+                            </h3>
+                            <p class="text-gray-900 dark:text-white font-medium">{{ lead.direccion }}</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                {{ lead.zona_geografica }}
+                                {% if lead.codigo_postal %} · CP {{ lead.codigo_postal }}{% endif %}
+                            </p>
                         </div>
 
+                        <!-- Descripción -->
                         {% if lead.descripcion %}
-                        <div>
-                            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Descripcion</h3>
-                            <p class="text-gray-900 dark:text-white whitespace-pre-line">{{ lead.descripcion }}</p>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                                </svg>
+                                Descripción
+                            </h3>
+                            <p class="text-gray-900 dark:text-white whitespace-pre-line text-sm leading-relaxed">{{ lead.descripcion }}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -270,7 +320,7 @@
 
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Intentos de contacto</p>
-                        <p class="font-medium text-gray-900 dark:text-white">{{ lead.numero_intentos }}</p>
+                        <p class="font-medium text-gray-900 dark:text-white">{{ lead_estado.numero_intentos|default:lead.numero_intentos }}</p>
                     </div>
                 </div>
             </div>
@@ -286,7 +336,7 @@
                             hx-target="body"
                             hx-swap="outerHTML"
                             class="w-full text-left p-3 rounded-lg border transition-colors
-                            {% if lead.estado == estado_choice.0 %}
+                            {% if estado_actual == estado_choice.0 %}
                             border-primary-500 bg-primary-50 dark:bg-primary-900/20
                             {% else %}
                             border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700
@@ -310,18 +360,22 @@
                         <dt class="text-gray-500 dark:text-gray-400">Fecha Scraping</dt>
                         <dd class="font-medium text-gray-900 dark:text-white">{{ lead.fecha_scraping|date:"d/m/Y H:i" }}</dd>
                     </div>
-                    {% if lead.fecha_primer_contacto %}
+                    {% with primer_contacto=lead_estado.fecha_primer_contacto|default:lead.fecha_primer_contacto %}
+                    {% if primer_contacto %}
                     <div>
                         <dt class="text-gray-500 dark:text-gray-400">Primer Contacto</dt>
-                        <dd class="font-medium text-gray-900 dark:text-white">{{ lead.fecha_primer_contacto|date:"d/m/Y H:i" }}</dd>
+                        <dd class="font-medium text-gray-900 dark:text-white">{{ primer_contacto|date:"d/m/Y H:i" }}</dd>
                     </div>
                     {% endif %}
-                    {% if lead.fecha_ultimo_contacto %}
+                    {% endwith %}
+                    {% with ultimo_contacto=lead_estado.fecha_ultimo_contacto|default:lead.fecha_ultimo_contacto %}
+                    {% if ultimo_contacto %}
                     <div>
                         <dt class="text-gray-500 dark:text-gray-400">Ultimo Contacto</dt>
-                        <dd class="font-medium text-gray-900 dark:text-white">{{ lead.fecha_ultimo_contacto|date:"d/m/Y H:i" }}</dd>
+                        <dd class="font-medium text-gray-900 dark:text-white">{{ ultimo_contacto|date:"d/m/Y H:i" }}</dd>
                     </div>
                     {% endif %}
+                    {% endwith %}
                     {% if lead.asignado_a %}
                     <div>
                         <dt class="text-gray-500 dark:text-gray-400">Asignado a</dt>

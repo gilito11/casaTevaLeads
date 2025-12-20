@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Lead, Nota
+from .models import Lead, Nota, LeadEstado
 
 
 class NotaInline(admin.TabularInline):
@@ -12,28 +12,27 @@ class NotaInline(admin.TabularInline):
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
     list_display = [
-        'lead_id', 'tenant', 'telefono_norm', 'nombre', 'direccion',
-        'zona_geografica', 'precio', 'estado', 'asignado_a',
+        'lead_id', 'tenant_id', 'telefono_norm', 'nombre', 'direccion',
+        'zona_geografica', 'precio', 'estado',
         'fecha_scraping', 'portal'
     ]
     list_filter = [
-        'estado', 'portal', 'tenant', 'zona_geografica',
-        'tipo_inmueble', 'fecha_scraping', 'asignado_a'
+        'estado', 'portal', 'zona_geografica',
+        'tipo_inmueble', 'fecha_scraping'
     ]
     search_fields = [
         'telefono_norm', 'email', 'nombre', 'direccion',
-        'zona_geografica', 'codigo_postal', 'descripcion'
+        'zona_geografica', 'descripcion'
     ]
     readonly_fields = [
         'lead_id', 'created_at', 'updated_at', 'fecha_scraping',
         'data_lake_reference'
     ]
-    autocomplete_fields = ['tenant', 'asignado_a']
     inlines = [NotaInline]
 
     fieldsets = (
         ('Información del Lead', {
-            'fields': ('lead_id', 'tenant', 'telefono_norm', 'email', 'nombre')
+            'fields': ('lead_id', 'tenant_id', 'telefono_norm', 'email', 'nombre')
         }),
         ('Propiedad', {
             'fields': (
@@ -47,7 +46,7 @@ class LeadAdmin(admin.ModelAdmin):
         }),
         ('Gestión', {
             'fields': (
-                'estado', 'asignado_a', 'numero_intentos',
+                'estado', 'asignado_a_id', 'numero_intentos',
                 'fecha_primer_contacto', 'fecha_ultimo_contacto',
                 'fecha_cambio_estado'
             )
@@ -59,10 +58,18 @@ class LeadAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(LeadEstado)
+class LeadEstadoAdmin(admin.ModelAdmin):
+    list_display = ['lead_id', 'telefono_norm', 'estado', 'numero_intentos', 'fecha_cambio_estado']
+    list_filter = ['estado', 'tenant']
+    search_fields = ['lead_id', 'telefono_norm']
+    readonly_fields = ['lead_id', 'created_at', 'updated_at']
+
+
 @admin.register(Nota)
 class NotaAdmin(admin.ModelAdmin):
     list_display = ['lead', 'autor', 'texto', 'created_at']
     list_filter = ['created_at', 'autor']
-    search_fields = ['texto', 'lead__telefono_norm', 'lead__nombre']
+    search_fields = ['texto', 'lead__telefono_norm']
     readonly_fields = ['created_at']
-    autocomplete_fields = ['lead', 'autor']
+    autocomplete_fields = ['autor']

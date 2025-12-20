@@ -4,7 +4,10 @@ from core.models import Tenant
 
 
 class Lead(models.Model):
-    """Modelo para gestionar leads inmobiliarios - Vista desde marts.dim_leads"""
+    """
+    Modelo para gestionar leads inmobiliarios - Vista desde marts.dim_leads
+    Las columnas coinciden con la VIEW existente en PostgreSQL.
+    """
 
     ESTADO_CHOICES = [
         ('NUEVO', 'Nuevo'),
@@ -18,33 +21,86 @@ class Lead(models.Model):
         ('YA_VENDIDO', 'Ya vendido'),
     ]
 
-    lead_id = models.AutoField(primary_key=True)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='leads')
+    # Columnas que existen en la VIEW marts.dim_leads
+    lead_id = models.CharField(max_length=100, primary_key=True)
+    tenant_id = models.IntegerField()
     telefono_norm = models.CharField(max_length=20)
     email = models.EmailField(blank=True, null=True)
-    nombre = models.CharField(max_length=255, blank=True)
-    direccion = models.TextField()
-    zona_geografica = models.CharField(max_length=100)
-    codigo_postal = models.CharField(max_length=10, blank=True)
-    tipo_inmueble = models.CharField(max_length=50, blank=True)
-    precio = models.DecimalField(max_digits=12, decimal_places=2)
+    nombre = models.CharField(max_length=255, blank=True, null=True)
+    direccion = models.TextField(null=True, blank=True)
+    zona_geografica = models.CharField(max_length=100, null=True, blank=True)
+    codigo_postal = models.CharField(max_length=10, blank=True, null=True)
+    tipo_inmueble = models.CharField(max_length=50, blank=True, null=True)
+    precio = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     habitaciones = models.IntegerField(null=True, blank=True)
     metros = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    descripcion = models.TextField(blank=True)
-    fotos = models.JSONField(default=list)
-    portal = models.CharField(max_length=50)
-    url_anuncio = models.TextField()
-    data_lake_reference = models.TextField(blank=True)
+    descripcion = models.TextField(blank=True, null=True)
+    fotos = models.JSONField(default=list, null=True, blank=True)
+    portal = models.CharField(max_length=50, null=True, blank=True)
+    url_anuncio = models.TextField(null=True, blank=True)
+    data_lake_reference = models.TextField(blank=True, null=True)
+    estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='NUEVO')
+    numero_intentos = models.IntegerField(default=0)
+    fecha_scraping = models.DateTimeField(null=True, blank=True)
+    fecha_primer_contacto = models.DateTimeField(null=True, blank=True)
+    fecha_ultimo_contacto = models.DateTimeField(null=True, blank=True)
+    fecha_cambio_estado = models.DateTimeField(null=True, blank=True)
+    asignado_a_id = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'marts"."dim_leads'
+        managed = False
+        verbose_name = 'Lead'
+        verbose_name_plural = 'Leads'
+        ordering = ['-fecha_scraping']
+
+    def __str__(self):
+        return f"{self.telefono_norm} - {self.direccion} ({self.estado})"
+
+    # Campos adicionales como properties (para datos que vendrán cuando se actualice dbt)
+    @property
+    def titulo(self):
+        """El título será extraído de descripción o URL por ahora"""
+        return self.descripcion[:100] if self.descripcion else ''
+
+    @property
+    def banos(self):
+        """Baños no está en la VIEW actual"""
+        return None
+
+    @property
+    def certificado_energetico(self):
+        """Certificado energético no está en la VIEW actual"""
+        return ''
+
+    @property
+    def fecha_publicacion(self):
+        """Fecha publicación no está en la VIEW actual"""
+        return None
+
+
+class LeadEstado(models.Model):
+    """
+    Tabla separada para gestionar el estado CRM de los leads.
+    Esta tabla es gestionada por Django (managed=True) y permite
+    actualizar el estado independientemente del modelo dbt.
+    """
+    ESTADO_CHOICES = Lead.ESTADO_CHOICES
+
+    lead_id = models.CharField(max_length=100, primary_key=True)  # MD5 hash del lead
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='lead_estados')
+    telefono_norm = models.CharField(max_length=20, db_index=True)
     estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='NUEVO')
     asignado_a = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='leads_asignados'
+        related_name='leads_estado_asignados'
     )
     numero_intentos = models.IntegerField(default=0)
-    fecha_scraping = models.DateTimeField()
     fecha_primer_contacto = models.DateTimeField(null=True, blank=True)
     fecha_ultimo_contacto = models.DateTimeField(null=True, blank=True)
     fecha_cambio_estado = models.DateTimeField(null=True, blank=True)
@@ -52,15 +108,13 @@ class Lead(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'marts"."dim_leads'
-        managed = False
+        db_table = 'leads_lead_estado'
+        verbose_name = 'Estado de Lead'
+        verbose_name_plural = 'Estados de Leads'
         unique_together = ['tenant', 'telefono_norm']
-        verbose_name = 'Lead'
-        verbose_name_plural = 'Leads'
-        ordering = ['-fecha_scraping']
 
     def __str__(self):
-        return f"{self.telefono_norm} - {self.direccion} ({self.estado})"
+        return f"{self.telefono_norm} - {self.estado}"
 
 
 class Nota(models.Model):

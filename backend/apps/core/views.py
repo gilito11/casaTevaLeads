@@ -302,3 +302,91 @@ def run_scraper_view(request):
 def scraper_status_view(request):
     """API para obtener el estado de los scrapers"""
     return JsonResponse(_running_scrapers)
+
+
+def _run_all_scrapers_process(tenant_id, zonas, scraper_key):
+    """Ejecuta todos los scrapers para todas las zonas en un proceso separado"""
+    try:
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+        script_path = os.path.join(project_root, 'run_all_scrapers.py')
+
+        if os.path.exists(script_path):
+            # Construir lista de zonas como string separado por comas
+            zone_slugs = ','.join([z.slug for z in zonas])
+
+            # Ejecutar el script de todos los scrapers
+            result = subprocess.run(
+                ['python', script_path, '--zones', zone_slugs, '--postgres'],
+                capture_output=True,
+                text=True,
+                timeout=1800,  # 30 minutos timeout para todas las zonas
+                cwd=project_root
+            )
+            _running_scrapers[scraper_key] = {
+                'status': 'completed' if result.returncode == 0 else 'error',
+                'output': result.stdout[-2000:] if result.stdout else '',
+                'error': result.stderr[-500:] if result.stderr else '',
+                'returncode': result.returncode,
+                'zonas_count': len(zonas),
+            }
+        else:
+            _running_scrapers[scraper_key] = {
+                'status': 'error',
+                'error': f'Script no encontrado: {script_path}',
+            }
+    except subprocess.TimeoutExpired:
+        _running_scrapers[scraper_key] = {
+            'status': 'timeout',
+            'error': 'El scraping masivo tardó demasiado tiempo (>30 min)',
+        }
+    except Exception as e:
+        _running_scrapers[scraper_key] = {
+            'status': 'error',
+            'error': str(e),
+        }
+
+
+@login_required
+def run_all_scrapers_view(request):
+    """Ejecutar todos los scrapers para todas las zonas configuradas"""
+    if request.method == 'POST':
+        tenant_id = request.session.get('tenant_id')
+
+        if tenant_id:
+            tenant = Tenant.objects.filter(tenant_id=tenant_id).first()
+            if tenant:
+                zonas = list(ZonaGeografica.objects.filter(tenant=tenant))
+
+                if not zonas:
+                    messages.warning(request, 'No hay zonas configuradas. Añade zonas primero.')
+                    return redirect('scrapers')
+
+                scraper_key = f'all_scrapers_{tenant_id}'
+
+                # Verificar si ya está corriendo
+                if scraper_key in _running_scrapers and _running_scrapers[scraper_key].get('status') == 'running':
+                    messages.warning(request, 'Ya hay un scraping masivo en ejecución. Espera a que termine.')
+                else:
+                    # Marcar como corriendo
+                    _running_scrapers[scraper_key] = {
+                        'status': 'running',
+                        'started': timezone.now().isoformat(),
+                        'zonas_count': len(zonas),
+                    }
+
+                    # Ejecutar en un thread separado
+                    thread = threading.Thread(
+                        target=_run_all_scrapers_process,
+                        args=(tenant_id, zonas, scraper_key)
+                    )
+                    thread.daemon = True
+                    thread.start()
+
+                    messages.success(
+                        request,
+                        f'Scraping masivo iniciado para {len(zonas)} zonas. Esto puede tardar varios minutos.'
+                    )
+        else:
+            messages.error(request, 'No se encontró el tenant')
+
+    return redirect('scrapers')

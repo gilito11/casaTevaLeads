@@ -93,7 +93,7 @@
                         <!-- Estado con dropdown para cambiar -->
                         <div x-data="{ open: false }" class="relative">
                             <button @click="open = !open" class="flex items-center space-x-1 hover:opacity-80">
-                                {% include 'components/estado_badge.html' with estado=lead.estado %}
+                                {% include 'components/estado_badge.html' with estado=lead.estado_actual %}
                                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                 </svg>
@@ -112,7 +112,7 @@
                                         hx-swap="outerHTML"
                                         @click="open = false"
                                         class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2
-                                        {% if lead.estado == estado_choice.0 %}bg-gray-50 dark:bg-gray-700{% endif %}">
+                                        {% if lead.estado_actual == estado_choice.0 %}bg-gray-50 dark:bg-gray-700{% endif %}">
                                     {% include 'components/estado_badge.html' with estado=estado_choice.0 %}
                                 </button>
                                 {% endfor %}

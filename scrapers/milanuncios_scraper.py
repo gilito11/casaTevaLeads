@@ -495,7 +495,6 @@ class MilanunciosScraper(scrapy.Spider):
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
         # Intentar extraer nombre del vendedor de la tarjeta
-        # Milanuncios a veces muestra el nombre del usuario en la card
         vendedor_nombre = None
         vendedor_selectors = [
             '.ma-AdCard-sellerName::text',
@@ -512,6 +511,37 @@ class MilanunciosScraper(scrapy.Spider):
         else:
             vendedor_nombre = 'Particular'
 
+        # Extraer fecha de publicación
+        fecha_publicacion = None
+        fecha_selectors = [
+            '.ma-AdCard-date::text',
+            '.ma-AdCardV2-date::text',
+            '[class*="Date"]::text',
+            'time::attr(datetime)',
+            'time::text',
+        ]
+        for selector in fecha_selectors:
+            fecha_text = card.css(selector).get()
+            if fecha_text and fecha_text.strip():
+                fecha_publicacion = fecha_text.strip()
+                break
+
+        # Extraer descripción breve (si existe en la card)
+        descripcion = None
+        desc_selectors = [
+            '.ma-AdCard-description::text',
+            '.ma-AdCardV2-description::text',
+            '[class*="Description"]::text',
+        ]
+        for selector in desc_selectors:
+            descripcion = card.css(selector).get()
+            if descripcion and descripcion.strip():
+                descripcion = descripcion.strip()
+                break
+
+        # Detectar tipo de inmueble del título
+        tipo_inmueble = self._detectar_tipo_inmueble(titulo or '')
+
         data = {
             'anuncio_id': anuncio_id,
             'titulo': titulo.strip() if titulo else None,
@@ -522,6 +552,9 @@ class MilanunciosScraper(scrapy.Spider):
             'metros': metros,
             'banos': banos,
             'certificado_energetico': certificado_energetico,
+            'tipo_inmueble': tipo_inmueble,
+            'descripcion': descripcion,
+            'fecha_publicacion': fecha_publicacion,
             'imagen_principal': imagen,
             'fotos': fotos,  # Lista de hasta 5 fotos
             'detail_url': detail_url,
@@ -719,6 +752,33 @@ class MilanunciosScraper(scrapy.Spider):
         if match:
             return match.group(1)
         return None
+
+    def _detectar_tipo_inmueble(self, texto: str) -> str:
+        """Detecta el tipo de inmueble del texto del título."""
+        texto_lower = texto.lower()
+
+        if 'piso' in texto_lower or 'apartamento' in texto_lower:
+            return 'Piso'
+        elif 'casa' in texto_lower or 'chalet' in texto_lower or 'villa' in texto_lower:
+            return 'Casa'
+        elif 'local' in texto_lower:
+            return 'Local'
+        elif 'garaje' in texto_lower or 'parking' in texto_lower or 'plaza' in texto_lower:
+            return 'Garaje'
+        elif 'terreno' in texto_lower or 'parcela' in texto_lower or 'solar' in texto_lower:
+            return 'Terreno'
+        elif 'nave' in texto_lower:
+            return 'Nave'
+        elif 'oficina' in texto_lower or 'despacho' in texto_lower:
+            return 'Oficina'
+        elif 'atico' in texto_lower or 'ático' in texto_lower:
+            return 'Ático'
+        elif 'duplex' in texto_lower or 'dúplex' in texto_lower:
+            return 'Dúplex'
+        elif 'estudio' in texto_lower or 'loft' in texto_lower:
+            return 'Estudio'
+        else:
+            return 'Otros'
 
     async def errback_close_page(self, failure):
         """Callback de error que cierra la página de Playwright."""

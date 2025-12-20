@@ -12,7 +12,47 @@
                 Configura las zonas y ejecuta los scrapers de portales inmobiliarios
             </p>
         </div>
+        {% if zonas %}
+        <form action="{% url 'run_all_scrapers' %}" method="post">
+            {% csrf_token %}
+            <button type="submit"
+                    onclick="return confirm('Ejecutar scrapers en {{ zonas|length }} zonas? Esto puede tardar varios minutos.')"
+                    class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors shadow-sm">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Actualizar Todo
+            </button>
+        </form>
+        {% endif %}
     </div>
+
+    <!-- Running Status Banner -->
+    {% for key, status in running_scrapers.items %}
+    {% if status.status == 'running' %}
+    <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-center justify-between">
+        <div class="flex items-center">
+            <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400 mr-3" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <div>
+                <p class="font-medium text-blue-800 dark:text-blue-300">
+                    {% if 'all_scrapers' in key %}
+                    Scraping masivo en ejecución ({{ status.zonas_count }} zonas)
+                    {% else %}
+                    Scraper en ejecución: {{ key }}
+                    {% endif %}
+                </p>
+                <p class="text-sm text-blue-600 dark:text-blue-400">Iniciado: {{ status.started|slice:":19"|default:"hace un momento" }}</p>
+            </div>
+        </div>
+        <a href="{% url 'scrapers' %}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm">
+            Refrescar
+        </a>
+    </div>
+    {% endif %}
+    {% endfor %}
 
     <!-- Messages -->
     {% if messages %}
@@ -173,12 +213,13 @@
         <h3 class="font-medium text-blue-800 dark:text-blue-400 mb-2">Como usar</h3>
         <ol class="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
             <li>Anade las zonas geograficas que quieres scrapear desde "Zonas Disponibles"</li>
-            <li>En "Mis Zonas", haz clic en los botones MA (Milanuncios), WP (Wallapop) o FC (Fotocasa) para ejecutar el scraper</li>
+            <li>Haz clic en <strong>"Actualizar Todo"</strong> para scrapear todas las zonas a la vez</li>
+            <li>O en "Mis Zonas", haz clic en MA (Milanuncios), WP (Wallapop) o FC (Fotocasa) para scrapers individuales</li>
             <li>Los leads encontrados apareceran automaticamente en la seccion de Leads</li>
         </ol>
         <p class="mt-3 text-xs text-blue-600 dark:text-blue-400">
-            <strong>Nota:</strong> Los scrapers se ejecutan en segundo plano y pueden tardar varios minutos.
-            En produccion (Azure), los scrapers necesitan Playwright instalado.
+            <strong>Nota:</strong> Los scrapers se ejecutan en segundo plano. El scraping masivo puede tardar 10-30 minutos dependiendo del numero de zonas.
+            Actualmente solo Milanuncios funciona (Wallapop y Fotocasa bloqueados por captcha).
         </p>
     </div>
 </div>

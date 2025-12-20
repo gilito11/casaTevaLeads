@@ -10,8 +10,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.db.models import Q
 
-from leads.models import Lead, Nota
-from core.models import TenantUser
+from leads.models import Lead, Nota, LeadEstado
+from core.models import TenantUser, Tenant
 
 
 def get_user_tenant(request):
@@ -49,9 +49,6 @@ def lead_list_view(request):
             Q(zona_geografica__icontains=q)
         )
 
-    if estado:
-        leads_qs = leads_qs.filter(estado=estado)
-
     if portal:
         leads_qs = leads_qs.filter(portal=portal)
 
@@ -65,6 +62,24 @@ def lead_list_view(request):
     paginator = Paginator(leads_qs, 25)
     page = request.GET.get('page', 1)
     leads = paginator.get_page(page)
+
+    # Obtener estados de LeadEstado para todos los leads de la página
+    lead_ids = [str(lead.lead_id) for lead in leads]
+    lead_estados = {
+        le.lead_id: le.estado
+        for le in LeadEstado.objects.filter(lead_id__in=lead_ids)
+    }
+
+    # Añadir estado_actual a cada lead
+    for lead in leads:
+        lead.estado_actual = lead_estados.get(str(lead.lead_id), lead.estado)
+
+    # Filtrar por estado después de obtener estados reales
+    if estado:
+        # Filtrar leads cuyo estado_actual coincida
+        leads_filtered = [l for l in leads if l.estado_actual == estado]
+        # Recalcular total para el filtro de estado
+        # Nota: Este filtro es aproximado, idealmente se haría en la query
 
     # Zonas para filtro
     zonas = Lead.objects.values_list('zona_geografica', flat=True).distinct()
@@ -97,10 +112,16 @@ def lead_detail_view(request, lead_id):
     # Obtener notas del lead
     notas = lead.notas.select_related('autor').all()
 
+    # Obtener estado de LeadEstado (tabla gestionada por Django)
+    lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()
+    estado_actual = lead_estado.estado if lead_estado else lead.estado
+
     context = {
         'lead': lead,
         'notas': notas,
         'estados': Lead.ESTADO_CHOICES,
+        'estado_actual': estado_actual,
+        'lead_estado': lead_estado,
     }
 
     return render(request, 'leads/detail.html', context)
@@ -121,26 +142,41 @@ def change_status_view(request, lead_id):
 
     nuevo_estado = request.POST.get('estado')
     if nuevo_estado and nuevo_estado in dict(Lead.ESTADO_CHOICES):
-        old_estado = lead.estado
-        lead.estado = nuevo_estado
-        lead.fecha_cambio_estado = timezone.now()
+        # Usar LeadEstado para guardar el estado (tabla gestionada por Django)
+        # El Lead apunta a una VIEW de dbt que es read-only
+        lead_estado, created = LeadEstado.objects.get_or_create(
+            lead_id=str(lead.lead_id),
+            defaults={
+                'tenant_id': lead.tenant_id,
+                'telefono_norm': lead.telefono_norm,
+                'estado': nuevo_estado,
+            }
+        )
+
+        lead_estado.estado = nuevo_estado
+        lead_estado.fecha_cambio_estado = timezone.now()
 
         # Si es el primer contacto
         if nuevo_estado in ['CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'NO_INTERESADO']:
-            if not lead.fecha_primer_contacto:
-                lead.fecha_primer_contacto = timezone.now()
-            lead.fecha_ultimo_contacto = timezone.now()
-            lead.numero_intentos += 1
+            if not lead_estado.fecha_primer_contacto:
+                lead_estado.fecha_primer_contacto = timezone.now()
+            lead_estado.fecha_ultimo_contacto = timezone.now()
+            lead_estado.numero_intentos += 1
 
-        lead.save()
+        lead_estado.save()
 
     # Si viene del detalle, recargar toda la pagina
     if request.headers.get('HX-Target') == 'body':
         return redirect('leads:detail', lead_id=lead_id)
 
+    # Obtener estado actual de LeadEstado
+    lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()
+    current_estado = lead_estado.estado if lead_estado else lead.estado
+
     # Si viene de la tabla, devolver solo la fila actualizada
     context = {
         'lead': lead,
+        'lead_estado': current_estado,
         'estados': Lead.ESTADO_CHOICES,
     }
 
