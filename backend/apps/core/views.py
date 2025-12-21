@@ -149,6 +149,46 @@ def profile_view(request):
 # Variable global para rastrear scrapers en ejecución
 _running_scrapers = {}
 
+# Mapeo de zonas de la BD a zonas de Pisos.com
+ZONA_MAPPING_PISOS = {
+    # Lleida
+    'tarragona_ciudad': 'tarragona_capital',
+    'tarragona_20km': 'tarragona_provincia',
+    'tarragona_30km': 'tarragona_provincia',
+    'tarragona_40km': 'tarragona_provincia',
+    'tarragona_50km': 'tarragona_provincia',
+    'lleida_ciudad': 'lleida_capital',
+    'lleida_20km': 'lleida_provincia',
+    'lleida_30km': 'lleida_provincia',
+    'lleida_40km': 'lleida_provincia',
+    'lleida_50km': 'lleida_provincia',
+    'la_bordeta': 'lleida_capital',
+    'balaguer': 'balaguer',
+    'mollerussa': 'mollerussa',
+    'tremp': 'tremp',
+    'tarrega': 'tarrega',
+    # Costa Daurada
+    'salou': 'salou',
+    'cambrils': 'cambrils',
+    'reus': 'reus',
+    'vendrell': 'vendrell',
+    'calafell': 'calafell',
+    'torredembarra': 'torredembarra',
+    'altafulla': 'altafulla',
+    'miami_platja': 'miami_platja',
+    'hospitalet_infant': 'hospitalet_infant',
+    'coma_ruga': 'coma_ruga',
+    'valls': 'valls',
+    'montblanc': 'montblanc',
+    'vila_seca': 'vila_seca',
+    # Terres de l'Ebre
+    'tortosa': 'tortosa',
+    'amposta': 'amposta',
+    'deltebre': 'deltebre',
+    'ametlla_mar': 'ametlla_mar',
+    'sant_carles_rapita': 'sant_carles_rapita',
+}
+
 
 @login_required
 def scrapers_view(request):
@@ -240,9 +280,20 @@ def _run_scraper_process(scraper_id, zona_slug, scraper_key):
         script_path = os.path.join(project_root, f'run_{scraper_id}_scraper.py')
 
         if os.path.exists(script_path):
+            # Mapear zona si es scraper de pisos
+            actual_zona = zona_slug
+            if scraper_id == 'pisos':
+                actual_zona = ZONA_MAPPING_PISOS.get(zona_slug)
+                if not actual_zona:
+                    _running_scrapers[scraper_key] = {
+                        'status': 'error',
+                        'error': f'Zona "{zona_slug}" no disponible para Pisos.com',
+                    }
+                    return
+
             # Ejecutar el scraper
             result = subprocess.run(
-                ['python', script_path, '--zones', zona_slug, '--postgres'],
+                ['python', script_path, '--zones', actual_zona, '--postgres'],
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minutos timeout

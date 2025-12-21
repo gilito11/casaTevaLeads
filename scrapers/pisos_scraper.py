@@ -88,6 +88,33 @@ ZONAS_PISOS = {
         'url_path': 'pisos-valls'
     },
 
+    # === MÁS COSTA DAURADA ===
+    'miami_platja': {
+        'nombre': 'Miami Platja',
+        'slug': 'miami_platja',
+        'url_path': 'pisos-miami_platja'
+    },
+    'hospitalet_infant': {
+        'nombre': "L'Hospitalet de l'Infant",
+        'slug': 'hospitalet_de_linfant',
+        'url_path': 'pisos-hospitalet_de_linfant'
+    },
+    'coma_ruga': {
+        'nombre': 'Coma-ruga',
+        'slug': 'coma_ruga',
+        'url_path': 'pisos-coma_ruga'
+    },
+    'montblanc': {
+        'nombre': 'Montblanc',
+        'slug': 'montblanc',
+        'url_path': 'pisos-montblanc'
+    },
+    'vila_seca': {
+        'nombre': 'Vila-seca',
+        'slug': 'vila_seca',
+        'url_path': 'pisos-vila_seca'
+    },
+
     # === TERRES DE L'EBRE ===
     'tortosa': {
         'nombre': 'Tortosa',
@@ -98,6 +125,43 @@ ZONAS_PISOS = {
         'nombre': 'Amposta',
         'slug': 'amposta',
         'url_path': 'pisos-amposta'
+    },
+    'deltebre': {
+        'nombre': 'Deltebre',
+        'slug': 'deltebre',
+        'url_path': 'pisos-deltebre'
+    },
+    'ametlla_mar': {
+        'nombre': "L'Ametlla de Mar",
+        'slug': 'ametlla_de_mar',
+        'url_path': 'pisos-ametlla_de_mar'
+    },
+    'sant_carles_rapita': {
+        'nombre': 'Sant Carles de la Ràpita',
+        'slug': 'sant_carles_de_la_rapita',
+        'url_path': 'pisos-sant_carles_de_la_rapita'
+    },
+
+    # === MÁS LLEIDA ===
+    'balaguer': {
+        'nombre': 'Balaguer',
+        'slug': 'balaguer',
+        'url_path': 'pisos-balaguer'
+    },
+    'mollerussa': {
+        'nombre': 'Mollerussa',
+        'slug': 'mollerussa',
+        'url_path': 'pisos-mollerussa'
+    },
+    'tremp': {
+        'nombre': 'Tremp',
+        'slug': 'tremp',
+        'url_path': 'pisos-tremp'
+    },
+    'tarrega': {
+        'nombre': 'Tàrrega',
+        'slug': 'tarrega',
+        'url_path': 'pisos-tarrega'
     },
 
     # === BARCELONA (para testing) ===
