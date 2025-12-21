@@ -1,5 +1,29 @@
+{% load humanize l10n %}
 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
     id="lead-row-{{ lead.lead_id }}">
+    <!-- Thumbnail -->
+    <td class="px-3 py-2">
+        {% if lead.fotos and lead.fotos|length > 0 %}
+        <a href="{% url 'leads:detail' lead.lead_id %}" class="block">
+            <img src="{{ lead.fotos.0 }}"
+                 alt="Foto"
+                 class="w-14 h-14 object-cover rounded-lg border border-gray-200 dark:border-gray-600 hover:opacity-80 transition-opacity"
+                 loading="lazy"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="w-14 h-14 bg-gray-100 dark:bg-gray-700 rounded-lg items-center justify-center hidden">
+                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </div>
+        </a>
+        {% else %}
+        <div class="w-14 h-14 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+        </div>
+        {% endif %}
+    </td>
     <td class="px-6 py-4">
         <div class="flex items-center">
             <div>
@@ -29,11 +53,7 @@
     </td>
     <td class="px-6 py-4 whitespace-nowrap">
         <span class="text-lg font-semibold text-gray-900 dark:text-white">
-            {% if lead.precio %}
-            {{ lead.precio|floatformat:0 }}&euro;
-            {% else %}
-            -
-            {% endif %}
+            {% if lead.precio %}{% localize on %}{{ lead.precio|floatformat:0 }}{% endlocalize %}&euro;{% else %}-{% endif %}
         </span>
     </td>
     <td class="px-6 py-4 whitespace-nowrap">
@@ -107,6 +127,17 @@
                 </svg>
             </a>
             {% endif %}
+            <!-- Eliminar -->
+            <button hx-post="{% url 'leads:delete' lead.lead_id %}"
+                    hx-target="#lead-row-{{ lead.lead_id }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Eliminar este lead?"
+                    class="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Eliminar lead">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
         </div>
     </td>
 </tr>

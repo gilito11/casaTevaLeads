@@ -111,7 +111,6 @@ class LeadEstado(models.Model):
         db_table = 'leads_lead_estado'
         verbose_name = 'Estado de Lead'
         verbose_name_plural = 'Estados de Leads'
-        unique_together = ['tenant', 'telefono_norm']
 
     def __str__(self):
         return f"{self.telefono_norm} - {self.estado}"

@@ -22,6 +22,7 @@ Ejemplos:
 """
 
 import argparse
+import os
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
 
@@ -117,8 +118,10 @@ def main():
 
     postgres_config = None
     if args.postgres:
+        db_url = os.environ.get('DATABASE_URL', '')
+        pg_host = 'postgres' if '@postgres' in db_url else 'localhost'
         postgres_config = {
-            'host': 'localhost',
+            'host': pg_host,
             'port': 5432,
             'database': 'casa_teva_db',
             'user': 'casa_teva',

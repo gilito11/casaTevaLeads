@@ -25,6 +25,12 @@
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script>
+        // CSRF token for HTMX requests
+        document.addEventListener('htmx:configRequest', function(evt) {
+            evt.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
+    </script>
 
     <!-- Alpine.js -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -112,6 +118,14 @@
             // Scroll to top of swapped content if needed
             if (evt.detail.target.id === 'main-content') {
                 evt.detail.target.scrollTop = 0;
+            }
+
+        });
+
+        // Reinicializar Alpine.js después de que HTMX termine
+        document.body.addEventListener('htmx:afterSettle', function(evt) {
+            if (window.Alpine && evt.detail.target) {
+                Alpine.initTree(evt.detail.target);
             }
         });
 

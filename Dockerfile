@@ -33,9 +33,35 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Stage 3: Runtime - imagen final
 FROM base as runtime
 
+# Instalar dependencias de Playwright (navegadores headless)
+RUN apt-get update && apt-get install -y \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libatspi2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copiar virtual environment desde builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# Instalar navegadores de Playwright en directorio compartido
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+RUN mkdir -p /opt/playwright && \
+    playwright install chromium && \
+    chmod -R 755 /opt/playwright
 
 # Crear directorios
 WORKDIR /app
@@ -51,7 +77,8 @@ COPY --chown=casateva:casateva dagster/ /app/dagster/
 COPY --chown=casateva:casateva dbt_project/ /app/dbt_project/
 COPY --chown=casateva:casateva scrapers/ /app/scrapers/
 COPY --chown=casateva:casateva scripts/ /app/scripts/
-COPY --chown=casateva:casateva run_fotocasa_scraper.py /app/
+COPY --chown=casateva:casateva run_*_scraper.py /app/
+COPY --chown=casateva:casateva run_all_scrapers.py /app/
 COPY --chown=casateva:casateva scrapy.cfg /app/
 
 # Cambiar a usuario no-root

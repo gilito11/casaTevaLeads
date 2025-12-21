@@ -128,12 +128,12 @@ def profile_view(request):
     # Estadisticas del usuario
     user_stats = {}
     if tenant_user:
-        leads_qs = Lead.objects.filter(tenant=tenant_user.tenant)
+        leads_qs = Lead.objects.filter(tenant_id=tenant_user.tenant.tenant_id)
         user_stats = {
             'total_leads': leads_qs.count(),
-            'leads_asignados': leads_qs.filter(asignado_a=request.user).count(),
+            'leads_asignados': leads_qs.filter(asignado_a_id=request.user.id).count(),
             'clientes_convertidos': leads_qs.filter(
-                asignado_a=request.user,
+                asignado_a_id=request.user.id,
                 estado='CLIENTE'
             ).count(),
         }
@@ -233,13 +233,15 @@ def _run_scraper_process(scraper_id, zona_slug, scraper_key):
     """Ejecuta el scraper en un proceso separado"""
     try:
         # Determinar el script a ejecutar
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+        # __file__ = backend/apps/core/views.py -> subir 4 niveles para llegar a project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # backend/apps/core
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))  # casa-teva-lead-system
         script_path = os.path.join(project_root, f'run_{scraper_id}_scraper.py')
 
         if os.path.exists(script_path):
             # Ejecutar el scraper
             result = subprocess.run(
-                ['python', script_path, '--zones', zona_slug, '--max-items', '10'],
+                ['python', script_path, '--zones', zona_slug, '--postgres'],
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minutos timeout
@@ -316,7 +318,9 @@ def scraper_status_partial_view(request):
 def _run_all_scrapers_process(tenant_id, zonas, scraper_key):
     """Ejecuta todos los scrapers para todas las zonas en un proceso separado"""
     try:
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+        # __file__ = backend/apps/core/views.py -> subir 4 niveles para llegar a project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # backend/apps/core
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))  # casa-teva-lead-system
         script_path = os.path.join(project_root, 'run_all_scrapers.py')
 
         if os.path.exists(script_path):

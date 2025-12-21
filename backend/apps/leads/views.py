@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.db.models import Q
+from django.db import connection
 
 from leads.models import Lead, Nota, LeadEstado
 from core.models import TenantUser, Tenant
@@ -211,3 +212,35 @@ def add_note_view(request, lead_id):
         return HttpResponse(html)
 
     return HttpResponse(status=400)
+
+
+@login_required
+def delete_lead_view(request, lead_id):
+    """Vista para eliminar un lead (HTMX)"""
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    # Verificar que el lead pertenece al tenant del usuario
+    if tenant_id and lead.tenant_id != tenant_id:
+        return HttpResponse(status=403)
+
+    # Eliminar el estado del lead si existe
+    LeadEstado.objects.filter(lead_id=str(lead.lead_id)).delete()
+
+    # Eliminar notas asociadas usando SQL directo (el FK apunta a una vista con lead_id tipo texto)
+    with connection.cursor() as cursor:
+        cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
+
+    # Eliminar el lead de la tabla real raw.raw_listings
+    # El lead_id es un hash MD5 generado desde tenant_id + portal + anuncio_id/titulo
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            DELETE FROM raw.raw_listings
+            WHERE md5(tenant_id::text || portal || COALESCE(raw_data->>'anuncio_id', raw_data->>'titulo')) = %s
+        """, [lead_id])
+
+    # Devolver respuesta vacía para que HTMX elimine la fila
+    return HttpResponse("")
