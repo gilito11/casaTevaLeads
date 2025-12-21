@@ -4,31 +4,50 @@ from django.utils.text import slugify
 
 
 # Zonas preestablecidas disponibles para todos los tenants
+# Solo zonas de Lleida y Tarragona (Costa Daurada) - sincronizado con scrapers/milanuncios_scraper.py
 ZONAS_PREESTABLECIDAS = {
-    # Lleida
-    'la_bordeta': {'nombre': 'La Bordeta, Lleida', 'lat': 41.6168393, 'lon': 0.6204561, 'provincia_id': 25},
+    # === LLEIDA ===
     'lleida_ciudad': {'nombre': 'Lleida Ciudad', 'lat': 41.6175899, 'lon': 0.6200146, 'provincia_id': 25},
-    # Tarragona / Costa Dorada
+    'lleida_20km': {'nombre': 'Lleida (20 km)', 'lat': 41.6175899, 'lon': 0.6200146, 'provincia_id': 25},
+    'lleida_30km': {'nombre': 'Lleida (30 km)', 'lat': 41.6175899, 'lon': 0.6200146, 'provincia_id': 25},
+    'lleida_40km': {'nombre': 'Lleida (40 km)', 'lat': 41.6175899, 'lon': 0.6200146, 'provincia_id': 25},
+    'lleida_50km': {'nombre': 'Lleida (50 km)', 'lat': 41.6175899, 'lon': 0.6200146, 'provincia_id': 25},
+    'la_bordeta': {'nombre': 'La Bordeta, Lleida', 'lat': 41.6168393, 'lon': 0.6204561, 'provincia_id': 25},
+    'balaguer': {'nombre': 'Balaguer', 'lat': 41.7907, 'lon': 0.8050, 'provincia_id': 25},
+    'mollerussa': {'nombre': 'Mollerussa', 'lat': 41.6311, 'lon': 0.8947, 'provincia_id': 25},
+    'tremp': {'nombre': 'Tremp', 'lat': 42.1667, 'lon': 0.8947, 'provincia_id': 25},
+    'tarrega': {'nombre': 'Tàrrega', 'lat': 41.6472, 'lon': 1.1392, 'provincia_id': 25},
+
+    # === TARRAGONA (con diferentes radios) ===
     'tarragona_ciudad': {'nombre': 'Tarragona Ciudad', 'lat': 41.1188827, 'lon': 1.2444909, 'provincia_id': 43},
-    'salou': {'nombre': 'Salou', 'lat': 41.0747326, 'lon': 1.1413905, 'provincia_id': 43},
-    'cambrils': {'nombre': 'Cambrils', 'lat': 41.0670881, 'lon': 1.0570748, 'provincia_id': 43},
-    'reus': {'nombre': 'Reus', 'lat': 41.1548727, 'lon': 1.1069153, 'provincia_id': 43},
-    # Barcelona
-    'barcelona_centro': {'nombre': 'Barcelona Centro', 'lat': 41.3873974, 'lon': 2.168568, 'provincia_id': 8},
-    'hospitalet': {'nombre': "L'Hospitalet de Llobregat", 'lat': 41.3596944, 'lon': 2.0994377, 'provincia_id': 8},
-    'badalona': {'nombre': 'Badalona', 'lat': 41.4501833, 'lon': 2.2475194, 'provincia_id': 8},
-    # Madrid
-    'madrid_centro': {'nombre': 'Madrid Centro', 'lat': 40.4167754, 'lon': -3.7037902, 'provincia_id': 28},
-    'madrid_norte': {'nombre': 'Madrid Norte', 'lat': 40.4893538, 'lon': -3.6827461, 'provincia_id': 28},
-    'madrid_sur': {'nombre': 'Madrid Sur', 'lat': 40.3539823, 'lon': -3.6941673, 'provincia_id': 28},
-    # Valencia
-    'valencia_ciudad': {'nombre': 'Valencia Ciudad', 'lat': 39.4699075, 'lon': -0.3762881, 'provincia_id': 46},
-    # Málaga / Costa del Sol
-    'malaga_ciudad': {'nombre': 'Málaga Ciudad', 'lat': 36.721261, 'lon': -4.4212655, 'provincia_id': 29},
-    'marbella': {'nombre': 'Marbella', 'lat': 36.5097845, 'lon': -4.8868565, 'provincia_id': 29},
-    # Alicante / Costa Blanca
-    'alicante_ciudad': {'nombre': 'Alicante Ciudad', 'lat': 38.3459963, 'lon': -0.4906855, 'provincia_id': 3},
-    'benidorm': {'nombre': 'Benidorm', 'lat': 38.5410566, 'lon': -0.1224373, 'provincia_id': 3},
+    'tarragona_20km': {'nombre': 'Tarragona (20 km)', 'lat': 41.1188827, 'lon': 1.2444909, 'provincia_id': 43},
+    'tarragona_30km': {'nombre': 'Tarragona (30 km)', 'lat': 41.1188827, 'lon': 1.2444909, 'provincia_id': 43},
+    'tarragona_40km': {'nombre': 'Tarragona (40 km)', 'lat': 41.1188827, 'lon': 1.2444909, 'provincia_id': 43},
+    'tarragona_50km': {'nombre': 'Tarragona (50 km)', 'lat': 41.1188827, 'lon': 1.2444909, 'provincia_id': 43},
+
+    # === COSTA DAURADA - Pueblos costeros ===
+    'salou': {'nombre': 'Salou', 'lat': 41.0764, 'lon': 1.1416, 'provincia_id': 43},
+    'cambrils': {'nombre': 'Cambrils', 'lat': 41.0672, 'lon': 1.0597, 'provincia_id': 43},
+    'reus': {'nombre': 'Reus', 'lat': 41.1548, 'lon': 1.1078, 'provincia_id': 43},
+    'vendrell': {'nombre': 'El Vendrell', 'lat': 41.2186, 'lon': 1.5362, 'provincia_id': 43},
+    'altafulla': {'nombre': 'Altafulla', 'lat': 41.1417, 'lon': 1.3778, 'provincia_id': 43},
+    'torredembarra': {'nombre': 'Torredembarra', 'lat': 41.1456, 'lon': 1.3958, 'provincia_id': 43},
+    'miami_platja': {'nombre': 'Miami Platja', 'lat': 41.0333, 'lon': 0.9833, 'provincia_id': 43},
+    'hospitalet_infant': {'nombre': "L'Hospitalet de l'Infant", 'lat': 40.9917, 'lon': 0.9250, 'provincia_id': 43},
+    'calafell': {'nombre': 'Calafell', 'lat': 41.2003, 'lon': 1.5681, 'provincia_id': 43},
+    'coma_ruga': {'nombre': 'Coma-ruga', 'lat': 41.1833, 'lon': 1.5167, 'provincia_id': 43},
+
+    # === COSTA DAURADA - Pueblos interiores ===
+    'valls': {'nombre': 'Valls', 'lat': 41.2861, 'lon': 1.2497, 'provincia_id': 43},
+    'montblanc': {'nombre': 'Montblanc', 'lat': 41.3772, 'lon': 1.1631, 'provincia_id': 43},
+    'vila_seca': {'nombre': 'Vila-seca', 'lat': 41.1125, 'lon': 1.1458, 'provincia_id': 43},
+
+    # === TERRES DE L'EBRE (sur de Tarragona) ===
+    'tortosa': {'nombre': 'Tortosa', 'lat': 40.8125, 'lon': 0.5216, 'provincia_id': 43},
+    'amposta': {'nombre': 'Amposta', 'lat': 40.7125, 'lon': 0.5811, 'provincia_id': 43},
+    'deltebre': {'nombre': 'Deltebre', 'lat': 40.7208, 'lon': 0.7181, 'provincia_id': 43},
+    'ametlla_mar': {'nombre': "L'Ametlla de Mar", 'lat': 40.8833, 'lon': 0.8000, 'provincia_id': 43},
+    'sant_carles_rapita': {'nombre': 'Sant Carles de la Ràpita', 'lat': 40.6167, 'lon': 0.5917, 'provincia_id': 43},
 }
 
 
@@ -110,6 +129,7 @@ class ZonaGeografica(models.Model):
     scrapear_milanuncios = models.BooleanField(default=True)
     scrapear_fotocasa = models.BooleanField(default=True)
     scrapear_wallapop = models.BooleanField(default=True)
+    scrapear_pisos = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

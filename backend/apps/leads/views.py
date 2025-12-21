@@ -2,16 +2,18 @@
 Vistas para la gestion de Leads.
 Lista, detalle, cambio de estado, notas, etc.
 """
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.db.models import Q
 from django.db import connection
+from django.views.decorators.http import require_POST
 
-from leads.models import Lead, Nota, LeadEstado
+from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist
 from core.models import TenantUser, Tenant
 
 
@@ -244,3 +246,140 @@ def delete_lead_view(request, lead_id):
 
     # Devolver respuesta vacía para que HTMX elimine la fila
     return HttpResponse("")
+
+
+@login_required
+@require_POST
+def bulk_change_status_view(request):
+    """Vista para cambiar el estado de múltiples leads a la vez"""
+    try:
+        data = json.loads(request.body)
+        lead_ids = data.get('lead_ids', [])
+        nuevo_estado = data.get('estado')
+
+        if not lead_ids or not nuevo_estado:
+            return JsonResponse({'error': 'Faltan parámetros'}, status=400)
+
+        if nuevo_estado not in dict(Lead.ESTADO_CHOICES):
+            return JsonResponse({'error': 'Estado inválido'}, status=400)
+
+        tenant_id = get_user_tenant(request)
+        updated_count = 0
+
+        for lead_id in lead_ids:
+            try:
+                lead = Lead.objects.get(lead_id=lead_id)
+
+                # Verificar que el lead pertenece al tenant
+                if tenant_id and lead.tenant_id != tenant_id:
+                    continue
+
+                # Usar LeadEstado para guardar el estado
+                lead_estado, created = LeadEstado.objects.get_or_create(
+                    lead_id=str(lead.lead_id),
+                    defaults={
+                        'tenant_id': lead.tenant_id,
+                        'telefono_norm': lead.telefono_norm,
+                        'estado': nuevo_estado,
+                    }
+                )
+
+                lead_estado.estado = nuevo_estado
+                lead_estado.fecha_cambio_estado = timezone.now()
+
+                if nuevo_estado in ['CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'NO_INTERESADO']:
+                    if not lead_estado.fecha_primer_contacto:
+                        lead_estado.fecha_primer_contacto = timezone.now()
+                    lead_estado.fecha_ultimo_contacto = timezone.now()
+                    lead_estado.numero_intentos += 1
+
+                lead_estado.save()
+                updated_count += 1
+
+            except Lead.DoesNotExist:
+                continue
+
+        return JsonResponse({'updated': updated_count})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+
+@login_required
+@require_POST
+def bulk_delete_view(request):
+    """Vista para eliminar múltiples leads a la vez, opcionalmente añadiéndolos a blacklist"""
+    try:
+        data = json.loads(request.body)
+        leads_info = data.get('leads_info', [])
+        add_to_blacklist = data.get('add_to_blacklist', False)
+
+        if not leads_info:
+            return JsonResponse({'error': 'No se especificaron leads'}, status=400)
+
+        tenant_id = get_user_tenant(request)
+        deleted_count = 0
+        blacklisted_count = 0
+
+        for info in leads_info:
+            lead_id = info.get('lead_id')
+            anuncio_id = info.get('anuncio_id', '')
+            portal = info.get('portal', '')
+
+            if not lead_id:
+                continue
+
+            try:
+                lead = Lead.objects.get(lead_id=lead_id)
+
+                # Verificar que el lead pertenece al tenant
+                if tenant_id and lead.tenant_id != tenant_id:
+                    continue
+
+                # Si hay que añadir a blacklist y tenemos la info necesaria
+                if add_to_blacklist and portal:
+                    # Usar anuncio_id si está disponible, sino usar el lead_id
+                    blacklist_id = anuncio_id if anuncio_id else lead_id
+                    try:
+                        tenant = Tenant.objects.get(tenant_id=tenant_id)
+                        AnuncioBlacklist.objects.get_or_create(
+                            tenant=tenant,
+                            portal=portal,
+                            anuncio_id=blacklist_id,
+                            defaults={
+                                'url_anuncio': lead.url_anuncio,
+                                'titulo': lead.direccion or lead.descripcion[:200] if lead.descripcion else '',
+                                'motivo': 'Eliminado por el usuario y marcado para no volver a scrapear',
+                                'created_by': request.user,
+                            }
+                        )
+                        blacklisted_count += 1
+                    except Exception:
+                        pass  # Si falla el blacklist, continuamos con el delete
+
+                # Eliminar estado del lead
+                LeadEstado.objects.filter(lead_id=str(lead_id)).delete()
+
+                # Eliminar notas
+                with connection.cursor() as cursor:
+                    cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
+
+                # Eliminar de raw_listings
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM raw.raw_listings
+                        WHERE md5(tenant_id::text || portal || COALESCE(raw_data->>'anuncio_id', raw_data->>'titulo')) = %s
+                    """, [lead_id])
+
+                deleted_count += 1
+
+            except Lead.DoesNotExist:
+                continue
+
+        return JsonResponse({
+            'deleted': deleted_count,
+            'blacklisted': blacklisted_count
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)

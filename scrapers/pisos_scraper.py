@@ -218,7 +218,7 @@ class PisosScraper(scrapy.Spider):
             )
 
     async def parse(self, response: Response):
-        """Parsea la página de resultados de Pisos.com."""
+        """Parsea la página de resultados de Pisos.com usando Playwright."""
         page = response.meta.get('playwright_page')
         zona_key = response.meta.get('zona_key')
         zona_nombre = response.meta.get('zona_nombre')
@@ -228,47 +228,34 @@ class PisosScraper(scrapy.Spider):
         logger.info(f"Parseando página {current_page} de zona {zona_key}: {response.url}")
 
         try:
-            # Selectores para las tarjetas de anuncios en Pisos.com
-            card_selectors = [
-                'div.ad-preview',
-                'article.ad-preview',
-                'div[class*="ad-preview"]',
-                '.listing-item',
-                'div.property-card',
-            ]
+            if not page:
+                logger.error("No se obtuvo el objeto page de Playwright")
+                return
 
-            cards = []
-            for selector in card_selectors:
-                cards = response.css(selector)
-                if cards:
-                    logger.info(f"Encontradas {len(cards)} tarjetas con selector: {selector}")
-                    break
+            # Esperar a que carguen los anuncios
+            await page.wait_for_selector('div.ad-preview', timeout=10000)
 
-            if not cards:
-                # Intentar con selectores alternativos
-                cards = response.css('a[href*="/comprar/"]').xpath('./ancestor::div[contains(@class, "ad")]')
-                if cards:
-                    logger.info(f"Encontradas {len(cards)} tarjetas con selector alternativo")
+            # Obtener tarjetas usando Playwright directamente (no response.css)
+            cards = await page.query_selector_all('div.ad-preview')
+            logger.info(f"Encontradas {len(cards)} tarjetas con Playwright")
 
             if not cards:
                 logger.warning(f"No se encontraron anuncios en {response.url}")
-                # Guardar HTML para debug
-                if page:
-                    html_content = await page.content()
-                    logger.debug(f"HTML de la página (primeros 2000 chars): {html_content[:2000]}")
 
             # Procesar cada tarjeta
             for card in cards:
                 try:
-                    listing_data = self._extract_listing_data(card, response, zona_key, zona_nombre)
+                    listing_data = await self._extract_listing_data_playwright(card, zona_key, zona_nombre)
 
                     if listing_data and listing_data.get('titulo'):
                         self.items_scraped += 1
 
                         # Guardar en base de datos
                         if self.base_scraper:
-                            self.base_scraper.save_listing(listing_data)
-                            self.items_saved += 1
+                            saved = self.base_scraper.save_listing(listing_data)
+                            if saved:
+                                self.items_saved += 1
+                                logger.info(f"Guardado: {listing_data.get('titulo', 'Sin título')[:50]}")
 
                         yield listing_data
 
@@ -277,28 +264,31 @@ class PisosScraper(scrapy.Spider):
                     continue
 
             # Buscar paginación
-            next_page_selectors = [
-                'a.next',
+            next_page_url = None
+
+            # Buscar enlace "Siguiente"
+            next_selectors = [
+                'a.pager__next',
                 'a[rel="next"]',
                 'a.pagination__next',
-                'a[title="Siguiente"]',
-                '.pagination a:contains("Siguiente")',
-                'a.pager__next',
             ]
 
-            next_page_url = None
-            for selector in next_page_selectors:
-                next_link = response.css(f'{selector}::attr(href)').get()
+            for selector in next_selectors:
+                next_link = await page.query_selector(selector)
                 if next_link:
-                    next_page_url = response.urljoin(next_link)
-                    break
+                    href = await next_link.get_attribute('href')
+                    if href:
+                        next_page_url = response.urljoin(href)
+                        break
 
             # También buscar por número de página
             if not next_page_url:
                 next_page_num = current_page + 1
-                page_link = response.css(f'a[href*="/{next_page_num}/"]::attr(href)').get()
+                page_link = await page.query_selector(f'a[href*="/{next_page_num}/"]')
                 if page_link:
-                    next_page_url = response.urljoin(page_link)
+                    href = await page_link.get_attribute('href')
+                    if href:
+                        next_page_url = response.urljoin(href)
 
             if next_page_url and current_page < 10:  # Limitar a 10 páginas por zona
                 logger.info(f"Siguiente página encontrada: {next_page_url}")
@@ -329,6 +319,142 @@ class PisosScraper(scrapy.Spider):
             if page:
                 await page.close()
 
+    async def _extract_listing_data_playwright(
+        self,
+        card,
+        zona_key: str,
+        zona_nombre: str
+    ) -> Optional[Dict[str, Any]]:
+        """Extrae datos de una tarjeta usando Playwright."""
+
+        try:
+            # URL y título del anuncio
+            title_link = await card.query_selector('.ad-preview__title')
+            url_anuncio = None
+            titulo = None
+
+            if title_link:
+                href = await title_link.get_attribute('href')
+                if href:
+                    url_anuncio = f"https://www.pisos.com{href}" if href.startswith('/') else href
+                titulo = await title_link.inner_text()
+                if titulo:
+                    titulo = titulo.strip()
+
+            # ID del anuncio desde la URL
+            anuncio_id = None
+            if url_anuncio:
+                match = re.search(r'-(\d+)(?:_\d+)?/?$', url_anuncio)
+                if match:
+                    anuncio_id = match.group(1)
+                else:
+                    # Intentar extraer de otra forma
+                    match = re.search(r'/(\d+)/?$', url_anuncio)
+                    if match:
+                        anuncio_id = match.group(1)
+
+            # Precio
+            precio = None
+            price_elem = await card.query_selector('.ad-preview__price')
+            if price_elem:
+                precio_text = await price_elem.inner_text()
+                if precio_text:
+                    precio_clean = re.sub(r'[^\d]', '', precio_text)
+                    if precio_clean:
+                        precio = float(precio_clean)
+
+            # Ubicación
+            ubicacion = None
+            location_elem = await card.query_selector('.ad-preview__subtitle')
+            if location_elem:
+                ubicacion = await location_elem.inner_text()
+                if ubicacion:
+                    ubicacion = ubicacion.strip()
+
+            # Características (metros, habitaciones, baños)
+            metros = None
+            habitaciones = None
+            banos = None
+
+            char_elems = await card.query_selector_all('.ad-preview__char')
+            for char_elem in char_elems:
+                feat = await char_elem.inner_text()
+                if feat:
+                    feat = feat.strip().lower()
+
+                    # Metros cuadrados
+                    if 'm²' in feat or 'm2' in feat:
+                        match = re.search(r'(\d+(?:[.,]\d+)?)', feat)
+                        if match:
+                            metros = float(match.group(1).replace(',', '.'))
+
+                    # Habitaciones
+                    if 'hab' in feat or 'dorm' in feat:
+                        match = re.search(r'(\d+)', feat)
+                        if match:
+                            habitaciones = int(match.group(1))
+
+                    # Baños
+                    if 'baño' in feat or 'wc' in feat:
+                        match = re.search(r'(\d+)', feat)
+                        if match:
+                            banos = int(match.group(1))
+
+            # Fotos (hasta 5)
+            fotos = []
+            img_elems = await card.query_selector_all('img[src*="imghs.net"]')
+            for img in img_elems[:5]:
+                src = await img.get_attribute('src')
+                if src and src.startswith('http'):
+                    fotos.append(src)
+
+            # Si no encontramos fotos, buscar en data-src
+            if not fotos:
+                img_elems = await card.query_selector_all('img[data-src*="imghs.net"]')
+                for img in img_elems[:5]:
+                    src = await img.get_attribute('data-src')
+                    if src and src.startswith('http'):
+                        fotos.append(src)
+
+            # Tipo de vendedor
+            vendedor = 'Particular'
+            agency_elem = await card.query_selector('.ad-preview__bottom-info-agency')
+            if agency_elem:
+                vendedor = await agency_elem.inner_text()
+                if vendedor:
+                    vendedor = vendedor.strip()
+
+            # Determinar si es particular
+            es_particular = True
+            if vendedor and any(x in vendedor.lower() for x in ['inmobiliaria', 'agencia', 'inmo', 'real estate', 'homes']):
+                es_particular = False
+
+            return {
+                'tenant_id': self.tenant_id,
+                'portal': 'pisos',
+                'anuncio_id': anuncio_id,
+                'titulo': titulo,
+                'descripcion': titulo or '',
+                'precio': precio,
+                'ubicacion': ubicacion,
+                'direccion': ubicacion,
+                'zona_busqueda': zona_nombre,
+                'zona_geografica': zona_nombre,
+                'habitaciones': habitaciones,
+                'banos': banos,
+                'metros': metros,
+                'fotos': fotos,
+                'vendedor': vendedor,
+                'es_particular': es_particular,
+                'url_anuncio': url_anuncio,
+                'detail_url': url_anuncio,
+                'telefono': None,
+            }
+
+        except Exception as e:
+            logger.error(f"Error extrayendo datos: {e}")
+            return None
+
     def _extract_listing_data(
         self,
         card,
@@ -336,7 +462,7 @@ class PisosScraper(scrapy.Spider):
         zona_key: str,
         zona_nombre: str
     ) -> Optional[Dict[str, Any]]:
-        """Extrae datos de una tarjeta de anuncio."""
+        """Extrae datos de una tarjeta de anuncio (método legacy, no usado)."""
 
         # URL del anuncio
         url_selectors = [

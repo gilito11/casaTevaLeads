@@ -3,7 +3,7 @@
 Script para ejecutar todos los scrapers en todas las zonas configuradas.
 
 Uso:
-    python run_all_scrapers.py [--minio] [--postgres]
+    python run_all_scrapers.py [--postgres] [--zones ZONAS]
 
 Ejemplos:
     # Ejecutar sin guardar (solo logs)
@@ -12,8 +12,8 @@ Ejemplos:
     # Ejecutar guardando en PostgreSQL
     python run_all_scrapers.py --postgres
 
-    # Ejecutar guardando en MinIO y PostgreSQL
-    python run_all_scrapers.py --minio --postgres
+    # Ejecutar zonas específicas
+    python run_all_scrapers.py --zones salou,cambrils --postgres
 """
 
 import sys
@@ -23,6 +23,7 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
 
 from scrapers.milanuncios_scraper import MilanunciosScraper, ZONAS_GEOGRAFICAS
+from scrapers.pisos_scraper import PisosScraper, ZONAS_PISOS
 
 # Configurar logging
 logging.basicConfig(
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Zonas por defecto para scrapear (las más comunes en Cataluña)
 ZONAS_DEFAULT = [
     'tarragona_ciudad',
-    'tarragona_provincia',
+    'tarragona_30km',  # Cubre área amplia alrededor de Tarragona
     'reus',
     'salou',
     'cambrils',
@@ -63,11 +64,6 @@ def main():
         '--all-zones',
         action='store_true',
         help='Scrapear TODAS las zonas disponibles'
-    )
-    parser.add_argument(
-        '--minio',
-        action='store_true',
-        help='Habilitar guardado en MinIO'
     )
     parser.add_argument(
         '--postgres',
@@ -115,27 +111,17 @@ def main():
         }
     }
 
-    # Configuración de MinIO y PostgreSQL
-    minio_config = None
+    # Configuración de PostgreSQL
     postgres_config = None
-
-    if args.minio:
-        import os
-        minio_config = {
-            'endpoint': os.environ.get('MINIO_ENDPOINT', 'localhost:9000'),
-            'access_key': os.environ.get('MINIO_ACCESS_KEY', 'minioadmin'),
-            'secret_key': os.environ.get('MINIO_SECRET_KEY', 'minioadmin'),
-            'bucket': os.environ.get('MINIO_BUCKET', 'raw-scraping'),
-        }
 
     if args.postgres:
         import os
         postgres_config = {
             'host': os.environ.get('POSTGRES_HOST', 'localhost'),
             'port': os.environ.get('POSTGRES_PORT', '5432'),
-            'dbname': os.environ.get('POSTGRES_DB', 'casa_teva'),
-            'user': os.environ.get('POSTGRES_USER', 'postgres'),
-            'password': os.environ.get('POSTGRES_PASSWORD', ''),
+            'database': os.environ.get('POSTGRES_DB', 'casa_teva_db'),
+            'user': os.environ.get('POSTGRES_USER', 'casa_teva'),
+            'password': os.environ.get('POSTGRES_PASSWORD', 'casateva2024'),
         }
 
     # Mostrar configuración
@@ -144,7 +130,6 @@ def main():
     print(f"SCRAPING MASIVO - {len(zones)} zonas")
     print(f"{'='*60}")
     print(f"Tenant ID: {args.tenant_id}")
-    print(f"MinIO: {'Habilitado' if args.minio else 'Deshabilitado'}")
     print(f"PostgreSQL: {'Habilitado' if args.postgres else 'Deshabilitado'}")
     print(f"\nZonas a scrapear:")
     for i, z in enumerate(zone_names, 1):
@@ -160,15 +145,39 @@ def main():
     # Crear proceso de Scrapy
     process = CrawlerProcess(settings)
 
-    # Solo Milanuncios por ahora (los otros están bloqueados)
+    # Milanuncios
     process.crawl(
         MilanunciosScraper,
         tenant_id=args.tenant_id,
         zones=zones,
         filters=filters,
-        minio_config=minio_config,
         postgres_config=postgres_config,
     )
+
+    # Pisos.com - mapear zonas de Milanuncios a zonas de Pisos
+    # Solo ejecutar si hay zonas equivalentes en Pisos.com
+    zona_mapping = {
+        'tarragona_ciudad': 'tarragona_capital',
+        'tarragona_30km': 'tarragona_provincia',
+        'reus': 'reus',
+        'salou': 'salou',
+        'cambrils': 'cambrils',
+        'lleida_ciudad': 'lleida_capital',
+    }
+    pisos_zones = []
+    for z in zones:
+        if z in zona_mapping and zona_mapping[z] in ZONAS_PISOS:
+            pisos_zones.append(zona_mapping[z])
+
+    if pisos_zones:
+        logger.info(f"Ejecutando Pisos.com en zonas: {pisos_zones}")
+        process.crawl(
+            PisosScraper,
+            tenant_id=args.tenant_id,
+            zones=pisos_zones,
+            filters={},
+            postgres_config=postgres_config,
+        )
 
     # Ejecutar
     logger.info("Iniciando scraping masivo...")

@@ -48,6 +48,7 @@ class Lead(models.Model):
     asignado_a_id = models.IntegerField(null=True, blank=True)
     created_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(null=True, blank=True)
+    anuncio_id = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         db_table = 'marts"."dim_leads'
@@ -130,3 +131,64 @@ class Nota(models.Model):
 
     def __str__(self):
         return f"Nota de {self.autor} - {self.lead} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
+
+
+class AnuncioBlacklist(models.Model):
+    """
+    Modelo para almacenar anuncios que no deben volver a scrapearse.
+    Cuando un usuario elimina un lead con la opcion "no volver a scrapear",
+    se guarda aqui para que los scrapers lo ignoren en futuras ejecuciones.
+    """
+    PORTAL_CHOICES = [
+        ('milanuncios', 'Milanuncios'),
+        ('wallapop', 'Wallapop'),
+        ('fotocasa', 'Fotocasa'),
+        ('pisos', 'Pisos.com'),
+    ]
+
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name='anuncios_blacklist'
+    )
+    portal = models.CharField(max_length=50, choices=PORTAL_CHOICES)
+    anuncio_id = models.CharField(
+        max_length=255,
+        help_text="ID unico del anuncio en el portal"
+    )
+    url_anuncio = models.TextField(blank=True, null=True)
+    titulo = models.CharField(max_length=500, blank=True, null=True)
+    motivo = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Motivo por el que se añadio a blacklist"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='anuncios_blacklist_creados'
+    )
+
+    class Meta:
+        db_table = 'leads_anuncio_blacklist'
+        verbose_name = 'Anuncio en Blacklist'
+        verbose_name_plural = 'Anuncios en Blacklist'
+        unique_together = ['tenant', 'portal', 'anuncio_id']
+        indexes = [
+            models.Index(fields=['portal', 'anuncio_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.portal}: {self.anuncio_id}"
+
+    @classmethod
+    def esta_en_blacklist(cls, tenant_id, portal, anuncio_id):
+        """Verifica si un anuncio esta en blacklist"""
+        return cls.objects.filter(
+            tenant_id=tenant_id,
+            portal=portal,
+            anuncio_id=anuncio_id
+        ).exists()

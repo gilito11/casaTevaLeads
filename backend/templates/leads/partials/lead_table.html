@@ -1,9 +1,77 @@
 {% load humanize l10n %}
-<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
+     x-data="bulkSelection()" x-init="init()">
+
+    <!-- Bulk Actions Toolbar -->
+    <div x-show="selectedCount > 0"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="px-4 py-3 bg-primary-50 dark:bg-primary-900/30 border-b border-primary-200 dark:border-primary-800 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
+                <span x-text="selectedCount"></span> seleccionado(s)
+            </span>
+            <button @click="clearSelection()"
+                    class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-200 underline">
+                Limpiar selección
+            </button>
+        </div>
+        <div class="flex items-center space-x-2">
+            <!-- Cambiar estado -->
+            <div x-data="{ open: false }" class="relative">
+                <button @click="open = !open"
+                        class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                    </svg>
+                    Cambiar estado
+                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" @click.away="open = false"
+                     class="absolute right-0 z-50 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1">
+                    {% for estado_choice in estados %}
+                    <button @click="bulkChangeStatus('{{ estado_choice.0 }}'); open = false"
+                            class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2">
+                        {% include 'components/estado_badge.html' with estado=estado_choice.0 %}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Eliminar -->
+            <button @click="bulkDelete(false)"
+                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Eliminar
+            </button>
+
+            <!-- Eliminar y blacklist -->
+            <button @click="bulkDelete(true)"
+                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                </svg>
+                Eliminar y no volver a scrapear
+            </button>
+        </div>
+    </div>
+
     <div class="overflow-x-auto">
         <table class="w-full">
             <thead class="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
+                    <th class="px-3 py-3 text-center w-10">
+                        <input type="checkbox"
+                               @change="toggleAll($event.target.checked)"
+                               :checked="allSelected"
+                               :indeterminate.prop="someSelected && !allSelected"
+                               class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                    </th>
                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">
                         Foto
                     </th>
@@ -33,7 +101,18 @@
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 {% for lead in leads %}
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                    id="lead-row-{{ lead.lead_id }}">
+                    :class="{ 'bg-primary-50 dark:bg-primary-900/20': selected.includes({{ lead.lead_id }}) }"
+                    id="lead-row-{{ lead.lead_id }}"
+                    data-lead-id="{{ lead.lead_id }}"
+                    data-anuncio-id="{{ lead.anuncio_id|default:'' }}"
+                    data-portal="{{ lead.portal }}">
+                    <!-- Checkbox -->
+                    <td class="px-3 py-2 text-center">
+                        <input type="checkbox"
+                               :checked="selected.includes({{ lead.lead_id }})"
+                               @change="toggleSelection({{ lead.lead_id }})"
+                               class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                    </td>
                     <!-- Thumbnail -->
                     <td class="px-3 py-2">
                         {% if lead.fotos and lead.fotos|length > 0 %}
@@ -176,7 +255,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="px-6 py-12 text-center">
+                    <td colspan="9" class="px-6 py-12 text-center">
                         <svg class="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>

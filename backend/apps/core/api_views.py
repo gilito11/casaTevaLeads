@@ -46,7 +46,7 @@ class ZonaGeograficaViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ZonaGeograficaSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['activa', 'tipo', 'scrapear_milanuncios', 'scrapear_fotocasa', 'scrapear_wallapop']
+    filterset_fields = ['activa', 'tipo', 'scrapear_milanuncios', 'scrapear_fotocasa', 'scrapear_wallapop', 'scrapear_pisos']
     search_fields = ['nombre', 'slug']
 
     def get_queryset(self):
