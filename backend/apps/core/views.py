@@ -180,6 +180,7 @@ def scrapers_view(request):
         {'id': 'milanuncios', 'nombre': 'Milanuncios', 'descripcion': 'Portal de anuncios clasificados'},
         {'id': 'wallapop', 'nombre': 'Wallapop', 'descripcion': 'Marketplace de segunda mano'},
         {'id': 'fotocasa', 'nombre': 'Fotocasa', 'descripcion': 'Portal inmobiliario'},
+        {'id': 'pisos', 'nombre': 'Pisos.com', 'descripcion': 'Portal inmobiliario grande'},
     ]
 
     context = {

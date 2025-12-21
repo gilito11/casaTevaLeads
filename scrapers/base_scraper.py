@@ -2,21 +2,17 @@
 Clase base para todos los scrapers de portales inmobiliarios.
 
 Esta clase proporciona funcionalidad común para:
-- Guardar datos en MinIO (data lake)
 - Guardar datos en PostgreSQL (raw layer)
 - Normalización de datos (teléfonos, zonas)
 - Filtrado de particulares vs profesionales
 """
 
-import json
 import logging
 import re
-import uuid
 from datetime import datetime
 from typing import Dict, Optional, Any
 
 import psycopg2
-from minio import Minio
 from psycopg2.extras import Json
 
 from scrapers.utils.particular_filter import debe_scrapear
@@ -34,47 +30,42 @@ class BaseScraper:
     """
     Clase base abstracta para scrapers de portales inmobiliarios.
 
-    Proporciona funcionalidad común para persistencia en data lake (MinIO),
-    base de datos (PostgreSQL) y normalización de datos.
+    Proporciona funcionalidad común para persistencia en PostgreSQL
+    y normalización de datos.
 
     Attributes:
         tenant_id (int): ID del tenant al que pertenece este scraper
         zones (dict): Diccionario con zonas geográficas a scrapear
         filters (dict): Filtros a aplicar (precio, habitaciones, etc.)
-        minio_client (Minio): Cliente de MinIO para data lake
         postgres_conn: Conexión a PostgreSQL
     """
 
     def __init__(
         self,
         tenant_id: int,
-        zones: Dict[str, Any],
-        filters: Dict[str, Any],
-        minio_config: Optional[Dict[str, str]] = None,
-        postgres_config: Optional[Dict[str, str]] = None
+        zones: Dict[str, Any] = None,
+        filters: Dict[str, Any] = None,
+        minio_config: Optional[Dict[str, str]] = None,  # Deprecated, se ignora
+        postgres_config: Optional[Dict[str, str]] = None,
+        portal: str = None
     ):
         """
         Inicializa el scraper base.
 
         Args:
             tenant_id: ID del tenant
-            zones: Zonas geográficas a scrapear
+            zones: Zonas geográficas a scrapear (opcional)
                    Ejemplo: {"lleida_ciudad": {"enabled": True, "codigos_postales": ["25001"]}}
-            filters: Filtros de scraping
+            filters: Filtros de scraping (opcional)
                     Ejemplo: {"filtros_precio": {"min": 50000, "max": 1000000}}
-            minio_config: Configuración de MinIO (endpoint, access_key, secret_key, bucket)
+            minio_config: DEPRECATED - se ignora, mantenido por compatibilidad
             postgres_config: Configuración de PostgreSQL (host, port, database, user, password)
+            portal: Nombre del portal (opcional, para uso con save_listing)
         """
         self.tenant_id = tenant_id
-        self.zones = zones
-        self.filters = filters
-
-        # Inicializar cliente MinIO
-        if minio_config:
-            self.minio_client = self._init_minio(minio_config)
-        else:
-            self.minio_client = None
-            logger.warning("MinIO no configurado - save_to_data_lake no funcionará")
+        self.zones = zones or {}
+        self.filters = filters or {}
+        self.portal = portal
 
         # Inicializar conexión PostgreSQL
         if postgres_config:
@@ -84,29 +75,6 @@ class BaseScraper:
             logger.warning("PostgreSQL no configurado - save_to_postgres_raw no funcionará")
 
         logger.info(f"Scraper inicializado para tenant_id={tenant_id}")
-
-    def _init_minio(self, config: Dict[str, str]) -> Minio:
-        """
-        Inicializa cliente de MinIO.
-
-        Args:
-            config: Configuración con endpoint, access_key, secret_key, secure
-
-        Returns:
-            Cliente de MinIO configurado
-        """
-        try:
-            client = Minio(
-                endpoint=config.get('endpoint', 'localhost:9000'),
-                access_key=config.get('access_key', 'minioadmin'),
-                secret_key=config.get('secret_key', 'minioadmin'),
-                secure=config.get('secure', False)
-            )
-            logger.info(f"Cliente MinIO inicializado: {config.get('endpoint')}")
-            return client
-        except Exception as e:
-            logger.error(f"Error al inicializar MinIO: {e}")
-            raise
 
     def _init_postgres(self, config: Dict[str, str]) -> psycopg2.extensions.connection:
         """
@@ -134,60 +102,15 @@ class BaseScraper:
 
     def save_to_data_lake(self, listing_data: Dict[str, Any], portal: str) -> Optional[str]:
         """
-        Guarda los datos del anuncio en el data lake (MinIO).
+        DEPRECATED: MinIO ha sido eliminado del proyecto.
 
-        El path sigue la estructura: bronze/tenant_{id}/{portal}/{YYYY-MM-DD}/listing_{uuid}.json
-
-        Args:
-            listing_data: Datos del anuncio a guardar
-            portal: Nombre del portal (fotocasa, milanuncios, wallapop)
+        Los datos se guardan directamente en PostgreSQL como JSONB.
+        Este método se mantiene por compatibilidad pero no hace nada.
 
         Returns:
-            str: Path completo del archivo en MinIO, o None si hubo error
-
-        Example:
-            >>> path = scraper.save_to_data_lake({"precio": 150000}, "fotocasa")
-            >>> print(path)
-            'bronze/tenant_1/fotocasa/2025-12-07/listing_abc123.json'
+            None siempre
         """
-        if not self.minio_client:
-            logger.error("MinIO no está configurado")
-            return None
-
-        try:
-            # Generar path único
-            fecha = datetime.now().strftime('%Y-%m-%d')
-            listing_uuid = str(uuid.uuid4())
-            object_name = f"bronze/tenant_{self.tenant_id}/{portal}/{fecha}/listing_{listing_uuid}.json"
-
-            # Convertir datos a JSON
-            json_data = json.dumps(listing_data, ensure_ascii=False, indent=2)
-            json_bytes = json_data.encode('utf-8')
-
-            # Subir a MinIO
-            bucket_name = 'casa-teva-data-lake'
-
-            # Crear bucket si no existe
-            if not self.minio_client.bucket_exists(bucket_name):
-                self.minio_client.make_bucket(bucket_name)
-                logger.info(f"Bucket creado: {bucket_name}")
-
-            # Subir archivo
-            from io import BytesIO
-            self.minio_client.put_object(
-                bucket_name=bucket_name,
-                object_name=object_name,
-                data=BytesIO(json_bytes),
-                length=len(json_bytes),
-                content_type='application/json'
-            )
-
-            logger.info(f"Datos guardados en data lake: {object_name}")
-            return object_name
-
-        except Exception as e:
-            logger.error(f"Error al guardar en data lake: {e}")
-            return None
+        return None
 
     def save_to_postgres_raw(
         self,
@@ -375,6 +298,135 @@ class BaseScraper:
             NotImplementedError: Si no se implementa en la clase hija
         """
         raise NotImplementedError("El método scrape() debe ser implementado por la clase hija")
+
+    def normalize_listing(self, listing_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normaliza los datos de un anuncio para que sean consistentes entre portales.
+
+        Campos estandarizados:
+        - tenant_id: int
+        - portal: str
+        - anuncio_id: str (único por portal)
+        - titulo: str
+        - descripcion: str
+        - precio: float (sin símbolos, solo número)
+        - direccion: str
+        - zona_busqueda: str (zona usada para búsqueda)
+        - zona_geografica: str (zona geográfica real)
+        - habitaciones: int
+        - banos: int
+        - metros: float
+        - fotos: list[str] (URLs de imágenes)
+        - vendedor: str
+        - es_particular: bool
+        - url_anuncio: str (URL completa del anuncio)
+        - telefono: str (normalizado, solo 9 dígitos)
+        - email: str
+
+        Args:
+            listing_data: Datos crudos del anuncio
+
+        Returns:
+            Dict con datos normalizados
+        """
+        normalized = {
+            'tenant_id': listing_data.get('tenant_id', self.tenant_id),
+            'portal': listing_data.get('portal', ''),
+            'anuncio_id': str(listing_data.get('anuncio_id', '')),
+            'titulo': str(listing_data.get('titulo', '') or '').strip(),
+            'descripcion': str(listing_data.get('descripcion', '') or '').strip(),
+            'direccion': str(listing_data.get('direccion', '') or listing_data.get('ubicacion', '') or '').strip(),
+            'zona_busqueda': str(listing_data.get('zona_busqueda', '') or '').strip(),
+            'zona_geografica': str(listing_data.get('zona_geografica', '') or listing_data.get('zona', '') or '').strip(),
+            'vendedor': str(listing_data.get('vendedor', 'Particular') or 'Particular').strip(),
+            'es_particular': bool(listing_data.get('es_particular', True)),
+            'url_anuncio': str(listing_data.get('url_anuncio', '') or listing_data.get('detail_url', '') or '').strip(),
+            'email': str(listing_data.get('email', '') or '').strip(),
+        }
+
+        # Normalizar precio
+        precio = listing_data.get('precio')
+        if precio is not None:
+            try:
+                if isinstance(precio, str):
+                    # Eliminar símbolos de moneda y espacios
+                    precio = re.sub(r'[€$\s.]', '', precio)
+                    precio = precio.replace(',', '.')
+                normalized['precio'] = float(precio)
+            except (ValueError, TypeError):
+                normalized['precio'] = None
+        else:
+            normalized['precio'] = None
+
+        # Normalizar habitaciones
+        habitaciones = listing_data.get('habitaciones')
+        if habitaciones is not None:
+            try:
+                normalized['habitaciones'] = int(habitaciones)
+            except (ValueError, TypeError):
+                normalized['habitaciones'] = None
+        else:
+            normalized['habitaciones'] = None
+
+        # Normalizar baños
+        banos = listing_data.get('banos')
+        if banos is not None:
+            try:
+                normalized['banos'] = int(banos)
+            except (ValueError, TypeError):
+                normalized['banos'] = None
+        else:
+            normalized['banos'] = None
+
+        # Normalizar metros
+        metros = listing_data.get('metros')
+        if metros is not None:
+            try:
+                if isinstance(metros, str):
+                    metros = metros.replace(',', '.')
+                    metros = re.sub(r'[^\d.]', '', metros)
+                normalized['metros'] = float(metros)
+            except (ValueError, TypeError):
+                normalized['metros'] = None
+        else:
+            normalized['metros'] = None
+
+        # Normalizar fotos
+        fotos = listing_data.get('fotos', [])
+        if isinstance(fotos, list):
+            normalized['fotos'] = [str(f) for f in fotos if f and str(f).startswith('http')]
+        elif isinstance(fotos, str) and fotos.startswith('http'):
+            normalized['fotos'] = [fotos]
+        else:
+            normalized['fotos'] = []
+
+        # Normalizar teléfono
+        telefono = listing_data.get('telefono')
+        if telefono:
+            normalized['telefono'] = self.normalize_phone(telefono)
+        else:
+            normalized['telefono'] = None
+
+        return normalized
+
+    def save_listing(self, listing_data: Dict[str, Any]) -> bool:
+        """
+        Normaliza y guarda un anuncio en PostgreSQL.
+
+        Args:
+            listing_data: Datos crudos del anuncio
+
+        Returns:
+            bool: True si se guardó correctamente
+        """
+        # Normalizar datos
+        normalized = self.normalize_listing(listing_data)
+
+        # Guardar en PostgreSQL
+        portal = normalized.get('portal', 'unknown')
+        data_lake_path = f"raw/{self.tenant_id}/{portal}/{normalized.get('anuncio_id', 'unknown')}"
+
+        return self.save_to_postgres_raw(normalized, data_lake_path, portal)
 
     def close(self):
         """
