@@ -3,6 +3,7 @@ Vistas principales de la aplicacion Core.
 Dashboard, login, perfil, scrapers, etc.
 """
 import subprocess
+import sys
 import threading
 import os
 from django.shortcuts import render, redirect, get_object_or_404
@@ -291,13 +292,20 @@ def _run_scraper_process(scraper_id, zona_slug, scraper_key):
                     }
                     return
 
-            # Ejecutar el scraper
+            # Ejecutar el scraper usando sys.executable para asegurar el Python correcto
+            # Incluir PLAYWRIGHT_BROWSERS_PATH para Azure
+            scraper_env = {
+                **os.environ,
+                'PYTHONPATH': project_root,
+                'PLAYWRIGHT_BROWSERS_PATH': os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '/home/playwright'),
+            }
             result = subprocess.run(
-                ['python', script_path, '--zones', actual_zona, '--postgres'],
+                [sys.executable, script_path, '--zones', actual_zona, '--postgres'],
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minutos timeout
-                cwd=project_root
+                cwd=project_root,
+                env=scraper_env
             )
             _running_scrapers[scraper_key] = {
                 'status': 'completed' if result.returncode == 0 else 'error',
@@ -380,12 +388,19 @@ def _run_all_scrapers_process(tenant_id, zonas, scraper_key):
             zone_slugs = ','.join([z.slug for z in zonas])
 
             # Ejecutar el script de todos los scrapers
+            # Incluir PLAYWRIGHT_BROWSERS_PATH para Azure
+            scraper_env = {
+                **os.environ,
+                'PYTHONPATH': project_root,
+                'PLAYWRIGHT_BROWSERS_PATH': os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '/home/playwright'),
+            }
             result = subprocess.run(
-                ['python', script_path, '--zones', zone_slugs, '--postgres'],
+                [sys.executable, script_path, '--zones', zone_slugs, '--postgres'],
                 capture_output=True,
                 text=True,
                 timeout=1800,  # 30 minutos timeout para todas las zonas
-                cwd=project_root
+                cwd=project_root,
+                env=scraper_env
             )
             _running_scrapers[scraper_key] = {
                 'status': 'completed' if result.returncode == 0 else 'error',

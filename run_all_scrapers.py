@@ -111,18 +111,35 @@ def main():
         }
     }
 
-    # Configuración de PostgreSQL
+    # Configuración de PostgreSQL (usa DATABASE_URL para Azure, o variables individuales para local)
     postgres_config = None
 
     if args.postgres:
         import os
-        postgres_config = {
-            'host': os.environ.get('POSTGRES_HOST', 'localhost'),
-            'port': os.environ.get('POSTGRES_PORT', '5432'),
-            'database': os.environ.get('POSTGRES_DB', 'casa_teva_db'),
-            'user': os.environ.get('POSTGRES_USER', 'casa_teva'),
-            'password': os.environ.get('POSTGRES_PASSWORD', 'casateva2024'),
-        }
+        from urllib.parse import urlparse
+
+        db_url = os.environ.get('DATABASE_URL', '')
+        if db_url and 'azure' in db_url:
+            # Parsear DATABASE_URL de Azure
+            # Formato: postgresql://user:pass@host:port/dbname?sslmode=require
+            parsed = urlparse(db_url)
+            postgres_config = {
+                'host': parsed.hostname,
+                'port': parsed.port or 5432,
+                'database': parsed.path.lstrip('/'),
+                'user': parsed.username,
+                'password': parsed.password,
+                'sslmode': 'require'
+            }
+        else:
+            # Config local (Docker o variables de entorno)
+            postgres_config = {
+                'host': os.environ.get('POSTGRES_HOST', 'localhost'),
+                'port': int(os.environ.get('POSTGRES_PORT', '5432')),
+                'database': os.environ.get('POSTGRES_DB', 'casa_teva_db'),
+                'user': os.environ.get('POSTGRES_USER', 'casa_teva'),
+                'password': os.environ.get('POSTGRES_PASSWORD', 'casateva2024'),
+            }
 
     # Mostrar configuración
     zone_names = [ZONAS_GEOGRAFICAS.get(z, {}).get('nombre', z) for z in zones]

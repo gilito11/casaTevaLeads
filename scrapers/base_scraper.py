@@ -81,20 +81,26 @@ class BaseScraper:
         Inicializa conexión a PostgreSQL.
 
         Args:
-            config: Configuración con host, port, database, user, password
+            config: Configuración con host, port, database, user, password, sslmode
 
         Returns:
             Conexión a PostgreSQL
         """
         try:
-            conn = psycopg2.connect(
-                host=config.get('host', 'localhost'),
-                port=config.get('port', 5432),
-                database=config.get('database', 'casa_teva_db'),
-                user=config.get('user', 'casa_teva'),
-                password=config.get('password', '')
-            )
-            logger.info(f"Conexión PostgreSQL establecida: {config.get('database')}")
+            # Construir parámetros de conexión
+            conn_params = {
+                'host': config.get('host', 'localhost'),
+                'port': config.get('port', 5432),
+                'database': config.get('database', 'casa_teva_db'),
+                'user': config.get('user', 'casa_teva'),
+                'password': config.get('password', ''),
+            }
+            # Añadir sslmode si está presente (requerido para Azure)
+            if config.get('sslmode'):
+                conn_params['sslmode'] = config.get('sslmode')
+
+            conn = psycopg2.connect(**conn_params)
+            logger.info(f"Conexión PostgreSQL establecida: {config.get('database')} (host: {config.get('host')})")
             return conn
         except Exception as e:
             logger.error(f"Error al conectar a PostgreSQL: {e}")
