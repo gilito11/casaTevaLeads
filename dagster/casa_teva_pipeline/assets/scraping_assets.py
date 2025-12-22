@@ -20,36 +20,67 @@ from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 logger = logging.getLogger(__name__)
 
 # Mapeo de zonas de BD a zonas de cada scraper
+# Todas las zonas disponibles en el scraper de Milanuncios
 ZONA_MAPPING_MILANUNCIOS = {
-    'tarragona_ciudad': 'tarragona_ciudad',
-    'tarragona_20km': 'tarragona_20km',
-    'tarragona_30km': 'tarragona_30km',
+    # Lleida
     'lleida_ciudad': 'lleida_ciudad',
     'lleida_20km': 'lleida_20km',
     'lleida_30km': 'lleida_30km',
+    'lleida_40km': 'lleida_40km',
+    'lleida_50km': 'lleida_50km',
     'la_bordeta': 'la_bordeta',
+    'balaguer': 'balaguer',
+    'mollerussa': 'mollerussa',
+    'tremp': 'tremp',
+    'tarrega': 'tarrega',
+    # Tarragona
+    'tarragona_ciudad': 'tarragona_ciudad',
+    'tarragona_20km': 'tarragona_20km',
+    'tarragona_30km': 'tarragona_30km',
+    'tarragona_40km': 'tarragona_40km',
+    'tarragona_50km': 'tarragona_50km',
+    # Costa Daurada - Costeros
     'salou': 'salou',
     'cambrils': 'cambrils',
     'reus': 'reus',
-    'costa_dorada': 'costa_dorada',
     'vendrell': 'vendrell',
-    'calafell': 'calafell',
-    'torredembarra': 'torredembarra',
     'altafulla': 'altafulla',
+    'torredembarra': 'torredembarra',
+    'miami_platja': 'miami_platja',
+    'hospitalet_infant': 'hospitalet_infant',
+    'calafell': 'calafell',
+    'coma_ruga': 'coma_ruga',
+    # Costa Daurada - Interior
     'valls': 'valls',
     'montblanc': 'montblanc',
+    'vila_seca': 'vila_seca',
+    # Terres de l'Ebre
     'tortosa': 'tortosa',
     'amposta': 'amposta',
+    'deltebre': 'deltebre',
+    'ametlla_mar': 'ametlla_mar',
+    'sant_carles_rapita': 'sant_carles_rapita',
 }
 
 ZONA_MAPPING_PISOS = {
-    'tarragona_ciudad': 'tarragona_capital',
-    'tarragona_20km': 'tarragona_provincia',
-    'tarragona_30km': 'tarragona_provincia',
+    # Lleida
     'lleida_ciudad': 'lleida_capital',
     'lleida_20km': 'lleida_provincia',
     'lleida_30km': 'lleida_provincia',
+    'lleida_40km': 'lleida_provincia',
+    'lleida_50km': 'lleida_provincia',
     'la_bordeta': 'lleida_capital',
+    'mollerussa': 'lleida_provincia',
+    'tremp': 'lleida_provincia',
+    'tarrega': 'lleida_provincia',
+    'balaguer': 'lleida_provincia',
+    # Tarragona
+    'tarragona_ciudad': 'tarragona_capital',
+    'tarragona_20km': 'tarragona_provincia',
+    'tarragona_30km': 'tarragona_provincia',
+    'tarragona_40km': 'tarragona_provincia',
+    'tarragona_50km': 'tarragona_provincia',
+    # Costa Daurada
     'salou': 'salou',
     'cambrils': 'cambrils',
     'reus': 'reus',
@@ -57,9 +88,14 @@ ZONA_MAPPING_PISOS = {
     'calafell': 'calafell',
     'torredembarra': 'torredembarra',
     'altafulla': 'altafulla',
+    'miami_platja': 'tarragona_provincia',
+    'vila_seca': 'tarragona_provincia',
     'valls': 'valls',
+    'montblanc': 'tarragona_provincia',
+    # Terres de l'Ebre
     'tortosa': 'tortosa',
     'amposta': 'amposta',
+    'sant_carles_rapita': 'tarragona_provincia',
 }
 
 
@@ -123,15 +159,20 @@ def run_scraper(
             'PLAYWRIGHT_BROWSERS_PATH', '/opt/playwright'
         )
 
+        # Construir comando con zonas como argumentos separados
+        # argparse espera: --zones zone1 zone2 zone3 (no comma-separated)
+        cmd = [
+            sys.executable,
+            script_path,
+            '--zones',
+        ] + zones + [
+            '--postgres',
+            f'--tenant-id={tenant_id}',
+        ]
+
         # Ejecutar scraper
         result = subprocess.run(
-            [
-                sys.executable,
-                script_path,
-                '--zones', zones_str,
-                '--postgres',
-                f'--tenant-id={tenant_id}',
-            ],
+            cmd,
             capture_output=True,
             text=True,
             timeout=1800,  # 30 minutos timeout
