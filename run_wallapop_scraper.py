@@ -130,17 +130,33 @@ def main():
             'secure': False
         }
 
+    # Configuración de PostgreSQL (si está habilitado)
+    # Usa DATABASE_URL si está disponible (Azure), sino usa config local (Docker)
     postgres_config = None
     if args.postgres:
         db_url = os.environ.get('DATABASE_URL', '')
-        pg_host = 'postgres' if '@postgres' in db_url else 'localhost'
-        postgres_config = {
-            'host': pg_host,
-            'port': 5432,
-            'database': 'casa_teva_db',
-            'user': 'casa_teva',
-            'password': 'casateva2024'
-        }
+        if db_url and 'azure' in db_url:
+            # Parsear DATABASE_URL de Azure
+            from urllib.parse import urlparse
+            parsed = urlparse(db_url)
+            postgres_config = {
+                'host': parsed.hostname,
+                'port': parsed.port or 5432,
+                'database': parsed.path.lstrip('/'),
+                'user': parsed.username,
+                'password': parsed.password,
+                'sslmode': 'require'
+            }
+        else:
+            # Config local (Docker)
+            pg_host = 'postgres' if db_url and '@postgres' in db_url else 'localhost'
+            postgres_config = {
+                'host': pg_host,
+                'port': 5432,
+                'database': 'casa_teva_db',
+                'user': 'casa_teva',
+                'password': 'casateva2024'
+            }
 
     # Mostrar configuración
     print(f"\n{'='*60}")
