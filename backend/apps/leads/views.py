@@ -236,12 +236,11 @@ def delete_lead_view(request, lead_id):
     with connection.cursor() as cursor:
         cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
 
-    # Eliminar el lead de la tabla real raw.raw_listings
-    # El lead_id es un hash MD5 generado desde tenant_id + portal + anuncio_id/titulo
+    # Eliminar el lead de la tabla marts.dim_leads
     with connection.cursor() as cursor:
         cursor.execute("""
-            DELETE FROM raw.raw_listings
-            WHERE md5(tenant_id::text || portal || COALESCE(raw_data->>'anuncio_id', raw_data->>'titulo')) = %s
+            DELETE FROM marts.dim_leads
+            WHERE lead_id = %s
         """, [lead_id])
 
     # Devolver respuesta vacía para que HTMX elimine la fila
@@ -364,11 +363,11 @@ def bulk_delete_view(request):
                 with connection.cursor() as cursor:
                     cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
 
-                # Eliminar de raw_listings
+                # Eliminar de marts.dim_leads
                 with connection.cursor() as cursor:
                     cursor.execute("""
-                        DELETE FROM raw.raw_listings
-                        WHERE md5(tenant_id::text || portal || COALESCE(raw_data->>'anuncio_id', raw_data->>'titulo')) = %s
+                        DELETE FROM marts.dim_leads
+                        WHERE lead_id = %s
                     """, [lead_id])
 
                 deleted_count += 1

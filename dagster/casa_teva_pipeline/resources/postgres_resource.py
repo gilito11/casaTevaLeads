@@ -377,13 +377,13 @@ class PostgresResource(ConfigurableResource):
         where_clause = "WHERE tenant_id = %s" if tenant_id else ""
         params = (tenant_id,) if tenant_id else None
 
-        # Total de leads
+        # Total de leads from marts.dim_leads
         query = f"""
             SELECT
                 COUNT(*) as total,
                 COUNT(DISTINCT portal) as portales,
-                MAX(scraping_timestamp) as ultimo_scraping
-            FROM raw.raw_listings
+                MAX(fecha_scraping) as ultimo_scraping
+            FROM marts.dim_leads
             {where_clause}
         """
         result = self.execute_query(query, params)

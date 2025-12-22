@@ -2,11 +2,13 @@
 Clase base para todos los scrapers de portales inmobiliarios.
 
 Esta clase proporciona funcionalidad común para:
-- Guardar datos en PostgreSQL (raw layer)
+- Guardar datos en PostgreSQL (marts.dim_leads)
 - Normalización de datos (teléfonos, zonas)
 - Filtrado de particulares vs profesionales
 """
 
+import hashlib
+import json
 import logging
 import re
 from datetime import datetime
@@ -118,6 +120,21 @@ class BaseScraper:
         """
         return None
 
+    def _generate_lead_id(self, portal: str, anuncio_id: str) -> str:
+        """
+        Genera un lead_id único como hash MD5.
+
+        Args:
+            portal: Nombre del portal
+            anuncio_id: ID del anuncio en el portal
+
+        Returns:
+            str: Hash MD5 de 32 caracteres
+        """
+        # Crear un string único combinando tenant, portal y anuncio_id
+        unique_string = f"{self.tenant_id}:{portal}:{anuncio_id}"
+        return hashlib.md5(unique_string.encode()).hexdigest()
+
     def save_to_postgres_raw(
         self,
         listing_data: Dict[str, Any],
@@ -125,22 +142,15 @@ class BaseScraper:
         portal: str
     ) -> bool:
         """
-        Guarda los datos del anuncio en la tabla raw.raw_listings de PostgreSQL.
+        Guarda los datos del anuncio en la tabla marts.dim_leads de PostgreSQL.
 
         Args:
-            listing_data: Datos del anuncio
-            data_lake_path: Path del archivo en MinIO
+            listing_data: Datos del anuncio (normalizados)
+            data_lake_path: Referencia al origen de datos
             portal: Nombre del portal
 
         Returns:
             bool: True si se guardó correctamente, False si hubo error
-
-        Example:
-            >>> success = scraper.save_to_postgres_raw(
-            ...     listing_data={"precio": 150000},
-            ...     data_lake_path="bronze/tenant_1/fotocasa/2025-12-07/listing_abc.json",
-            ...     portal="fotocasa"
-            ... )
         """
         if not self.postgres_conn:
             logger.error("PostgreSQL no está configurado")
@@ -149,30 +159,85 @@ class BaseScraper:
         try:
             cursor = self.postgres_conn.cursor()
 
-            # SQL para insertar en raw.raw_listings con detección de duplicados
-            # Usa ON CONFLICT DO NOTHING para ignorar duplicados silenciosamente
+            # Generar lead_id como MD5 hash
+            anuncio_id = str(listing_data.get('anuncio_id', ''))
+            if not anuncio_id:
+                logger.warning(f"Anuncio sin ID, no se puede guardar")
+                return False
+
+            lead_id = self._generate_lead_id(portal, anuncio_id)
+
+            # Preparar fotos como JSON string para el campo JSONB
+            fotos = listing_data.get('fotos', [])
+            if isinstance(fotos, list):
+                fotos_json = json.dumps(fotos)
+            else:
+                fotos_json = '[]'
+
+            # SQL para insertar en marts.dim_leads
+            # Usa ON CONFLICT para actualizar si ya existe
             sql = """
-                INSERT INTO raw.raw_listings (
+                INSERT INTO marts.dim_leads (
+                    lead_id,
                     tenant_id,
+                    telefono_norm,
+                    email,
+                    nombre,
+                    direccion,
+                    zona_geografica,
+                    codigo_postal,
+                    tipo_inmueble,
+                    precio,
+                    habitaciones,
+                    metros,
+                    descripcion,
+                    fotos,
                     portal,
-                    data_lake_path,
-                    raw_data,
-                    scraping_timestamp
-                ) VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
-                WHERE raw_data->>'anuncio_id' IS NOT NULL
-                DO NOTHING
+                    url_anuncio,
+                    data_lake_reference,
+                    estado,
+                    numero_intentos,
+                    fecha_scraping,
+                    created_at,
+                    updated_at,
+                    anuncio_id
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s
+                )
+                ON CONFLICT (lead_id) DO NOTHING
             """
+
+            now = datetime.now()
 
             # Ejecutar insert
             cursor.execute(
                 sql,
                 (
+                    lead_id,
                     self.tenant_id,
+                    listing_data.get('telefono') or '',
+                    listing_data.get('email') or None,
+                    listing_data.get('vendedor') or listing_data.get('nombre') or None,
+                    listing_data.get('direccion') or None,
+                    listing_data.get('zona_geografica') or listing_data.get('zona_busqueda') or None,
+                    listing_data.get('codigo_postal') or None,
+                    listing_data.get('tipo_inmueble') or 'piso',
+                    listing_data.get('precio') or None,
+                    listing_data.get('habitaciones') or None,
+                    listing_data.get('metros') or None,
+                    listing_data.get('descripcion') or None,
+                    fotos_json,
                     portal,
+                    listing_data.get('url_anuncio') or None,
                     data_lake_path,
-                    Json(listing_data),  # Convertir dict a JSONB
-                    datetime.now()
+                    'NUEVO',
+                    0,
+                    now,
+                    now,
+                    now,
+                    anuncio_id,
                 )
             )
 
@@ -181,9 +246,9 @@ class BaseScraper:
             cursor.close()
 
             if rows_affected > 0:
-                logger.info(f"Datos guardados en PostgreSQL: {portal} - {data_lake_path}")
+                logger.info(f"Lead guardado en PostgreSQL: {portal} - {anuncio_id}")
             else:
-                logger.debug(f"Duplicado ignorado: {portal} - {listing_data.get('anuncio_id', 'N/A')}")
+                logger.debug(f"Duplicado ignorado: {portal} - {anuncio_id}")
             return rows_affected > 0
 
         except Exception as e:
