@@ -1,0 +1,31 @@
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 3000
+      transport: auto
+      allowInsecure: false
+  template:
+    containers:
+      - name: dagster-scrapers
+        image: inmoleadsacr.azurecr.io/casa-teva-dagster:latest
+        resources:
+          cpu: 1
+          memory: 2Gi
+        command:
+          - /bin/bash
+          - -c
+          - cd /app/dagster && dagster dev -h 0.0.0.0 -p 3000 -w workspace.yaml
+        env:
+          - name: DATABASE_URL
+            value: postgresql://inmoleadsadmin:ataulfo1!@inmoleads-db.postgres.database.azure.com:5432/inmoleadsdb?sslmode=require
+          - name: PLAYWRIGHT_BROWSERS_PATH
+            value: /opt/playwright
+          - name: DAGSTER_HOME
+            value: /opt/dagster/dagster_home
+          - name: PYTHONUNBUFFERED
+            value: "1"
+    scale:
+      minReplicas: 1
+      maxReplicas: 1
