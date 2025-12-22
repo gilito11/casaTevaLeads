@@ -334,8 +334,8 @@ class PostgresResource(ConfigurableResource):
         if tenant_id:
             query = """
                 SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre
-                FROM core_zonageografica z
-                JOIN core_tenant t ON z.tenant_id = t.tenant_id
+                FROM zonas_geograficas z
+                JOIN tenants t ON z.tenant_id = t.tenant_id
                 WHERE z.activa = true AND z.tenant_id = %s
                 ORDER BY z.tenant_id, z.nombre
             """
@@ -343,8 +343,8 @@ class PostgresResource(ConfigurableResource):
         else:
             query = """
                 SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre
-                FROM core_zonageografica z
-                JOIN core_tenant t ON z.tenant_id = t.tenant_id
+                FROM zonas_geograficas z
+                JOIN tenants t ON z.tenant_id = t.tenant_id
                 WHERE z.activa = true
                 ORDER BY z.tenant_id, z.nombre
             """
