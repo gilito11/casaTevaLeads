@@ -2,7 +2,12 @@
 
 Orquestación de scrapers y ETL para el sistema de captación de leads inmobiliarios.
 
-## 📁 Estructura
+## Decisión de Diseño: Sin MinIO
+
+> MinIO fue eliminado del proyecto. Los datos se guardan directamente en PostgreSQL
+> como JSONB en la tabla `raw.raw_listings`. Ver `INSTRUCCIONES_SETUP.md` para más detalles.
+
+## Estructura
 
 ```
 dagster/
@@ -12,13 +17,12 @@ dagster/
     ├── assets/
     │   └── scraping_assets.py              # Assets de scraping
     ├── resources/
-    │   ├── minio_resource.py               # Resource MinIO
     │   └── postgres_resource.py            # Resource PostgreSQL
     └── schedules/
         └── scraping_schedules.py           # Schedules automatizados
 ```
 
-## 🚀 Inicio Rápido
+## Inicio Rápido
 
 ### 1. Instalar dependencias
 
@@ -51,17 +55,10 @@ Desde CLI:
 dagster asset materialize -m casa_teva_pipeline
 ```
 
-## 📊 Assets Definidos
-
-### **bronze_fotocasa_listings**
-- Ejecuta scraper de Fotocasa
-- Guarda JSONs en MinIO: `bronze/tenant_1/fotocasa/{fecha}/`
-- **Output**: Metadata con número de listings y paths
+## Assets Definidos
 
 ### **raw_postgres_listings**
-- Depende de: `bronze_fotocasa_listings`
-- Lee JSONs de MinIO
-- Inserta en PostgreSQL: `raw.raw_listings`
+- Inserta datos en PostgreSQL: `raw.raw_listings`
 - **Output**: Número de registros cargados
 
 ### **scraping_stats**
@@ -69,31 +66,7 @@ dagster asset materialize -m casa_teva_pipeline
 - Genera estadísticas consolidadas
 - **Output**: Dict con métricas de scraping
 
-### **bronze_milanuncios_listings** (Placeholder)
-- Por implementar cuando scraper esté listo
-
-### **bronze_wallapop_listings** (Placeholder)
-- Por implementar cuando scraper esté listo
-
-## 🔧 Resources
-
-### **MinIOResource**
-Interacción con Data Lake (MinIO):
-- `save_json()`: Guarda diccionarios como JSON
-- `read_json()`: Lee archivos JSON
-- `list_files()`: Lista archivos por prefijo
-- `delete_file()`: Elimina archivos
-
-**Configuración:**
-```python
-MinIOResource(
-    endpoint="localhost:9000",
-    access_key="minioadmin",
-    secret_key="minioadmin",
-    bucket_name="casa-teva-data-lake",
-    secure=False
-)
-```
+## Resources
 
 ### **PostgresResource**
 Interacción con PostgreSQL:
@@ -114,27 +87,19 @@ PostgresResource(
 )
 ```
 
-## ⏰ Schedules
+## Schedules
 
-### **scraping_schedule** (Activo)
+### **scraping_schedule**
 - **Cron**: `0 */6 * * *` (cada 6 horas)
 - **Timezone**: Europe/Madrid
 - **Horarios**: 00:00, 06:00, 12:00, 18:00
-- **Estado**: RUNNING
+- **Estado**: STOPPED (activar manualmente)
 
-### **scraping_schedule_hourly** (Inactivo)
-- **Cron**: `0 * * * *` (cada hora)
-- **Estado**: STOPPED (para testing)
-
-### **scraping_schedule_daily** (Inactivo)
+### **scraping_schedule_daily**
 - **Cron**: `0 2 * * *` (2 AM diario)
 - **Estado**: STOPPED
 
-### **scraping_schedule_custom** (Inactivo)
-- **Lógica custom**: Solo días laborables
-- **Estado**: STOPPED
-
-## 🎯 Jobs
+## Jobs
 
 ### **scraping_job**
 - Ejecuta todos los assets de scraping
@@ -144,33 +109,19 @@ PostgresResource(
 - Solo ejecuta assets de Fotocasa
 - Tags: portal=fotocasa
 
-## 📈 Lineage de Datos
+## Lineage de Datos
 
 ```
-bronze_fotocasa_listings (MinIO)
+Scrapers (Playwright)
     ↓
-raw_postgres_listings (PostgreSQL)
+raw.raw_listings (PostgreSQL JSONB)
     ↓
-scraping_stats (Métricas)
+dbt (staging → marts)
+    ↓
+Django (Web CRM)
 ```
 
-## 🔄 Flujo de Ejecución
-
-1. **Scraping** (`bronze_fotocasa_listings`)
-   - Ejecuta `run_fotocasa_scraper.py --minio`
-   - Scrapy + Playwright extrae listings
-   - Guarda JSONs en MinIO bronze layer
-
-2. **Carga** (`raw_postgres_listings`)
-   - Lee todos los JSONs del día
-   - Bulk insert en PostgreSQL
-   - Tabla: `raw.raw_listings`
-
-3. **Reporting** (`scraping_stats`)
-   - Consolida estadísticas
-   - Metadata en Dagster UI
-
-## 🛠️ Comandos Útiles
+## Comandos Útiles
 
 ### Verificar configuración
 ```bash
@@ -179,17 +130,11 @@ dagster dev --check
 
 ### Materializar asset específico
 ```bash
-dagster asset materialize -m casa_teva_pipeline -s bronze_fotocasa_listings
-```
-
-### Materializar todos los assets
-```bash
-dagster asset materialize -m casa_teva_pipeline
+dagster asset materialize -m casa_teva_pipeline -s raw_postgres_listings
 ```
 
 ### Ver logs
 ```bash
-# Los logs aparecen en la UI y en consola
 dagster dev -v
 ```
 
@@ -199,22 +144,23 @@ dagster schedule start scraping_schedule
 dagster schedule stop scraping_schedule
 ```
 
-## 📝 Configuración Personalizada
+## Configuración Personalizada
 
-### Cambiar configuración de MinIO
+### Cambiar configuración de PostgreSQL
 
 Editar `casa_teva_pipeline/__init__.py`:
 
 ```python
+import os
+
 resources = {
-    "minio": MinIOResource(
-        endpoint="minio.tudominio.com:9000",  # ← Cambiar
-        access_key="tu_access_key",           # ← Cambiar
-        secret_key="tu_secret_key",           # ← Cambiar
-        bucket_name="mi-bucket",              # ← Cambiar
-        secure=True,                          # ← Cambiar si usas HTTPS
+    "postgres": PostgresResource(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=5432,
+        database=os.getenv("POSTGRES_DB", "casa_teva_db"),
+        user=os.getenv("POSTGRES_USER", "casa_teva"),
+        password=os.getenv("POSTGRES_PASSWORD", "casateva2024"),
     ),
-    # ...
 }
 ```
 
@@ -225,12 +171,12 @@ Editar `schedules/scraping_schedules.py`:
 ```python
 scraping_schedule = ScheduleDefinition(
     name="scraping_schedule",
-    cron_schedule="0 */4 * * *",  # ← Cambiar a cada 4 horas
+    cron_schedule="0 */4 * * *",  # Cambiar a cada 4 horas
     # ...
 )
 ```
 
-## 🐛 Debugging
+## Debugging
 
 ### Ver detalles de ejecución
 1. Ir a "Runs" en la UI
@@ -242,50 +188,23 @@ scraping_schedule = ScheduleDefinition(
 dagster dev --log-level debug
 ```
 
-### Verificar assets sin ejecutar
-```bash
-dagster asset check -m casa_teva_pipeline
-```
-
-## 🔐 Seguridad
+## Seguridad
 
 **IMPORTANTE**: Las credenciales en `__init__.py` son para desarrollo.
 
 Para producción:
 1. Usar variables de entorno
-2. Usar secrets manager (AWS Secrets Manager, etc.)
+2. Usar Azure Key Vault u otro secrets manager
 3. Configurar con ConfigurableResource
 
-Ejemplo con env vars:
-```python
-import os
+## Próximos Pasos
 
-resources = {
-    "postgres": PostgresResource(
-        password=os.getenv("POSTGRES_PASSWORD"),
-        # ...
-    ),
-}
-```
+1. Configurar Azure Functions para scrapers automáticos
+2. Implementar alertas (Slack, email)
+3. Añadir tests para assets
+4. Configurar para producción en Azure
 
-## 📊 Metadata y Observabilidad
-
-Dagster trackea automáticamente:
-- ✅ Tiempo de ejecución de cada asset
-- ✅ Metadata custom (num_listings, paths, etc.)
-- ✅ Lineage de datos
-- ✅ Versiones de assets
-- ✅ Historial de runs
-
-## 🚧 Próximos Pasos
-
-1. Implementar assets para Milanuncios y Wallapop
-2. Añadir sensors para ejecutar cuando aparezcan nuevos archivos
-3. Implementar alertas (Slack, email)
-4. Añadir tests para assets
-5. Configurar Dagster Cloud para producción
-
-## 📚 Documentación
+## Documentación
 
 - [Dagster Docs](https://docs.dagster.io/)
 - [Asset Best Practices](https://docs.dagster.io/concepts/assets/software-defined-assets)

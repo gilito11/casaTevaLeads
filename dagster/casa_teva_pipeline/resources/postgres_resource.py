@@ -26,6 +26,7 @@ class PostgresResource(ConfigurableResource):
         database: Nombre de la base de datos
         user: Usuario de PostgreSQL
         password: Contraseña de PostgreSQL
+        sslmode: Modo SSL (require para Azure)
     """
 
     host: str = Field(
@@ -48,16 +49,25 @@ class PostgresResource(ConfigurableResource):
         default="casateva2024",
         description="PostgreSQL password"
     )
+    sslmode: str = Field(
+        default="prefer",
+        description="SSL mode (require for Azure)"
+    )
 
     def _get_connection(self) -> psycopg2.extensions.connection:
         """Crea y retorna una conexión a PostgreSQL"""
-        return psycopg2.connect(
-            host=self.host,
-            port=self.port,
-            database=self.database,
-            user=self.user,
-            password=self.password
-        )
+        conn_params = {
+            'host': self.host,
+            'port': self.port,
+            'database': self.database,
+            'user': self.user,
+            'password': self.password,
+        }
+        # Añadir sslmode si no es el valor por defecto
+        if self.sslmode and self.sslmode != "prefer":
+            conn_params['sslmode'] = self.sslmode
+
+        return psycopg2.connect(**conn_params)
 
     def execute_query(
         self,
@@ -310,3 +320,83 @@ class PostgresResource(ConfigurableResource):
         if result and result[0][0]:
             return result[0][0].isoformat()
         return None
+
+    def get_active_zones(self, tenant_id: int = None) -> List[Dict[str, Any]]:
+        """
+        Obtiene las zonas activas de la base de datos.
+
+        Args:
+            tenant_id: ID del tenant (opcional, si None obtiene todas)
+
+        Returns:
+            Lista de zonas con slug, nombre y tenant_id
+        """
+        if tenant_id:
+            query = """
+                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre
+                FROM core_zonageografica z
+                JOIN core_tenant t ON z.tenant_id = t.tenant_id
+                WHERE z.activa = true AND z.tenant_id = %s
+                ORDER BY z.tenant_id, z.nombre
+            """
+            params = (tenant_id,)
+        else:
+            query = """
+                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre
+                FROM core_zonageografica z
+                JOIN core_tenant t ON z.tenant_id = t.tenant_id
+                WHERE z.activa = true
+                ORDER BY z.tenant_id, z.nombre
+            """
+            params = None
+
+        result = self.execute_query(query, params)
+
+        zones = []
+        if result:
+            for row in result:
+                zones.append({
+                    'slug': row[0],
+                    'nombre': row[1],
+                    'tenant_id': row[2],
+                    'tenant_nombre': row[3],
+                })
+
+        return zones
+
+    def get_scraping_stats(self, tenant_id: int = None) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas de scraping.
+
+        Args:
+            tenant_id: ID del tenant (opcional)
+
+        Returns:
+            Dict con estadísticas
+        """
+        where_clause = "WHERE tenant_id = %s" if tenant_id else ""
+        params = (tenant_id,) if tenant_id else None
+
+        # Total de leads
+        query = f"""
+            SELECT
+                COUNT(*) as total,
+                COUNT(DISTINCT portal) as portales,
+                MAX(scraping_timestamp) as ultimo_scraping
+            FROM raw.raw_listings
+            {where_clause}
+        """
+        result = self.execute_query(query, params)
+
+        stats = {
+            'total_leads': 0,
+            'portales_activos': 0,
+            'ultimo_scraping': None,
+        }
+
+        if result and result[0]:
+            stats['total_leads'] = result[0][0] or 0
+            stats['portales_activos'] = result[0][1] or 0
+            stats['ultimo_scraping'] = result[0][2].isoformat() if result[0][2] else None
+
+        return stats

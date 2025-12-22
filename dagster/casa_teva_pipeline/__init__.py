@@ -2,6 +2,10 @@
 Pipeline de Dagster para Casa Teva.
 
 Define todos los assets, resources, schedules y jobs del sistema.
+
+Schedules configurados:
+- scraping_schedule_spanish: 9:00, 11:00, 13:00, 15:00, 17:00, 19:00 hora española
+- scraping_schedule_daily: 2:00 AM diario (backup)
 """
 import os
 
@@ -15,17 +19,16 @@ from dagster import (
 )
 
 from casa_teva_pipeline.assets import scraping_assets
-from casa_teva_pipeline.resources.minio_resource import MinIOResource
 from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 
 
 # Cargar todos los assets del módulo scraping_assets
 all_assets = load_assets_from_modules([scraping_assets])
 
-# Definir job para scraping completo
+# Job principal de scraping
 scraping_job = define_asset_job(
     name="scraping_job",
-    description="Job completo de scraping: extrae datos de portales y carga en Data Lake y PostgreSQL",
+    description="Ejecuta scraping de todos los portales para las zonas activas",
     selection=AssetSelection.all(),
     tags={
         "team": "data-engineering",
@@ -33,59 +36,75 @@ scraping_job = define_asset_job(
     }
 )
 
-# Definir job solo para Fotocasa
-fotocasa_job = define_asset_job(
-    name="fotocasa_job",
-    description="Job de scraping solo para Fotocasa",
-    selection=AssetSelection.assets(
-        scraping_assets.bronze_fotocasa_listings,
-        scraping_assets.raw_postgres_listings,
-        scraping_assets.scraping_stats,
-    ),
-    tags={
-        "portal": "fotocasa",
-    }
-)
-
-# Definir schedules - usando el job directamente
-scraping_schedule = ScheduleDefinition(
-    name="scraping_schedule",
-    cron_schedule="0 */6 * * *",  # Cada 6 horas
+# Schedule principal: 9, 11, 13, 15, 17, 19 hora española
+# Cron: minuto hora día mes día_semana
+# 0 9,11,13,15,17,19 * * * = A las 9:00, 11:00, 13:00, 15:00, 17:00, 19:00
+scraping_schedule_spanish = ScheduleDefinition(
+    name="scraping_schedule_spanish",
+    cron_schedule="0 9,11,13,15,17,19 * * *",
     job=scraping_job,
-    default_status=DefaultScheduleStatus.STOPPED,  # Empezar parado
-    description="Ejecuta scrapers de portales inmobiliarios cada 6 horas",
+    execution_timezone="Europe/Madrid",
+    default_status=DefaultScheduleStatus.RUNNING,  # Activado por defecto
+    description="Scraping cada 2 horas en horario laboral español (9-11-13-15-17-19)",
 )
 
+# Schedule de backup: 2 AM diario
 scraping_schedule_daily = ScheduleDefinition(
     name="scraping_schedule_daily",
-    cron_schedule="0 2 * * *",  # Diario a las 2 AM
+    cron_schedule="0 2 * * *",
     job=scraping_job,
-    default_status=DefaultScheduleStatus.STOPPED,
-    description="Ejecuta scrapers diariamente a las 2 AM",
+    execution_timezone="Europe/Madrid",
+    default_status=DefaultScheduleStatus.STOPPED,  # Desactivado por defecto
+    description="Scraping diario a las 2 AM (backup)",
 )
 
-# Definir resources usando variables de entorno
+# Determinar configuración de PostgreSQL según entorno
+# Para Azure: usar DATABASE_URL o variables individuales con SSL
+def get_postgres_config():
+    """Obtiene la configuración de PostgreSQL desde variables de entorno."""
+    db_url = os.getenv("DATABASE_URL", "")
+
+    # Si es Azure (tiene 'azure' en la URL)
+    if "azure" in db_url:
+        from urllib.parse import urlparse
+        parsed = urlparse(db_url)
+        return {
+            "host": parsed.hostname,
+            "port": parsed.port or 5432,
+            "database": parsed.path.lstrip('/'),
+            "user": parsed.username,
+            "password": parsed.password,
+            "sslmode": "require",
+        }
+
+    # Configuración por defecto (local/Docker)
+    return {
+        "host": os.getenv("DAGSTER_POSTGRES_HOST", "localhost"),
+        "port": int(os.getenv("DAGSTER_POSTGRES_PORT", "5432")),
+        "database": os.getenv("DAGSTER_POSTGRES_DB", "casa_teva_db"),
+        "user": os.getenv("DAGSTER_POSTGRES_USER", "casa_teva"),
+        "password": os.getenv("DAGSTER_POSTGRES_PASSWORD", "casateva2024"),
+        "sslmode": os.getenv("DAGSTER_POSTGRES_SSLMODE", "prefer"),
+    }
+
+
+pg_config = get_postgres_config()
+
 resources = {
-    "minio": MinIOResource(
-        endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
-        access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-        secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
-        bucket_name="casa-teva-data-lake",
-        secure=False,
-    ),
     "postgres": PostgresResource(
-        host=os.getenv("DAGSTER_POSTGRES_HOST", "localhost"),
-        port=5432,
-        database=os.getenv("DAGSTER_POSTGRES_DB", "casa_teva_db"),
-        user=os.getenv("DAGSTER_POSTGRES_USER", "casa_teva"),
-        password=os.getenv("DAGSTER_POSTGRES_PASSWORD", "casateva2024"),
+        host=pg_config["host"],
+        port=pg_config["port"],
+        database=pg_config["database"],
+        user=pg_config["user"],
+        password=pg_config["password"],
+        sslmode=pg_config["sslmode"],
     ),
 }
 
 # Crear Definitions que exporta todo
 defs = Definitions(
     assets=all_assets,
-    jobs=[scraping_job, fotocasa_job],
-    schedules=[scraping_schedule, scraping_schedule_daily],
+    jobs=[scraping_job],
+    schedules=[scraping_schedule_spanish, scraping_schedule_daily],
     resources=resources,
 )

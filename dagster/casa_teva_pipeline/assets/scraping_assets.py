@@ -1,286 +1,335 @@
 """
 Assets de Dagster para el proceso de scraping de portales inmobiliarios.
 
-Define los assets para:
-- Scraping de portales (Fotocasa, Milanuncios, Wallapop)
-- Carga en Data Lake (MinIO)
-- Carga en PostgreSQL (raw layer)
+Lee las zonas activas de la base de datos y ejecuta los scrapers correspondientes.
+Los scrapers guardan directamente en PostgreSQL.
 """
 
 import subprocess
+import sys
+import os
 import logging
 from datetime import datetime
 from typing import Dict, List, Any
 
 from dagster import asset, AssetExecutionContext, MetadataValue, Output
 
-from casa_teva_pipeline.resources.minio_resource import MinIOResource
 from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 
 
 logger = logging.getLogger(__name__)
 
+# Mapeo de zonas de BD a zonas de cada scraper
+ZONA_MAPPING_MILANUNCIOS = {
+    'tarragona_ciudad': 'tarragona_ciudad',
+    'tarragona_20km': 'tarragona_20km',
+    'tarragona_30km': 'tarragona_30km',
+    'lleida_ciudad': 'lleida_ciudad',
+    'lleida_20km': 'lleida_20km',
+    'lleida_30km': 'lleida_30km',
+    'la_bordeta': 'la_bordeta',
+    'salou': 'salou',
+    'cambrils': 'cambrils',
+    'reus': 'reus',
+    'costa_dorada': 'costa_dorada',
+    'vendrell': 'vendrell',
+    'calafell': 'calafell',
+    'torredembarra': 'torredembarra',
+    'altafulla': 'altafulla',
+    'valls': 'valls',
+    'montblanc': 'montblanc',
+    'tortosa': 'tortosa',
+    'amposta': 'amposta',
+}
 
-@asset(
-    description="Ejecuta scraper de Fotocasa y guarda listings en Data Lake (MinIO)",
-    compute_kind="python",
-    group_name="scraping",
-)
-def bronze_fotocasa_listings(
+ZONA_MAPPING_PISOS = {
+    'tarragona_ciudad': 'tarragona_capital',
+    'tarragona_20km': 'tarragona_provincia',
+    'tarragona_30km': 'tarragona_provincia',
+    'lleida_ciudad': 'lleida_capital',
+    'lleida_20km': 'lleida_provincia',
+    'lleida_30km': 'lleida_provincia',
+    'la_bordeta': 'lleida_capital',
+    'salou': 'salou',
+    'cambrils': 'cambrils',
+    'reus': 'reus',
+    'vendrell': 'vendrell',
+    'calafell': 'calafell',
+    'torredembarra': 'torredembarra',
+    'altafulla': 'altafulla',
+    'valls': 'valls',
+    'tortosa': 'tortosa',
+    'amposta': 'amposta',
+}
+
+
+def get_project_root() -> str:
+    """Obtiene el directorio raíz del proyecto."""
+    # Dagster corre desde /app/dagster, el proyecto está en /app
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # assets -> casa_teva_pipeline -> dagster -> app
+    return os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+
+
+def run_scraper(
     context: AssetExecutionContext,
-    minio: MinIOResource
-) -> Output[Dict[str, Any]]:
+    scraper_name: str,
+    zones: List[str],
+    tenant_id: int = 1
+) -> Dict[str, Any]:
     """
-    Ejecuta el scraper de Fotocasa y guarda los resultados en MinIO.
+    Ejecuta un scraper específico para las zonas dadas.
 
-    Este asset:
-    1. Ejecuta FotocasaScraper usando Scrapy
-    2. Guarda JSONs de listings en bronze/tenant_1/fotocasa/{fecha}/
-    3. Retorna metadata con número de listings y paths
+    Args:
+        context: Contexto de ejecución de Dagster
+        scraper_name: Nombre del scraper (milanuncios, pisos)
+        zones: Lista de zonas a scrapear
+        tenant_id: ID del tenant
 
     Returns:
-        Dict con metadata del scraping
+        Dict con resultados del scraping
     """
-    context.log.info("Iniciando scraping de Fotocasa...")
+    project_root = get_project_root()
+    script_path = os.path.join(project_root, f'run_{scraper_name}_scraper.py')
 
-    # Configuración del tenant
-    tenant_id = 1
-    fecha = datetime.now().strftime('%Y-%m-%d')
+    if not os.path.exists(script_path):
+        context.log.warning(f"Script no encontrado: {script_path}")
+        return {
+            'scraper': scraper_name,
+            'status': 'skipped',
+            'reason': f'Script not found: {script_path}',
+            'zones': zones,
+            'leads_found': 0,
+        }
+
+    if not zones:
+        context.log.info(f"No hay zonas para {scraper_name}")
+        return {
+            'scraper': scraper_name,
+            'status': 'skipped',
+            'reason': 'No zones configured',
+            'zones': [],
+            'leads_found': 0,
+        }
+
+    zones_str = ','.join(zones)
+    context.log.info(f"Ejecutando {scraper_name} para zonas: {zones_str}")
 
     try:
-        # Ejecutar scraper de Fotocasa usando subprocess
-        # NOTA: Esto ejecuta el scraper y guarda directamente en MinIO
+        # Configurar entorno con PLAYWRIGHT_BROWSERS_PATH
+        env = os.environ.copy()
+        env['PYTHONPATH'] = project_root
+        env['PLAYWRIGHT_BROWSERS_PATH'] = os.environ.get(
+            'PLAYWRIGHT_BROWSERS_PATH', '/opt/playwright'
+        )
+
+        # Ejecutar scraper
         result = subprocess.run(
             [
-                'python',
-                'run_fotocasa_scraper.py',
+                sys.executable,
+                script_path,
+                '--zones', zones_str,
+                '--postgres',
                 f'--tenant-id={tenant_id}',
-                '--minio',
             ],
             capture_output=True,
             text=True,
-            timeout=3600  # 1 hora timeout
+            timeout=1800,  # 30 minutos timeout
+            cwd=project_root,
+            env=env,
         )
 
         if result.returncode != 0:
-            context.log.error(f"Error en scraper: {result.stderr}")
-            raise Exception(f"Scraper falló con código {result.returncode}")
+            context.log.error(f"Error en {scraper_name}: {result.stderr[:500]}")
+            return {
+                'scraper': scraper_name,
+                'status': 'error',
+                'error': result.stderr[:500],
+                'zones': zones,
+                'leads_found': 0,
+            }
 
-        context.log.info("Scraping completado exitosamente")
+        context.log.info(f"{scraper_name} completado exitosamente")
 
-        # Listar archivos creados en MinIO
-        prefix = f"bronze/tenant_{tenant_id}/fotocasa/{fecha}/"
-        files = minio.list_files(prefix=prefix)
+        # Intentar extraer número de leads del output
+        leads_found = 0
+        if 'leads guardados' in result.stdout.lower():
+            # Buscar patrón como "X leads guardados"
+            import re
+            match = re.search(r'(\d+)\s+leads?\s+guardad', result.stdout.lower())
+            if match:
+                leads_found = int(match.group(1))
 
-        num_listings = len(files)
-
-        context.log.info(f"Scrapeados {num_listings} listings de Fotocasa")
-
-        # Preparar metadata
-        metadata = {
-            'tenant_id': tenant_id,
-            'portal': 'fotocasa',
-            'fecha': fecha,
-            'num_listings': num_listings,
-            'paths': files,
-            'prefix': prefix,
+        return {
+            'scraper': scraper_name,
+            'status': 'completed',
+            'zones': zones,
+            'leads_found': leads_found,
+            'output': result.stdout[-1000:] if result.stdout else '',
         }
 
+    except subprocess.TimeoutExpired:
+        context.log.error(f"{scraper_name} excedió el timeout")
+        return {
+            'scraper': scraper_name,
+            'status': 'timeout',
+            'zones': zones,
+            'leads_found': 0,
+        }
+
+    except Exception as e:
+        context.log.error(f"Error ejecutando {scraper_name}: {e}")
+        return {
+            'scraper': scraper_name,
+            'status': 'error',
+            'error': str(e),
+            'zones': zones,
+            'leads_found': 0,
+        }
+
+
+@asset(
+    description="Ejecuta todos los scrapers para las zonas activas en la BD",
+    compute_kind="python",
+    group_name="scraping",
+)
+def scraping_all_portals(
+    context: AssetExecutionContext,
+    postgres: PostgresResource
+) -> Output[Dict[str, Any]]:
+    """
+    Asset principal de scraping.
+
+    1. Lee las zonas activas de la base de datos
+    2. Mapea las zonas a cada scraper
+    3. Ejecuta los scrapers
+    4. Retorna estadísticas
+    """
+    context.log.info("Iniciando scraping de todos los portales...")
+    fecha = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    # Obtener zonas activas de la BD
+    zones = postgres.get_active_zones()
+
+    if not zones:
+        context.log.warning("No hay zonas activas configuradas")
         return Output(
-            value=metadata,
+            value={
+                'fecha': fecha,
+                'status': 'no_zones',
+                'message': 'No hay zonas activas configuradas',
+                'scrapers': [],
+            },
             metadata={
-                'num_listings': MetadataValue.int(num_listings),
-                'portal': MetadataValue.text('fotocasa'),
-                'fecha': MetadataValue.text(fecha),
-                'paths_sample': MetadataValue.text('\n'.join(files[:5])),  # Primeros 5
+                'status': MetadataValue.text('No zones configured'),
             }
         )
 
-    except subprocess.TimeoutExpired:
-        context.log.error("Scraper excedió el timeout de 1 hora")
-        raise
+    context.log.info(f"Zonas activas encontradas: {len(zones)}")
+    for zone in zones:
+        context.log.info(f"  - {zone['nombre']} ({zone['slug']}) - Tenant: {zone['tenant_nombre']}")
 
-    except Exception as e:
-        context.log.error(f"Error ejecutando scraper: {e}")
-        raise
+    # Agrupar zonas por tenant
+    zones_by_tenant = {}
+    for zone in zones:
+        tid = zone['tenant_id']
+        if tid not in zones_by_tenant:
+            zones_by_tenant[tid] = []
+        zones_by_tenant[tid].append(zone['slug'])
 
+    # Ejecutar scrapers para cada tenant
+    all_results = []
+    total_leads = 0
 
-@asset(
-    description="Carga listings desde MinIO a PostgreSQL raw.raw_listings",
-    compute_kind="python",
-    group_name="scraping",
-)
-def raw_postgres_listings(
-    context: AssetExecutionContext,
-    minio: MinIOResource,
-    postgres: PostgresResource,
-    bronze_fotocasa_listings: Dict[str, Any]
-) -> Output[int]:
-    """
-    Lee JSONs de MinIO y los carga en PostgreSQL raw.raw_listings.
+    for tenant_id, zone_slugs in zones_by_tenant.items():
+        context.log.info(f"Procesando tenant {tenant_id} con {len(zone_slugs)} zonas")
 
-    Este asset:
-    1. Lee todos los JSONs del prefijo en MinIO
-    2. Los inserta en raw.raw_listings usando bulk insert
-    3. Retorna número de registros cargados
+        # Mapear zonas para Milanuncios
+        milanuncios_zones = []
+        for slug in zone_slugs:
+            if slug in ZONA_MAPPING_MILANUNCIOS:
+                mapped = ZONA_MAPPING_MILANUNCIOS[slug]
+                if mapped not in milanuncios_zones:
+                    milanuncios_zones.append(mapped)
 
-    Args:
-        bronze_fotocasa_listings: Metadata del asset upstream
+        # Mapear zonas para Pisos.com
+        pisos_zones = []
+        for slug in zone_slugs:
+            if slug in ZONA_MAPPING_PISOS:
+                mapped = ZONA_MAPPING_PISOS[slug]
+                if mapped not in pisos_zones:
+                    pisos_zones.append(mapped)
 
-    Returns:
-        Número de registros insertados
-    """
-    context.log.info("Iniciando carga a PostgreSQL...")
+        # Ejecutar Milanuncios
+        if milanuncios_zones:
+            result = run_scraper(context, 'milanuncios', milanuncios_zones, tenant_id)
+            all_results.append(result)
+            total_leads += result.get('leads_found', 0)
 
-    tenant_id = bronze_fotocasa_listings['tenant_id']
-    portal = bronze_fotocasa_listings['portal']
-    paths = bronze_fotocasa_listings['paths']
+        # Ejecutar Pisos.com
+        if pisos_zones:
+            result = run_scraper(context, 'pisos', pisos_zones, tenant_id)
+            all_results.append(result)
+            total_leads += result.get('leads_found', 0)
 
-    if not paths:
-        context.log.warning("No hay listings para cargar")
-        return Output(value=0, metadata={'num_loaded': MetadataValue.int(0)})
+    # Preparar resumen
+    completed = sum(1 for r in all_results if r['status'] == 'completed')
+    errors = sum(1 for r in all_results if r['status'] == 'error')
+    skipped = sum(1 for r in all_results if r['status'] == 'skipped')
 
-    # Preparar datos para bulk insert
-    listings_to_insert = []
-
-    for path in paths:
-        try:
-            # Leer JSON de MinIO
-            raw_data = minio.read_json(path)
-
-            if raw_data:
-                listings_to_insert.append({
-                    'tenant_id': tenant_id,
-                    'portal': portal,
-                    'data_lake_path': path,
-                    'raw_data': raw_data
-                })
-
-        except Exception as e:
-            context.log.error(f"Error leyendo {path}: {e}")
-
-    # Insertar en PostgreSQL usando bulk insert
-    num_loaded = postgres.bulk_insert_raw_listings(listings_to_insert)
-
-    context.log.info(f"Cargados {num_loaded} listings en PostgreSQL")
-
-    return Output(
-        value=num_loaded,
-        metadata={
-            'num_loaded': MetadataValue.int(num_loaded),
-            'num_errors': MetadataValue.int(len(paths) - num_loaded),
-            'portal': MetadataValue.text(portal),
-        }
-    )
-
-
-@asset(
-    description="Scraping de Milanuncios (placeholder)",
-    compute_kind="python",
-    group_name="scraping",
-)
-def bronze_milanuncios_listings(
-    context: AssetExecutionContext
-) -> Output[Dict[str, Any]]:
-    """
-    Placeholder para scraper de Milanuncios.
-
-    TODO: Implementar cuando el scraper esté listo.
-    """
-    context.log.info("Scraper de Milanuncios - Por implementar")
-
-    metadata = {
-        'tenant_id': 1,
-        'portal': 'milanuncios',
-        'num_listings': 0,
-        'paths': [],
+    summary = {
+        'fecha': fecha,
+        'status': 'completed',
+        'zonas_activas': len(zones),
+        'scrapers_ejecutados': len(all_results),
+        'scrapers_completados': completed,
+        'scrapers_con_error': errors,
+        'scrapers_omitidos': skipped,
+        'total_leads_encontrados': total_leads,
+        'resultados': all_results,
     }
 
+    context.log.info(f"Scraping completado: {completed} OK, {errors} errores, {skipped} omitidos")
+    context.log.info(f"Total leads encontrados: {total_leads}")
+
     return Output(
-        value=metadata,
+        value=summary,
         metadata={
-            'status': MetadataValue.text('Not implemented'),
+            'fecha': MetadataValue.text(fecha),
+            'zonas_activas': MetadataValue.int(len(zones)),
+            'scrapers_ejecutados': MetadataValue.int(len(all_results)),
+            'scrapers_completados': MetadataValue.int(completed),
+            'scrapers_con_error': MetadataValue.int(errors),
+            'total_leads': MetadataValue.int(total_leads),
         }
     )
 
 
 @asset(
-    description="Scraping de Wallapop (placeholder)",
-    compute_kind="python",
-    group_name="scraping",
-)
-def bronze_wallapop_listings(
-    context: AssetExecutionContext
-) -> Output[Dict[str, Any]]:
-    """
-    Placeholder para scraper de Wallapop.
-
-    TODO: Implementar cuando el scraper esté listo.
-    """
-    context.log.info("Scraper de Wallapop - Por implementar")
-
-    metadata = {
-        'tenant_id': 1,
-        'portal': 'wallapop',
-        'num_listings': 0,
-        'paths': [],
-    }
-
-    return Output(
-        value=metadata,
-        metadata={
-            'status': MetadataValue.text('Not implemented'),
-        }
-    )
-
-
-@asset(
-    description="Estadísticas de scraping consolidadas",
+    description="Estadísticas del último scraping",
     compute_kind="python",
     group_name="reporting",
+    deps=["scraping_all_portals"],
 )
 def scraping_stats(
     context: AssetExecutionContext,
     postgres: PostgresResource,
-    bronze_fotocasa_listings: Dict[str, Any],
-    raw_postgres_listings: int
 ) -> Output[Dict[str, Any]]:
     """
-    Genera estadísticas consolidadas del proceso de scraping.
-
-    Args:
-        bronze_fotocasa_listings: Metadata de Fotocasa
-        raw_postgres_listings: Número de registros cargados
-
-    Returns:
-        Dict con estadísticas consolidadas
+    Genera estadísticas después del scraping.
     """
     context.log.info("Generando estadísticas de scraping...")
 
-    # Obtener último timestamp
-    tenant_id = bronze_fotocasa_listings['tenant_id']
-    portal = bronze_fotocasa_listings['portal']
+    stats = postgres.get_scraping_stats()
 
-    last_scraping = postgres.get_latest_scraping_timestamp(tenant_id, portal)
-
-    stats = {
-        'fecha': bronze_fotocasa_listings['fecha'],
-        'portales': {
-            'fotocasa': {
-                'scrapeados': bronze_fotocasa_listings['num_listings'],
-                'cargados': raw_postgres_listings,
-            }
-        },
-        'total_scrapeados': bronze_fotocasa_listings['num_listings'],
-        'total_cargados': raw_postgres_listings,
-        'ultimo_scraping': last_scraping,
-    }
+    context.log.info(f"Total leads en BD: {stats['total_leads']}")
+    context.log.info(f"Último scraping: {stats['ultimo_scraping']}")
 
     return Output(
         value=stats,
         metadata={
-            'total_scrapeados': MetadataValue.int(stats['total_scrapeados']),
-            'total_cargados': MetadataValue.int(stats['total_cargados']),
-            'ultimo_scraping': MetadataValue.text(last_scraping or 'N/A'),
+            'total_leads': MetadataValue.int(stats['total_leads']),
+            'portales_activos': MetadataValue.int(stats['portales_activos']),
+            'ultimo_scraping': MetadataValue.text(stats['ultimo_scraping'] or 'N/A'),
         }
     )
