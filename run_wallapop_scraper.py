@@ -39,8 +39,7 @@ def main():
         '--zones',
         nargs='+',
         default=['barcelona'],
-        choices=list(ZONAS_WALLAPOP.keys()),
-        help='Zonas a scrapear (default: barcelona)'
+        help='Zonas a scrapear (default: barcelona). Use --list-zones para ver disponibles.'
     )
     parser.add_argument(
         '--tenant-id',
@@ -103,6 +102,21 @@ def main():
             print(f"  - {usuario}")
         print(f"\nTotal: {len(USUARIOS_BLACKLIST_INICIAL)} usuarios")
         return
+
+    # Validar zonas
+    zonas_validas = []
+    for zona in args.zones:
+        if zona in ZONAS_WALLAPOP:
+            zonas_validas.append(zona)
+        else:
+            print(f"ADVERTENCIA: Zona '{zona}' no encontrada para Wallapop, ignorando...")
+
+    if not zonas_validas:
+        print("ERROR: Ninguna zona válida especificada.")
+        print(f"Zonas disponibles: {', '.join(sorted(ZONAS_WALLAPOP.keys()))}")
+        return
+
+    args.zones = zonas_validas
 
     # Configuración
     filters = {'precio_min': args.precio_min}

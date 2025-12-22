@@ -66,8 +66,7 @@ Ejemplos:
         '--zones',
         nargs='+',
         default=['la_bordeta'],
-        choices=list(ZONAS_GEOGRAFICAS.keys()),
-        help='Zonas a scrapear (default: la_bordeta)'
+        help='Zonas a scrapear (default: la_bordeta). Use --list-zones para ver zonas disponibles.'
     )
     parser.add_argument(
         '--tenant-id',
@@ -121,6 +120,21 @@ Ejemplos:
             print(f"                     Provincia ID: {zona['geoProvinceId']}")
         print()
         return
+
+    # Validar que las zonas existen
+    zonas_validas = []
+    for zona in args.zones:
+        if zona in ZONAS_GEOGRAFICAS:
+            zonas_validas.append(zona)
+        else:
+            print(f"ADVERTENCIA: Zona '{zona}' no encontrada, ignorando...")
+
+    if not zonas_validas:
+        print("ERROR: Ninguna zona válida especificada.")
+        print(f"Zonas disponibles: {', '.join(sorted(ZONAS_GEOGRAFICAS.keys()))}")
+        return
+
+    args.zones = zonas_validas
 
     # Configuración de filtros
     filters = {
