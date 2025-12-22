@@ -120,20 +120,23 @@ class BaseScraper:
         """
         return None
 
-    def _generate_lead_id(self, portal: str, anuncio_id: str) -> str:
+    def _generate_lead_id(self, portal: str, anuncio_id: str) -> int:
         """
-        Genera un lead_id único como hash MD5.
+        Genera un lead_id único como entero (hash truncado).
 
         Args:
             portal: Nombre del portal
             anuncio_id: ID del anuncio en el portal
 
         Returns:
-            str: Hash MD5 de 32 caracteres
+            int: ID numérico único (fits in PostgreSQL integer: max 2.1 billion)
         """
         # Crear un string único combinando tenant, portal y anuncio_id
         unique_string = f"{self.tenant_id}:{portal}:{anuncio_id}"
-        return hashlib.md5(unique_string.encode()).hexdigest()
+        # Convertir MD5 a entero - usar módulo para mantener en rango de int
+        hash_hex = hashlib.md5(unique_string.encode()).hexdigest()
+        # Use modulo to keep within PostgreSQL integer range (0 to 2,147,483,647)
+        return int(hash_hex, 16) % 2147483647
 
     def save_to_postgres_raw(
         self,
@@ -211,26 +214,37 @@ class BaseScraper:
 
             now = datetime.now()
 
+            # Prepare values ensuring NOT NULL constraints are satisfied
+            # NOT NULL columns: lead_id, telefono_norm, direccion, zona_geografica,
+            #                   precio, portal, url_anuncio, fecha_scraping
+            telefono = listing_data.get('telefono') or ''
+            direccion = listing_data.get('direccion') or listing_data.get('ubicacion') or 'Sin dirección'
+            zona = listing_data.get('zona_geografica') or listing_data.get('zona_busqueda') or 'Sin zona'
+            precio = listing_data.get('precio')
+            if precio is None:
+                precio = 0  # Default price for NOT NULL constraint
+            url = listing_data.get('url_anuncio') or listing_data.get('detail_url') or ''
+
             # Ejecutar insert
             cursor.execute(
                 sql,
                 (
                     lead_id,
                     self.tenant_id,
-                    listing_data.get('telefono') or '',
+                    telefono,
                     listing_data.get('email') or None,
                     listing_data.get('vendedor') or listing_data.get('nombre') or None,
-                    listing_data.get('direccion') or None,
-                    listing_data.get('zona_geografica') or listing_data.get('zona_busqueda') or None,
+                    direccion,
+                    zona,
                     listing_data.get('codigo_postal') or None,
                     listing_data.get('tipo_inmueble') or 'piso',
-                    listing_data.get('precio') or None,
+                    precio,
                     listing_data.get('habitaciones') or None,
                     listing_data.get('metros') or None,
                     listing_data.get('descripcion') or None,
                     fotos_json,
                     portal,
-                    listing_data.get('url_anuncio') or None,
+                    url,
                     data_lake_path,
                     'NUEVO',
                     0,
