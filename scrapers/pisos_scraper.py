@@ -488,24 +488,37 @@ class PisosScraper(scrapy.Spider):
                     if src and src.startswith('http'):
                         fotos.append(src)
 
-            # Tipo de vendedor
-            vendedor = 'Particular'
-            agency_elem = await card.query_selector('.ad-preview__bottom-info-agency')
-            if agency_elem:
-                vendedor = await agency_elem.inner_text()
-                if vendedor:
-                    vendedor = vendedor.strip()
-
-            # Determinar si es particular - keywords de inmobiliarias españolas
+            # Detectar si es inmobiliaria o particular
+            # Método 1: Buscar logo de inmobiliaria con enlace a /inmobiliaria-{nombre}/
             es_particular = True
-            inmobiliaria_keywords = [
-                'inmobiliaria', 'agencia', 'inmo', 'real estate', 'homes',
-                'fincas', 'propiedades', 'promotora', 'consulting', 'asesores',
-                'gestora', 'viviendas', 'realty', 'estate', 'properties',
-                'group', 'soluciones', 's.l.', 's.l', 'sl'
-            ]
-            if vendedor and any(x in vendedor.lower() for x in inmobiliaria_keywords):
-                es_particular = False
+            vendedor = 'Particular'
+
+            logo_elem = await card.query_selector('.ad-preview__logo span[data-lnk-href]')
+            if logo_elem:
+                logo_href = await logo_elem.get_attribute('data-lnk-href')
+                if logo_href and '/inmobiliaria' in logo_href.lower():
+                    es_particular = False
+                    # Extraer nombre de la inmobiliaria del enlace
+                    # Ej: /inmobiliaria-assessoria_imperial_tarraco_527767_0/
+                    match = re.search(r'/inmobiliaria-([^/]+)/', logo_href)
+                    if match:
+                        vendedor = match.group(1).replace('_', ' ').title()
+
+            # Método 2: Buscar atributo data-ga-ecom que indica profesional
+            if es_particular:
+                phone_btn = await card.query_selector('button[data-ga-ecom*="profesional"]')
+                if phone_btn:
+                    es_particular = False
+                    if vendedor == 'Particular':
+                        vendedor = 'Profesional'
+
+            # Método 3: Verificar si hay imagen de logo (las inmobiliarias tienen logo)
+            if es_particular:
+                logo_img = await card.query_selector('.ad-preview__logo img')
+                if logo_img:
+                    es_particular = False
+                    if vendedor == 'Particular':
+                        vendedor = 'Inmobiliaria'
 
             return {
                 'tenant_id': self.tenant_id,
