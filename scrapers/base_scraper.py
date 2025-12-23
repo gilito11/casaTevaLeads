@@ -138,6 +138,34 @@ class BaseScraper:
         # Use modulo to keep within PostgreSQL integer range (0 to 2,147,483,647)
         return int(hash_hex, 16) % 2147483647
 
+    def _is_in_blacklist(self, portal: str, anuncio_id: str) -> bool:
+        """
+        Verifica si un anuncio está en la blacklist.
+
+        Args:
+            portal: Nombre del portal
+            anuncio_id: ID del anuncio en el portal
+
+        Returns:
+            bool: True si está en blacklist, False si no
+        """
+        if not self.postgres_conn:
+            return False
+
+        try:
+            cursor = self.postgres_conn.cursor()
+            cursor.execute("""
+                SELECT 1 FROM leads_anuncio_blacklist
+                WHERE tenant_id = %s AND portal = %s AND anuncio_id = %s
+                LIMIT 1
+            """, (self.tenant_id, portal, anuncio_id))
+            result = cursor.fetchone()
+            cursor.close()
+            return result is not None
+        except Exception as e:
+            logger.debug(f"Error checking blacklist: {e}")
+            return False
+
     def save_to_postgres_raw(
         self,
         listing_data: Dict[str, Any],
@@ -166,6 +194,11 @@ class BaseScraper:
             anuncio_id = str(listing_data.get('anuncio_id', ''))
             if not anuncio_id:
                 logger.warning(f"Anuncio sin ID, no se puede guardar")
+                return False
+
+            # Check if anuncio is in blacklist
+            if self._is_in_blacklist(portal, anuncio_id):
+                logger.debug(f"Anuncio en blacklist, ignorando: {portal} - {anuncio_id}")
                 return False
 
             lead_id = self._generate_lead_id(portal, anuncio_id)

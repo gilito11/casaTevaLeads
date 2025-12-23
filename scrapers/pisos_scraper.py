@@ -226,6 +226,7 @@ class PisosScraper(scrapy.Spider):
         # Contadores
         self.items_scraped = 0
         self.items_saved = 0
+        self.items_skipped_inmobiliaria = 0
         self.pages_scraped = 0
 
         # Base scraper para guardar datos
@@ -313,6 +314,13 @@ class PisosScraper(scrapy.Spider):
 
                     if listing_data and listing_data.get('titulo'):
                         self.items_scraped += 1
+
+                        # Filtrar inmobiliarias - solo guardar particulares
+                        if not listing_data.get('es_particular', True):
+                            vendedor = listing_data.get('vendedor', 'Desconocido')
+                            logger.debug(f"Saltando inmobiliaria: {vendedor} - {listing_data.get('titulo', '')[:40]}")
+                            self.items_skipped_inmobiliaria += 1
+                            continue
 
                         # Guardar en base de datos
                         if self.base_scraper:
@@ -488,9 +496,15 @@ class PisosScraper(scrapy.Spider):
                 if vendedor:
                     vendedor = vendedor.strip()
 
-            # Determinar si es particular
+            # Determinar si es particular - keywords de inmobiliarias españolas
             es_particular = True
-            if vendedor and any(x in vendedor.lower() for x in ['inmobiliaria', 'agencia', 'inmo', 'real estate', 'homes']):
+            inmobiliaria_keywords = [
+                'inmobiliaria', 'agencia', 'inmo', 'real estate', 'homes',
+                'fincas', 'propiedades', 'promotora', 'consulting', 'asesores',
+                'gestora', 'viviendas', 'realty', 'estate', 'properties',
+                'group', 'soluciones', 's.l.', 's.l', 'sl'
+            ]
+            if vendedor and any(x in vendedor.lower() for x in inmobiliaria_keywords):
                 es_particular = False
 
             return {
@@ -694,7 +708,8 @@ class PisosScraper(scrapy.Spider):
     def closed(self, reason):
         """Se ejecuta cuando el spider termina."""
         logger.info(f"Spider cerrado: {reason}")
-        logger.info(f"Estadísticas: {self.items_scraped} items extraídos, {self.items_saved} guardados, {self.pages_scraped} páginas")
+        logger.info(f"Estadísticas: {self.items_scraped} items extraídos, {self.items_saved} guardados, "
+                    f"{self.items_skipped_inmobiliaria} inmobiliarias filtradas, {self.pages_scraped} páginas")
 
         if self.base_scraper:
             self.base_scraper.close()
