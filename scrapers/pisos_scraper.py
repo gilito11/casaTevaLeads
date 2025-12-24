@@ -489,16 +489,14 @@ class PisosScraper(scrapy.Spider):
                         fotos.append(src)
 
             # Detectar si es inmobiliaria o particular
-            # El atributo data-ga-ecom es el más fiable:
-            #   - "venta-particular-viviendas" = particular
-            #   - "venta-profesional-viviendas" = inmobiliaria
-            es_particular = True
+            # Múltiples métodos de detección para mayor fiabilidad
+            es_particular = None  # None = no determinado aún
             vendedor = 'Particular'
 
-            # Método 1 (PRINCIPAL): Buscar data-ga-ecom en el botón de llamar
-            phone_btn = await card.query_selector('button[data-ga-ecom]')
-            if phone_btn:
-                ga_ecom = await phone_btn.get_attribute('data-ga-ecom')
+            # Método 1: Buscar data-ga-ecom en cualquier elemento (botón, enlace, etc.)
+            ga_ecom_elem = await card.query_selector('[data-ga-ecom]')
+            if ga_ecom_elem:
+                ga_ecom = await ga_ecom_elem.get_attribute('data-ga-ecom')
                 if ga_ecom:
                     if 'profesional' in ga_ecom.lower():
                         es_particular = False
@@ -507,13 +505,46 @@ class PisosScraper(scrapy.Spider):
                         es_particular = True
                         vendedor = 'Particular'
 
-            # Método 2 (SECUNDARIO): Si es profesional, extraer nombre de la inmobiliaria
-            if not es_particular:
+            # Método 2: Buscar enlace a /inmobiliaria-{nombre}/
+            if es_particular is None or es_particular:
+                logo_elem = await card.query_selector('[data-lnk-href*="inmobiliaria"]')
+                if logo_elem:
+                    es_particular = False
+                    logo_href = await logo_elem.get_attribute('data-lnk-href')
+                    if logo_href:
+                        match = re.search(r'/inmobiliaria-([^/]+)/', logo_href)
+                        if match:
+                            vendedor = match.group(1).replace('_', ' ').title()
+                        else:
+                            vendedor = 'Inmobiliaria'
+
+            # Método 3: Verificar si hay logo de agencia (imagen en .ad-preview__logo)
+            if es_particular is None or es_particular:
+                logo_img = await card.query_selector('.ad-preview__logo img[src*="prof"], .ad-preview__logo img[data-src*="prof"]')
+                if logo_img:
+                    es_particular = False
+                    if vendedor == 'Particular':
+                        vendedor = 'Profesional'
+
+            # Método 4: Verificar patrón de URL - si tiene _NUMERO es profesional
+            # URLs de profesionales: /comprar/piso-zona-12345678_123456/
+            # URLs de particulares: /comprar/piso-zona-12345678/
+            if es_particular is None or es_particular:
+                if url_anuncio and re.search(r'-\d+_\d+/?$', url_anuncio):
+                    es_particular = False
+                    if vendedor == 'Particular':
+                        vendedor = 'Profesional'
+
+            # Default: si no pudimos determinar, asumir particular
+            if es_particular is None:
+                es_particular = True
+
+            # Si es profesional, intentar extraer nombre de la inmobiliaria
+            if not es_particular and vendedor in ['Profesional', 'Inmobiliaria']:
                 logo_elem = await card.query_selector('.ad-preview__logo span[data-lnk-href]')
                 if logo_elem:
                     logo_href = await logo_elem.get_attribute('data-lnk-href')
                     if logo_href and '/inmobiliaria' in logo_href.lower():
-                        # Extraer nombre de la inmobiliaria del enlace
                         match = re.search(r'/inmobiliaria-([^/]+)/', logo_href)
                         if match:
                             vendedor = match.group(1).replace('_', ' ').title()
