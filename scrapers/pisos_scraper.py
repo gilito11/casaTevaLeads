@@ -493,17 +493,18 @@ class PisosScraper(scrapy.Spider):
             es_particular = None  # None = no determinado aún
             vendedor = 'Particular'
 
-            # Método 1: Buscar data-ga-ecom en cualquier elemento (botón, enlace, etc.)
-            ga_ecom_elem = await card.query_selector('[data-ga-ecom]')
-            if ga_ecom_elem:
-                ga_ecom = await ga_ecom_elem.get_attribute('data-ga-ecom')
-                if ga_ecom:
-                    if 'profesional' in ga_ecom.lower():
-                        es_particular = False
-                        vendedor = 'Profesional'
-                    elif 'particular' in ga_ecom.lower():
-                        es_particular = True
-                        vendedor = 'Particular'
+            # Método 1: Buscar "particular" o "profesional" en el HTML de la tarjeta
+            # Esto es más fiable que buscar elementos específicos
+            try:
+                card_html = await card.inner_html()
+                if 'venta-particular' in card_html.lower():
+                    es_particular = True
+                    vendedor = 'Particular'
+                elif 'venta-profesional' in card_html.lower():
+                    es_particular = False
+                    vendedor = 'Profesional'
+            except Exception as e:
+                logger.debug(f"Error obteniendo HTML de tarjeta: {e}")
 
             # Método 2: Buscar enlace a /inmobiliaria-{nombre}/
             if es_particular is None or es_particular:
