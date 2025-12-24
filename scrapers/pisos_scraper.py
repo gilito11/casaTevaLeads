@@ -518,7 +518,7 @@ class PisosScraper(scrapy.Spider):
                         else:
                             vendedor = 'Inmobiliaria'
 
-            # Método 3: Verificar si hay logo de agencia (imagen en .ad-preview__logo)
+            # Método 3: Verificar si hay logo de agencia (imagen en .ad-preview__logo con 'prof' en URL)
             if es_particular is None or es_particular:
                 logo_img = await card.query_selector('.ad-preview__logo img[src*="prof"], .ad-preview__logo img[data-src*="prof"]')
                 if logo_img:
@@ -526,18 +526,12 @@ class PisosScraper(scrapy.Spider):
                     if vendedor == 'Particular':
                         vendedor = 'Profesional'
 
-            # Método 4: Verificar patrón de URL - si tiene _NUMERO es profesional
-            # URLs de profesionales: /comprar/piso-zona-12345678_123456/
-            # URLs de particulares: /comprar/piso-zona-12345678/
-            if es_particular is None or es_particular:
-                if url_anuncio and re.search(r'-\d+_\d+/?$', url_anuncio):
-                    es_particular = False
-                    if vendedor == 'Particular':
-                        vendedor = 'Profesional'
-
             # Default: si no pudimos determinar, asumir particular
             if es_particular is None:
                 es_particular = True
+
+            # Log para debug
+            logger.debug(f"Anuncio {anuncio_id}: es_particular={es_particular}, vendedor={vendedor}")
 
             # Si es profesional, intentar extraer nombre de la inmobiliaria
             if not es_particular and vendedor in ['Profesional', 'Inmobiliaria']:
