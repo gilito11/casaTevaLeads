@@ -227,7 +227,9 @@ class PisosScraper(scrapy.Spider):
         self.items_scraped = 0
         self.items_saved = 0
         self.items_skipped_inmobiliaria = 0
+        self.items_skipped_inmobiliaria_detail = 0  # Filtrados en página de detalle
         self.pages_scraped = 0
+        self.detail_pages_checked = 0
 
         # Base scraper para guardar datos
         if minio_config or postgres_config:
@@ -315,12 +317,44 @@ class PisosScraper(scrapy.Spider):
                     if listing_data and listing_data.get('titulo'):
                         self.items_scraped += 1
 
-                        # Filtrar inmobiliarias - solo guardar particulares
+                        # Filtrar inmobiliarias obvias desde la tarjeta
                         if not listing_data.get('es_particular', True):
                             vendedor = listing_data.get('vendedor', 'Desconocido')
-                            logger.debug(f"Saltando inmobiliaria: {vendedor} - {listing_data.get('titulo', '')[:40]}")
+                            logger.debug(f"Saltando inmobiliaria (tarjeta): {vendedor} - {listing_data.get('titulo', '')[:40]}")
                             self.items_skipped_inmobiliaria += 1
                             continue
+
+                        # Verificación final: visitar página de detalle para confirmar
+                        # Esto también extrae el teléfono si está disponible
+                        # Usamos una nueva página para no perder el contexto del listado
+                        if listing_data.get('url_anuncio'):
+                            self.detail_pages_checked += 1
+                            browser_context = page.context
+                            detail_page = await browser_context.new_page()
+
+                            try:
+                                detail_result = await self._verify_particular_on_detail_page(
+                                    detail_page,
+                                    listing_data['url_anuncio'],
+                                    listing_data.get('anuncio_id', 'unknown')
+                                )
+
+                                if detail_result:
+                                    if not detail_result.get('es_particular', True):
+                                        vendedor = detail_result.get('vendedor', 'Inmobiliaria')
+                                        logger.info(f"Saltando inmobiliaria (detalle): {vendedor} - {listing_data.get('titulo', '')[:40]}")
+                                        self.items_skipped_inmobiliaria_detail += 1
+                                        await detail_page.close()
+                                        continue
+
+                                    # Actualizar datos con info del detalle
+                                    if detail_result.get('telefono'):
+                                        listing_data['telefono'] = detail_result['telefono']
+                                    if detail_result.get('vendedor') and detail_result['vendedor'] != 'Particular':
+                                        listing_data['vendedor'] = detail_result['vendedor']
+
+                            finally:
+                                await detail_page.close()
 
                         # Guardar en base de datos
                         if self.base_scraper:
@@ -570,6 +604,173 @@ class PisosScraper(scrapy.Spider):
             logger.error(f"Error extrayendo datos: {e}")
             return None
 
+    async def _verify_particular_on_detail_page(
+        self,
+        page,
+        url: str,
+        anuncio_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Visita la página de detalle para verificar si es particular o inmobiliaria.
+        Revisa la sección "Contacta con el Anunciante" para detectar logos/nombres de agencias.
+        También extrae el teléfono si está disponible.
+
+        Returns:
+            Dict con 'es_particular', 'vendedor', 'telefono' o None si hay error
+        """
+        try:
+            logger.debug(f"Verificando detalle de anuncio {anuncio_id}: {url}")
+
+            # Navegar a la página de detalle
+            await page.goto(url, wait_until='networkidle', timeout=30000)
+            await page.wait_for_timeout(1500)
+
+            result = {
+                'es_particular': True,
+                'vendedor': 'Particular',
+                'telefono': None
+            }
+
+            # === DETECTAR INMOBILIARIA EN "CONTACTA CON EL ANUNCIANTE" ===
+
+            # Buscar el contenedor de contacto del anunciante
+            contact_selectors = [
+                '.contact-box',
+                '.advertiser-box',
+                '.owner-info',
+                '[class*="contact"]',
+                '[class*="advertiser"]',
+                '.ad-detail__contact',
+                '.detail-contact',
+            ]
+
+            contact_section = None
+            for selector in contact_selectors:
+                contact_section = await page.query_selector(selector)
+                if contact_section:
+                    break
+
+            if contact_section:
+                # Método 1: Buscar logo de inmobiliaria (imagen con link a /inmobiliaria-)
+                agency_logo = await contact_section.query_selector('a[href*="/inmobiliaria-"] img')
+                if agency_logo:
+                    result['es_particular'] = False
+                    # Extraer nombre de la inmobiliaria del link
+                    parent_link = await contact_section.query_selector('a[href*="/inmobiliaria-"]')
+                    if parent_link:
+                        href = await parent_link.get_attribute('href')
+                        if href:
+                            match = re.search(r'/inmobiliaria-([^/]+)/?', href)
+                            if match:
+                                result['vendedor'] = match.group(1).replace('_', ' ').replace('-', ' ').title()
+                    logger.debug(f"Detectada inmobiliaria por logo: {result['vendedor']}")
+
+                # Método 2: Buscar link directo a inmobiliaria
+                if result['es_particular']:
+                    agency_link = await contact_section.query_selector('a[href*="/inmobiliaria-"]')
+                    if agency_link:
+                        result['es_particular'] = False
+                        href = await agency_link.get_attribute('href')
+                        if href:
+                            match = re.search(r'/inmobiliaria-([^/]+)/?', href)
+                            if match:
+                                result['vendedor'] = match.group(1).replace('_', ' ').replace('-', ' ').title()
+                        else:
+                            agency_text = await agency_link.inner_text()
+                            if agency_text:
+                                result['vendedor'] = agency_text.strip()
+                        logger.debug(f"Detectada inmobiliaria por link: {result['vendedor']}")
+
+                # Método 3: Buscar texto que indique profesional/inmobiliaria
+                if result['es_particular']:
+                    section_html = await contact_section.inner_html()
+                    section_html_lower = section_html.lower()
+
+                    agency_keywords = [
+                        'inmobiliaria', 'agencia', 'real estate', 'profesional',
+                        'promotora', 'gestora', 'consulting', 'properties',
+                        'fincas', 'inmuebles', 'inversiones'
+                    ]
+
+                    for keyword in agency_keywords:
+                        if keyword in section_html_lower:
+                            result['es_particular'] = False
+                            result['vendedor'] = 'Profesional'
+                            logger.debug(f"Detectada inmobiliaria por keyword '{keyword}'")
+                            break
+
+            # === BÚSQUEDA ADICIONAL FUERA DEL CONTENEDOR DE CONTACTO ===
+
+            # Buscar en toda la página por logo/link de inmobiliaria
+            if result['es_particular']:
+                page_agency_link = await page.query_selector('.ad-detail a[href*="/inmobiliaria-"]')
+                if page_agency_link:
+                    result['es_particular'] = False
+                    href = await page_agency_link.get_attribute('href')
+                    if href:
+                        match = re.search(r'/inmobiliaria-([^/]+)/?', href)
+                        if match:
+                            result['vendedor'] = match.group(1).replace('_', ' ').replace('-', ' ').title()
+                    logger.debug(f"Detectada inmobiliaria en página: {result['vendedor']}")
+
+            # === EXTRAER TELÉFONO ===
+
+            phone_selectors = [
+                'a[href^="tel:"]',
+                '.phone-number',
+                '[class*="phone"]',
+                '[class*="telefono"]',
+                'a[data-phone]',
+            ]
+
+            for selector in phone_selectors:
+                phone_elem = await page.query_selector(selector)
+                if phone_elem:
+                    # Intentar obtener del href tel:
+                    href = await phone_elem.get_attribute('href')
+                    if href and href.startswith('tel:'):
+                        phone = href.replace('tel:', '').strip()
+                        if phone and len(phone) >= 9:
+                            result['telefono'] = phone
+                            break
+
+                    # Intentar obtener del texto
+                    phone_text = await phone_elem.inner_text()
+                    if phone_text:
+                        phone_clean = re.sub(r'[^\d+]', '', phone_text)
+                        if phone_clean and len(phone_clean) >= 9:
+                            result['telefono'] = phone_clean
+                            break
+
+            # Intentar hacer clic en "Ver teléfono" si existe
+            if not result['telefono']:
+                show_phone_btn = await page.query_selector('button[class*="phone"], a[class*="show-phone"], [data-action="show-phone"]')
+                if show_phone_btn:
+                    try:
+                        await show_phone_btn.click()
+                        await page.wait_for_timeout(1000)
+
+                        # Buscar teléfono de nuevo después del clic
+                        for selector in phone_selectors:
+                            phone_elem = await page.query_selector(selector)
+                            if phone_elem:
+                                href = await phone_elem.get_attribute('href')
+                                if href and href.startswith('tel:'):
+                                    result['telefono'] = href.replace('tel:', '').strip()
+                                    break
+                    except Exception as e:
+                        logger.debug(f"No se pudo hacer clic en mostrar teléfono: {e}")
+
+            logger.debug(f"Resultado verificación {anuncio_id}: particular={result['es_particular']}, "
+                        f"vendedor={result['vendedor']}, tel={result['telefono']}")
+
+            return result
+
+        except Exception as e:
+            logger.warning(f"Error verificando detalle de {anuncio_id}: {e}")
+            # En caso de error, devolver None para no filtrar el lead
+            return None
+
     def _extract_listing_data(
         self,
         card,
@@ -745,8 +946,15 @@ class PisosScraper(scrapy.Spider):
     def closed(self, reason):
         """Se ejecuta cuando el spider termina."""
         logger.info(f"Spider cerrado: {reason}")
-        logger.info(f"Estadísticas: {self.items_scraped} items extraídos, {self.items_saved} guardados, "
-                    f"{self.items_skipped_inmobiliaria} inmobiliarias filtradas, {self.pages_scraped} páginas")
+        logger.info(f"=== ESTADÍSTICAS PISOS.COM ===")
+        logger.info(f"  Páginas de listado: {self.pages_scraped}")
+        logger.info(f"  Anuncios encontrados: {self.items_scraped}")
+        logger.info(f"  Inmobiliarias filtradas (tarjeta): {self.items_skipped_inmobiliaria}")
+        logger.info(f"  Páginas de detalle verificadas: {self.detail_pages_checked}")
+        logger.info(f"  Inmobiliarias filtradas (detalle): {self.items_skipped_inmobiliaria_detail}")
+        logger.info(f"  Leads guardados: {self.items_saved}")
+        total_filtered = self.items_skipped_inmobiliaria + self.items_skipped_inmobiliaria_detail
+        logger.info(f"  Total inmobiliarias filtradas: {total_filtered}")
 
         if self.base_scraper:
             self.base_scraper.close()

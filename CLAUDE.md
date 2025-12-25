@@ -163,3 +163,10 @@ ACR (Container Registry):
 2. GitHub Actions construye imagen Docker
 3. Push a Azure Container Registry (inmoleadsacr.azurecr.io)
 4. `az containerapp update` para actualizar el contenedor
+
+## Claude Code Preferences
+
+- Run long commands (builds, deploys, tests) in background mode
+- Make decisions without asking when possible - just do it
+- Use parallel agents for codebase exploration
+- Be concise, skip unnecessary confirmations
