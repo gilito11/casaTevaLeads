@@ -128,7 +128,8 @@ class ZonaGeografica(models.Model):
     # Portales a scrapear en esta zona
     scrapear_milanuncios = models.BooleanField(default=True)
     scrapear_fotocasa = models.BooleanField(default=True)
-    scrapear_wallapop = models.BooleanField(default=True)
+    scrapear_habitaclia = models.BooleanField(default=True)
+    scrapear_wallapop = models.BooleanField(default=False)  # Deshabilitado (bloqueado)
     scrapear_pisos = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -225,6 +226,91 @@ class UsuarioBlacklist(models.Model):
         ).filter(
             models.Q(tenant__isnull=True) | models.Q(tenant=tenant)
         ).exists()
+
+
+class ScrapingJob(models.Model):
+    """
+    Modelo para trackear trabajos de scraping con feedback al usuario.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('running', 'Ejecutando'),
+        ('completed', 'Completado'),
+        ('error', 'Error'),
+    ]
+
+    PORTAL_CHOICES = [
+        ('milanuncios', 'Milanuncios'),
+        ('fotocasa', 'Fotocasa'),
+        ('habitaclia', 'Habitaclia'),
+        ('pisos', 'Pisos.com'),
+        ('all', 'Todos los portales'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='scraping_jobs')
+    portal = models.CharField(max_length=50, choices=PORTAL_CHOICES)
+    zona = models.ForeignKey(
+        'ZonaGeografica', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='scraping_jobs'
+    )
+    zona_nombre = models.CharField(max_length=255, blank=True)  # Backup if zona deleted
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    # Resultados
+    leads_encontrados = models.IntegerField(default=0)
+    leads_guardados = models.IntegerField(default=0)
+    leads_filtrados = models.IntegerField(default=0)
+    leads_duplicados = models.IntegerField(default=0)
+
+    # Errores
+    error_message = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'scraping_jobs'
+        verbose_name = 'Trabajo de Scraping'
+        verbose_name_plural = 'Trabajos de Scraping'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.portal} - {self.zona_nombre or 'Todas'} ({self.get_status_display()})"
+
+    @property
+    def duration_seconds(self):
+        """Duración del trabajo en segundos."""
+        if self.started_at and self.completed_at:
+            return (self.completed_at - self.started_at).total_seconds()
+        return None
+
+    def mark_running(self):
+        """Marca el trabajo como en ejecución."""
+        from django.utils import timezone
+        self.status = 'running'
+        self.started_at = timezone.now()
+        self.save(update_fields=['status', 'started_at'])
+
+    def mark_completed(self, encontrados=0, guardados=0, filtrados=0, duplicados=0):
+        """Marca el trabajo como completado con resultados."""
+        from django.utils import timezone
+        self.status = 'completed'
+        self.completed_at = timezone.now()
+        self.leads_encontrados = encontrados
+        self.leads_guardados = guardados
+        self.leads_filtrados = filtrados
+        self.leads_duplicados = duplicados
+        self.save()
+
+    def mark_error(self, message):
+        """Marca el trabajo como error."""
+        from django.utils import timezone
+        self.status = 'error'
+        self.completed_at = timezone.now()
+        self.error_message = message
+        self.save()
 
 
 class ContadorUsuarioPortal(models.Model):

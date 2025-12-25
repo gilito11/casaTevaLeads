@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.http import JsonResponse
 from datetime import timedelta
 
-from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS
+from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS, ScrapingJob
 from leads.models import Lead
 
 
@@ -216,11 +216,11 @@ def scrapers_view(request):
             'activa': slug in zonas_activas_slugs,
         })
 
-    # Scrapers disponibles
+    # Scrapers disponibles (activos con Botasaurus)
     scrapers = [
         {'id': 'milanuncios', 'nombre': 'Milanuncios', 'descripcion': 'Portal de anuncios clasificados'},
-        {'id': 'wallapop', 'nombre': 'Wallapop', 'descripcion': 'Marketplace de segunda mano'},
         {'id': 'fotocasa', 'nombre': 'Fotocasa', 'descripcion': 'Portal inmobiliario'},
+        {'id': 'habitaclia', 'nombre': 'Habitaclia', 'descripcion': 'Portal inmobiliario catalan'},
         {'id': 'pisos', 'nombre': 'Pisos.com', 'descripcion': 'Portal inmobiliario grande'},
     ]
 
@@ -470,3 +470,197 @@ def run_all_scrapers_view(request):
             messages.error(request, 'No se encontró el tenant')
 
     return redirect('scrapers')
+
+
+# ============================================================
+# NUEVAS VISTAS: Scraping con Botasaurus y feedback de leads
+# ============================================================
+
+def _run_botasaurus_scraper(job_id, portal, zona_slug):
+    """
+    Ejecuta el scraper Botasaurus en background y actualiza el ScrapingJob.
+    """
+    try:
+        job = ScrapingJob.objects.get(id=job_id)
+        job.mark_running()
+
+        # Construir path al proyecto
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+
+        # Determinar qué portales ejecutar
+        if portal == 'all':
+            portals_arg = ['milanuncios', 'fotocasa', 'habitaclia', 'pisos']
+        else:
+            portals_arg = [portal]
+
+        # Construir comando
+        script_path = os.path.join(project_root, 'run_botasaurus_scrapers.py')
+        cmd = [
+            sys.executable, script_path,
+            '--portals', *portals_arg,
+            '--zones', zona_slug,
+            '--postgres'
+        ]
+
+        # Ejecutar scraper
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 minutos max
+            cwd=project_root,
+            env={**os.environ, 'PYTHONPATH': project_root}
+        )
+
+        # Parsear output para extraer estadísticas
+        output = result.stdout
+        encontrados = 0
+        guardados = 0
+        filtrados = 0
+
+        # Buscar líneas como "[OK] milanuncios: 3 guardados, 0 filtrados"
+        import re
+        for line in output.split('\n'):
+            match = re.search(r'\[OK\]\s+\w+:\s+(\d+)\s+guardados?,\s+(\d+)\s+filtrados?', line)
+            if match:
+                guardados += int(match.group(1))
+                filtrados += int(match.group(2))
+            # Buscar "Total listings scraped: X"
+            total_match = re.search(r'Total listings scraped:\s+(\d+)', line)
+            if total_match:
+                encontrados += int(total_match.group(1))
+
+        if result.returncode == 0:
+            job.mark_completed(
+                encontrados=encontrados,
+                guardados=guardados,
+                filtrados=filtrados
+            )
+        else:
+            job.mark_error(f"Error (code {result.returncode}): {result.stderr[-500:]}")
+
+    except subprocess.TimeoutExpired:
+        job = ScrapingJob.objects.get(id=job_id)
+        job.mark_error("Timeout: El scraping tardó más de 10 minutos")
+    except Exception as e:
+        try:
+            job = ScrapingJob.objects.get(id=job_id)
+            job.mark_error(str(e))
+        except:
+            pass
+
+
+@login_required
+def run_botasaurus_view(request):
+    """
+    Ejecutar scraper Botasaurus para un portal y zona específicos.
+    Crea un ScrapingJob y devuelve su ID para tracking.
+    """
+    if request.method == 'POST':
+        portal = request.POST.get('portal', 'all')
+        zona_id = request.POST.get('zona_id')
+
+        # Obtener tenant
+        tenant_id = request.session.get('tenant_id')
+        if not tenant_id:
+            messages.error(request, 'No se encontró el tenant')
+            return redirect('scrapers')
+
+        tenant = get_object_or_404(Tenant, tenant_id=tenant_id)
+
+        # Obtener zona
+        zona = None
+        zona_nombre = 'Todas las zonas'
+        zona_slug = None
+
+        if zona_id:
+            zona = get_object_or_404(ZonaGeografica, id=zona_id, tenant=tenant)
+            zona_nombre = zona.nombre
+            zona_slug = zona.slug
+        else:
+            # Si no hay zona específica, usar todas las zonas activas
+            zonas = ZonaGeografica.objects.filter(tenant=tenant, activa=True)
+            if zonas.exists():
+                zona_slug = ','.join([z.slug for z in zonas])
+                zona_nombre = f"{zonas.count()} zonas"
+            else:
+                messages.warning(request, 'No hay zonas activas configuradas')
+                return redirect('scrapers')
+
+        # Verificar si ya hay un job corriendo para este portal/zona
+        running_job = ScrapingJob.objects.filter(
+            tenant=tenant,
+            portal=portal,
+            status='running'
+        ).first()
+
+        if running_job:
+            messages.warning(request, f'Ya hay un scraping en ejecución para {portal}')
+            return redirect('scrapers')
+
+        # Crear el job
+        job = ScrapingJob.objects.create(
+            tenant=tenant,
+            portal=portal,
+            zona=zona,
+            zona_nombre=zona_nombre,
+            status='pending'
+        )
+
+        # Ejecutar en thread separado
+        thread = threading.Thread(
+            target=_run_botasaurus_scraper,
+            args=(job.id, portal, zona_slug)
+        )
+        thread.daemon = True
+        thread.start()
+
+        messages.success(request, f'Scraping iniciado para {portal} - {zona_nombre}')
+
+    return redirect('scrapers')
+
+
+@login_required
+def scraping_jobs_partial_view(request):
+    """
+    Vista HTMX que devuelve el estado de los últimos jobs de scraping.
+    Se actualiza cada 3 segundos mientras hay jobs corriendo.
+    """
+    tenant_id = request.session.get('tenant_id')
+    if not tenant_id:
+        return JsonResponse({'error': 'No tenant'}, status=400)
+
+    # Últimos 5 jobs
+    jobs = ScrapingJob.objects.filter(
+        tenant_id=tenant_id
+    ).order_by('-created_at')[:5]
+
+    # Verificar si hay alguno corriendo para auto-refresh
+    has_running = jobs.filter(status__in=['pending', 'running']).exists()
+
+    context = {
+        'jobs': jobs,
+        'has_running': has_running,
+    }
+    return render(request, 'scrapers/partials/jobs_status.html', context)
+
+
+@login_required
+def scraping_job_detail_view(request, job_id):
+    """API para obtener el detalle de un job específico."""
+    tenant_id = request.session.get('tenant_id')
+    job = get_object_or_404(ScrapingJob, id=job_id, tenant_id=tenant_id)
+
+    return JsonResponse({
+        'id': job.id,
+        'portal': job.portal,
+        'zona': job.zona_nombre,
+        'status': job.status,
+        'leads_encontrados': job.leads_encontrados,
+        'leads_guardados': job.leads_guardados,
+        'leads_filtrados': job.leads_filtrados,
+        'error': job.error_message,
+        'started_at': job.started_at.isoformat() if job.started_at else None,
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+    })

@@ -1,3 +1,4 @@
+{% load lead_filters %}
 {% for key, status in running_scrapers.items %}
     {% if status.status == 'running' %}
     <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-center justify-between mb-4">
@@ -14,7 +15,7 @@
                     Scraper en ejecucion: {{ key }}
                     {% endif %}
                 </p>
-                <p class="text-sm text-blue-600 dark:text-blue-400">Iniciado: {{ status.started|slice:":19"|default:"hace un momento" }}</p>
+                <p class="text-sm text-blue-600 dark:text-blue-400">Iniciado: {{ status.started|format_datetime_es }}</p>
             </div>
         </div>
         <span class="text-xs text-blue-500 dark:text-blue-400">Auto-actualiza cada 10s</span>

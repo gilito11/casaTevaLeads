@@ -27,12 +27,31 @@
         {% endif %}
     </div>
 
-    <!-- Status Container with Auto-refresh -->
+    <!-- Status Container with Auto-refresh (legacy) -->
     <div id="scraper-status-container"
          hx-get="{% url 'scraper_status_partial' %}"
          hx-trigger="every 10s"
          hx-swap="innerHTML">
         {% include 'scrapers/partials/status_banner.html' %}
+    </div>
+
+    <!-- Scraping Jobs Status (new - with lead counts) -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Trabajos de Scraping</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Estado de los ultimos scrapers ejecutados</p>
+        </div>
+        <div class="p-4"
+             hx-get="{% url 'scraping_jobs_partial' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="text-center py-4">
+                <svg class="animate-spin h-5 w-5 text-gray-400 mx-auto" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </div>
+        </div>
     </div>
 
     <!-- Messages -->
@@ -69,37 +88,53 @@
                             </p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <!-- Run Scraper Button -->
-                            <form action="{% url 'run_scraper' %}" method="post" class="inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="zona_slug" value="{{ zona.slug }}">
-                                <div class="flex space-x-1">
-                                    {% if zona.scrapear_milanuncios %}
-                                    <button type="submit" name="scraper_id" value="milanuncios"
-                                            class="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900">
+                            <!-- Run Botasaurus Scraper Buttons -->
+                            <div class="flex space-x-1">
+                                {% if zona.scrapear_milanuncios %}
+                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
+                                    <button type="submit" name="portal" value="milanuncios"
+                                            class="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900"
+                                            title="Milanuncios">
                                         MA
                                     </button>
-                                    {% endif %}
-                                    {% if zona.scrapear_wallapop %}
-                                    <button type="submit" name="scraper_id" value="wallapop"
-                                            class="px-2 py-1 text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900">
-                                        WP
-                                    </button>
-                                    {% endif %}
-                                    {% if zona.scrapear_fotocasa %}
-                                    <button type="submit" name="scraper_id" value="fotocasa"
-                                            class="px-2 py-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900">
+                                </form>
+                                {% endif %}
+                                {% if zona.scrapear_fotocasa %}
+                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
+                                    <button type="submit" name="portal" value="fotocasa"
+                                            class="px-2 py-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900"
+                                            title="Fotocasa">
                                         FC
                                     </button>
-                                    {% endif %}
-                                    {% if zona.scrapear_pisos %}
-                                    <button type="submit" name="scraper_id" value="pisos"
-                                            class="px-2 py-1 text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400 rounded hover:bg-orange-200 dark:hover:bg-orange-900">
+                                </form>
+                                {% endif %}
+                                {% if zona.scrapear_habitaclia %}
+                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
+                                    <button type="submit" name="portal" value="habitaclia"
+                                            class="px-2 py-1 text-xs bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-400 rounded hover:bg-teal-200 dark:hover:bg-teal-900"
+                                            title="Habitaclia">
+                                        HA
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% if zona.scrapear_pisos %}
+                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
+                                    <button type="submit" name="portal" value="pisos"
+                                            class="px-2 py-1 text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400 rounded hover:bg-orange-200 dark:hover:bg-orange-900"
+                                            title="Pisos.com">
                                         PI
                                     </button>
-                                    {% endif %}
-                                </div>
-                            </form>
+                                </form>
+                                {% endif %}
+                            </div>
                             <!-- Delete Button -->
                             <a href="{% url 'remove_zona' zona.id %}"
                                onclick="return confirm('Eliminar zona {{ zona.nombre }}?')"
@@ -179,7 +214,7 @@
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 rounded-lg flex items-center justify-center
                             {% if scraper.id == 'milanuncios' %}bg-blue-100 text-blue-600
-                            {% elif scraper.id == 'wallapop' %}bg-green-100 text-green-600
+                            {% elif scraper.id == 'habitaclia' %}bg-teal-100 text-teal-600
                             {% elif scraper.id == 'pisos' %}bg-orange-100 text-orange-600
                             {% else %}bg-purple-100 text-purple-600{% endif %}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,12 +238,12 @@
         <ol class="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
             <li>Anade las zonas geograficas que quieres scrapear desde "Zonas Disponibles"</li>
             <li>Haz clic en <strong>"Actualizar Todo"</strong> para scrapear todas las zonas a la vez</li>
-            <li>O en "Mis Zonas", haz clic en MA (Milanuncios), WP (Wallapop), FC (Fotocasa) o PI (Pisos) para scrapers individuales</li>
+            <li>O en "Mis Zonas", haz clic en MA (Milanuncios), FC (Fotocasa), HA (Habitaclia) o PI (Pisos) para scrapers individuales</li>
+            <li>El estado del scraping aparecera en "Trabajos de Scraping" con el numero de leads encontrados</li>
             <li>Los leads encontrados apareceran automaticamente en la seccion de Leads</li>
         </ol>
         <p class="mt-3 text-xs text-blue-600 dark:text-blue-400">
-            <strong>Nota:</strong> Los scrapers se ejecutan en segundo plano. El scraping masivo puede tardar 10-30 minutos dependiendo del numero de zonas.
-            Actualmente funcionan Milanuncios y Pisos.com (Wallapop y Fotocasa bloqueados por captcha).
+            <strong>Nota:</strong> Los scrapers se ejecutan en segundo plano. El panel de "Trabajos de Scraping" se actualiza automaticamente cada 3 segundos mientras hay scrapers activos.
         </p>
     </div>
 </div>
