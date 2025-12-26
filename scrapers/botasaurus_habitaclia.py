@@ -248,31 +248,41 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                     if ubicacion_match:
                         listing['ubicacion'] = ubicacion_match.group(1).strip()
 
-                    # Extract description - Habitaclia uses .summary class or feature-container
-                    # First try to find summary section
+                    # Extract description - Habitaclia uses class="comment" for descriptions
+                    # First try to find the comment section (permissive match)
                     desc_match = re.search(
-                        r'class="[^"]*summary[^"]*"[^>]*>(.*?)</div>',
+                        r'<div[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</div>',
                         html, re.DOTALL | re.IGNORECASE
                     )
                     if not desc_match:
-                        # Try feature-container
+                        # Try section with comment
                         desc_match = re.search(
-                            r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</(?:div|section)',
+                            r'<section[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</section>',
                             html, re.DOTALL | re.IGNORECASE
                         )
                     if not desc_match:
-                        # Try to find long text blocks (property description)
-                        # Look for text between tags that is substantial
-                        text_blocks = re.findall(r'>([^<]{150,})<', html)
+                        # Try any element with descripcion/description in class
+                        desc_match = re.search(
+                            r'class="[^"]*(?:descripcion|description)[^"]*"[^>]*>(.*?)</(?:div|section|p)',
+                            html, re.DOTALL | re.IGNORECASE
+                        )
+                    # Fallback: find long text blocks directly in HTML (>100 chars between tags)
+                    if not desc_match or 'descripcion' not in listing:
+                        text_blocks = re.findall(r'>([^<]{100,})<', html)
                         for block in text_blocks:
                             clean_text = block.strip()
-                            if clean_text and 'cookie' not in clean_text.lower() and 'javascript' not in clean_text.lower():
+                            if (clean_text and
+                                'cookie' not in clean_text.lower() and
+                                'javascript' not in clean_text.lower() and
+                                'privacy' not in clean_text.lower() and
+                                'google' not in clean_text.lower() and
+                                'analytics' not in clean_text.lower()):
                                 listing['descripcion'] = clean_text[:2000]
                                 break
                     if desc_match and 'descripcion' not in listing:
                         desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
                         desc_text = re.sub(r'\s+', ' ', desc_text).strip()
-                        if len(desc_text) > 50:
+                        if len(desc_text) > 30:
                             listing['descripcion'] = desc_text[:2000]
 
                     # Extract photos - Habitaclia uses images.habimg.com/imgh/ structure
