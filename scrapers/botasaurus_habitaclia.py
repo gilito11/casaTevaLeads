@@ -271,12 +271,19 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         text_blocks = re.findall(r'>([^<]{100,})<', html)
                         for block in text_blocks:
                             clean_text = block.strip()
+                            # Skip JavaScript code, cookie banners, and other non-content
                             if (clean_text and
                                 'cookie' not in clean_text.lower() and
                                 'javascript' not in clean_text.lower() and
                                 'privacy' not in clean_text.lower() and
                                 'google' not in clean_text.lower() and
-                                'analytics' not in clean_text.lower()):
+                                'analytics' not in clean_text.lower() and
+                                'gdpr' not in clean_text.lower() and
+                                'window.' not in clean_text.lower() and
+                                'function' not in clean_text.lower() and
+                                '__tcfapi' not in clean_text and
+                                'addEventListener' not in clean_text and
+                                not clean_text.startswith('{')):
                                 listing['descripcion'] = clean_text[:2000]
                                 break
                     if desc_match and 'descripcion' not in listing:
@@ -287,6 +294,12 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
                     # Extract photos - Habitaclia uses images.habimg.com/imgh/ structure
                     # Pattern: //images.habimg.com/imgh/XXX-XXXXXXX/filename.jpg
+                    # IMPORTANT: Only capture photos matching THIS listing's ID to avoid
+                    # capturing images from "similar properties" sections
+                    anuncio_id = listing.get('anuncio_id', '')
+                    # Extract the numeric part for matching (e.g., "500006030072" -> "6030072")
+                    id_for_match = anuncio_id[-7:] if len(anuncio_id) > 7 else anuncio_id
+
                     photos = re.findall(
                         r'(?:https?:)?//images\.habimg\.com/imgh/[^"\'<>\s]+\.(?:jpg|jpeg|png|webp)',
                         html, re.IGNORECASE
@@ -297,11 +310,13 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         # Ensure https://
                         if photo.startswith('//'):
                             photo = 'https:' + photo
-                        # Remove size suffixes like _G, _XL to get base image
-                        photo_base = re.sub(r'_[A-Z]{1,2}\.', '.', photo)
-                        if photo_base not in seen and 'logo' not in photo.lower() and 'icon' not in photo.lower():
-                            unique_photos.append(photo)
-                            seen.add(photo_base)
+                        # Only keep photos that contain this listing's ID in the path
+                        # This filters out "similar properties" images
+                        if id_for_match and id_for_match in photo:
+                            photo_base = re.sub(r'_[A-Z]{1,2}\.', '.', photo)
+                            if photo_base not in seen and 'logo' not in photo.lower():
+                                unique_photos.append(photo)
+                                seen.add(photo_base)
                     listing['fotos'] = unique_photos[:10]
 
                     # Check if particular or agency
