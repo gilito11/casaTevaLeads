@@ -7,6 +7,35 @@
      hx-swap="outerHTML"
      {% endif %}>
 
+{# HTMX flash messages (auto-hide after 3s) #}
+{% if success_message %}
+<div class="mb-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-sm"
+     x-data="{ show: true }"
+     x-init="setTimeout(() => show = false, 3000)"
+     x-show="show"
+     x-transition>
+    {{ success_message }}
+</div>
+{% endif %}
+{% if warning_message %}
+<div class="mb-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-sm"
+     x-data="{ show: true }"
+     x-init="setTimeout(() => show = false, 3000)"
+     x-show="show"
+     x-transition>
+    {{ warning_message }}
+</div>
+{% endif %}
+{% if error_message %}
+<div class="mb-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-sm"
+     x-data="{ show: true }"
+     x-init="setTimeout(() => show = false, 5000)"
+     x-show="show"
+     x-transition>
+    {{ error_message }}
+</div>
+{% endif %}
+
 {% if jobs %}
 <div class="space-y-3">
     {% for job in jobs %}

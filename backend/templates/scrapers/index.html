@@ -41,7 +41,7 @@
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Trabajos de Scraping</h2>
             <p class="text-sm text-gray-500 dark:text-gray-400">Estado de los ultimos scrapers ejecutados</p>
         </div>
-        <div class="p-4"
+        <div class="p-4" id="scraping-jobs-container"
              hx-get="{% url 'scraping_jobs_partial' %}"
              hx-trigger="load"
              hx-swap="innerHTML">
@@ -88,52 +88,62 @@
                             </p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <!-- Run Botasaurus Scraper Buttons -->
-                            <div class="flex space-x-1">
+                            <!-- Run Botasaurus Scraper Buttons (HTMX - no page reload) -->
+                            <div class="flex space-x-1" id="zona-{{ zona.id }}-buttons">
                                 {% if zona.scrapear_milanuncios %}
-                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
-                                    <button type="submit" name="portal" value="milanuncios"
-                                            class="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900"
-                                            title="Milanuncios">
-                                        MA
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        hx-post="{% url 'run_botasaurus' %}"
+                                        hx-vals='{"zona_id": "{{ zona.id }}", "portal": "milanuncios"}'
+                                        hx-target="#scraping-jobs-container"
+                                        hx-swap="innerHTML"
+                                        hx-indicator="#loading-{{ zona.id }}"
+                                        class="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900"
+                                        title="Milanuncios">
+                                    MA
+                                </button>
                                 {% endif %}
                                 {% if zona.scrapear_fotocasa %}
-                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
-                                    <button type="submit" name="portal" value="fotocasa"
-                                            class="px-2 py-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900"
-                                            title="Fotocasa">
-                                        FC
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        hx-post="{% url 'run_botasaurus' %}"
+                                        hx-vals='{"zona_id": "{{ zona.id }}", "portal": "fotocasa"}'
+                                        hx-target="#scraping-jobs-container"
+                                        hx-swap="innerHTML"
+                                        hx-indicator="#loading-{{ zona.id }}"
+                                        class="px-2 py-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900"
+                                        title="Fotocasa">
+                                    FC
+                                </button>
                                 {% endif %}
                                 {% if zona.scrapear_habitaclia %}
-                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
-                                    <button type="submit" name="portal" value="habitaclia"
-                                            class="px-2 py-1 text-xs bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-400 rounded hover:bg-teal-200 dark:hover:bg-teal-900"
-                                            title="Habitaclia">
-                                        HA
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        hx-post="{% url 'run_botasaurus' %}"
+                                        hx-vals='{"zona_id": "{{ zona.id }}", "portal": "habitaclia"}'
+                                        hx-target="#scraping-jobs-container"
+                                        hx-swap="innerHTML"
+                                        hx-indicator="#loading-{{ zona.id }}"
+                                        class="px-2 py-1 text-xs bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-400 rounded hover:bg-teal-200 dark:hover:bg-teal-900"
+                                        title="Habitaclia">
+                                    HA
+                                </button>
                                 {% endif %}
                                 {% if zona.scrapear_pisos %}
-                                <form action="{% url 'run_botasaurus' %}" method="post" class="inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="zona_id" value="{{ zona.id }}">
-                                    <button type="submit" name="portal" value="pisos"
-                                            class="px-2 py-1 text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400 rounded hover:bg-orange-200 dark:hover:bg-orange-900"
-                                            title="Pisos.com">
-                                        PI
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        hx-post="{% url 'run_botasaurus' %}"
+                                        hx-vals='{"zona_id": "{{ zona.id }}", "portal": "pisos"}'
+                                        hx-target="#scraping-jobs-container"
+                                        hx-swap="innerHTML"
+                                        hx-indicator="#loading-{{ zona.id }}"
+                                        class="px-2 py-1 text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400 rounded hover:bg-orange-200 dark:hover:bg-orange-900"
+                                        title="Pisos.com">
+                                    PI
+                                </button>
                                 {% endif %}
+                                <span id="loading-{{ zona.id }}" class="htmx-indicator">
+                                    <svg class="animate-spin h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                </span>
                             </div>
                             <!-- Delete Button -->
                             <a href="{% url 'remove_zona' zona.id %}"

@@ -556,7 +556,11 @@ def run_botasaurus_view(request):
     """
     Ejecutar scraper Botasaurus para un portal y zona específicos.
     Crea un ScrapingJob y devuelve su ID para tracking.
+
+    Supports HTMX requests - returns partial HTML instead of redirect.
     """
+    is_htmx = request.headers.get('HX-Request') == 'true'
+
     if request.method == 'POST':
         portal = request.POST.get('portal', 'all')
         zona_id = request.POST.get('zona_id')
@@ -564,6 +568,12 @@ def run_botasaurus_view(request):
         # Obtener tenant
         tenant_id = request.session.get('tenant_id')
         if not tenant_id:
+            if is_htmx:
+                return render(request, 'scrapers/partials/jobs_status.html', {
+                    'jobs': [],
+                    'has_running': False,
+                    'error_message': 'No se encontró el tenant',
+                })
             messages.error(request, 'No se encontró el tenant')
             return redirect('scrapers')
 
@@ -585,6 +595,12 @@ def run_botasaurus_view(request):
                 zona_slug = ','.join([z.slug for z in zonas])
                 zona_nombre = f"{zonas.count()} zonas"
             else:
+                if is_htmx:
+                    return render(request, 'scrapers/partials/jobs_status.html', {
+                        'jobs': [],
+                        'has_running': False,
+                        'error_message': 'No hay zonas activas configuradas',
+                    })
                 messages.warning(request, 'No hay zonas activas configuradas')
                 return redirect('scrapers')
 
@@ -596,6 +612,14 @@ def run_botasaurus_view(request):
         ).first()
 
         if running_job:
+            if is_htmx:
+                # Return current jobs status showing the running job
+                jobs = list(ScrapingJob.objects.filter(tenant_id=tenant_id).order_by('-created_at')[:5])
+                return render(request, 'scrapers/partials/jobs_status.html', {
+                    'jobs': jobs,
+                    'has_running': True,
+                    'warning_message': f'Ya hay un scraping en ejecución para {portal}',
+                })
             messages.warning(request, f'Ya hay un scraping en ejecución para {portal}')
             return redirect('scrapers')
 
@@ -616,6 +640,16 @@ def run_botasaurus_view(request):
         thread.daemon = True
         thread.start()
 
+        # For HTMX: return updated jobs partial
+        if is_htmx:
+            jobs = list(ScrapingJob.objects.filter(tenant_id=tenant_id).order_by('-created_at')[:5])
+            has_running = ScrapingJob.objects.filter(tenant_id=tenant_id, status__in=['pending', 'running']).exists()
+            return render(request, 'scrapers/partials/jobs_status.html', {
+                'jobs': jobs,
+                'has_running': has_running,
+                'success_message': f'Scraping iniciado para {portal} - {zona_nombre}',
+            })
+
         messages.success(request, f'Scraping iniciado para {portal} - {zona_nombre}')
 
     return redirect('scrapers')
@@ -629,15 +663,20 @@ def scraping_jobs_partial_view(request):
     """
     tenant_id = request.session.get('tenant_id')
     if not tenant_id:
-        return JsonResponse({'error': 'No tenant'}, status=400)
+        # Render empty state instead of error for better UX
+        return render(request, 'scrapers/partials/jobs_status.html', {
+            'jobs': [],
+            'has_running': False,
+        })
 
-    # Últimos 5 jobs
-    jobs = ScrapingJob.objects.filter(
-        tenant_id=tenant_id
-    ).order_by('-created_at')[:5]
+    # Base queryset
+    jobs_qs = ScrapingJob.objects.filter(tenant_id=tenant_id).order_by('-created_at')
 
-    # Verificar si hay alguno corriendo para auto-refresh
-    has_running = jobs.filter(status__in=['pending', 'running']).exists()
+    # Verificar si hay alguno corriendo para auto-refresh (antes del slice)
+    has_running = jobs_qs.filter(status__in=['pending', 'running']).exists()
+
+    # Últimos 5 jobs (slice después de la verificación)
+    jobs = list(jobs_qs[:5])
 
     context = {
         'jobs': jobs,
