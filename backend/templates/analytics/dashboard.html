@@ -1,0 +1,471 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Analytics</h1>
+        <p class="text-gray-600 dark:text-gray-400">Metricas y estadisticas del negocio inmobiliario</p>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <!-- Total Leads -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Leads</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ kpis.total_leads|default:0|floatformat:0 }}</p>
+                </div>
+                <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leads Esta Semana -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Esta Semana</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ kpis.leads_ultima_semana|default:0|floatformat:0 }}</p>
+                </div>
+                <div class="w-10 h-10 bg-cyan-100 dark:bg-cyan-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-cyan-600 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasa Conversion -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Conversion</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ kpis.tasa_conversion|default:0|floatformat:1 }}%</p>
+                </div>
+                <div class="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Valor Pipeline -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Pipeline</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ kpis.valor_pipeline|default:0|floatformat:0 }}&euro;</p>
+                </div>
+                <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Score Medio -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Score Medio</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ kpis.score_medio|default:0|floatformat:0 }}</p>
+                </div>
+                <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dias Primer Contacto -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Dias 1er Contacto</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ kpis.dias_medio_primer_contacto|default:0|floatformat:1 }}</p>
+                </div>
+                <div class="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embudo de Conversion -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">Embudo de Conversion</h3>
+        <div class="h-80">
+            <canvas id="embudoChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Charts Row: Leads por Dia + Evolucion Precios -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Leads por Dia -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Leads Captados (Ultimos 30 dias)</h3>
+            <div class="h-72">
+                <canvas id="leadsPorDiaChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Evolucion Precios -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Evolucion Precio Medio (Semanal)</h3>
+            <div class="h-72">
+                <canvas id="evolucionPreciosChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparativa de Portales -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Comparativa de Portales</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Portal</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Leads</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unicos</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contactados</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Convertidos</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">% Conv.</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Score</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Precio Medio</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for portal in comparativa_portales %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ portal.portal|title }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ portal.total_leads|floatformat:0 }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ portal.leads_unicos|floatformat:0 }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ portal.contactados|floatformat:0 }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ portal.convertidos|floatformat:0 }}</td>
+                        <td class="px-4 py-3 text-right">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if portal.tasa_conversion >= 10 %}bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300
+                                {% elif portal.tasa_conversion >= 5 %}bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300
+                                {% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}">
+                                {{ portal.tasa_conversion|floatformat:1 }}%
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ portal.score_medio|floatformat:0 }}</td>
+                        <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{{ portal.precio_medio|floatformat:0 }}&euro;</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No hay datos de portales</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Charts Row: Precios por Zona + Tipologia -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Precios por Zona -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Precio Medio por Zona</h3>
+            <div class="h-80">
+                <canvas id="preciosPorZonaChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Tipologia de Inmuebles -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Distribucion por Tipo de Inmueble</h3>
+            <div class="h-80">
+                <canvas id="tipologiaChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla Precios por Zona Detallada -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Analisis de Precios por Zona</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Zona</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Inmuebles</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Precio Medio</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Precio Mediana</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Precio/m2</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for zona in precios_por_zona %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ zona.zona_clasificada }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ zona.total_inmuebles|floatformat:0 }}</td>
+                        <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{{ zona.precio_medio|floatformat:0 }}&euro;</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ zona.precio_mediana|floatformat:0 }}&euro;</td>
+                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ zona.precio_m2_medio|floatformat:0 }}&euro;/m2</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No hay datos de zonas</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#9CA3AF' : '#6B7280';
+    const gridColor = isDark ? '#374151' : '#E5E7EB';
+
+    // Data from Django
+    const embudoData = {{ embudo_json|safe }};
+    const leadsPorDiaData = {{ leads_por_dia_json|safe }};
+    const evolucionPreciosData = {{ evolucion_precios_json|safe }};
+    const preciosPorZonaData = {{ precios_por_zona_json|safe }};
+    const tipologiaData = {{ tipologia_json|safe }};
+
+    // Embudo de Conversion (Horizontal Bar)
+    const embudoCtx = document.getElementById('embudoChart');
+    if (embudoCtx && embudoData.length > 0) {
+        new Chart(embudoCtx, {
+            type: 'bar',
+            data: {
+                labels: embudoData.map(d => d.estado),
+                datasets: [{
+                    label: 'Leads',
+                    data: embudoData.map(d => d.total_leads),
+                    backgroundColor: [
+                        '#3B82F6', // Nuevo - blue
+                        '#06B6D4', // En Proceso - cyan
+                        '#F97316', // Contactado - orange
+                        '#22C55E', // Interesado - green
+                        '#EF4444', // No Interesado - red
+                        '#EAB308', // En Espera - yellow
+                        '#10B981', // Cliente - emerald
+                        '#6B7280', // Otros - gray
+                    ],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = embudoData[context.dataIndex];
+                                return `${context.raw} leads (${item.porcentaje.toFixed(1)}%)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: textColor }
+                    }
+                }
+            }
+        });
+    }
+
+    // Leads por Dia (Line Chart)
+    const leadsDiaCtx = document.getElementById('leadsPorDiaChart');
+    if (leadsDiaCtx && leadsPorDiaData.length > 0) {
+        new Chart(leadsDiaCtx, {
+            type: 'line',
+            data: {
+                labels: leadsPorDiaData.map(d => d.fecha),
+                datasets: [{
+                    label: 'Leads Captados',
+                    data: leadsPorDiaData.map(d => d.leads_captados),
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, maxTicksLimit: 10 }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Evolucion Precios (Line Chart)
+    const preciosCtx = document.getElementById('evolucionPreciosChart');
+    if (preciosCtx && evolucionPreciosData.length > 0) {
+        new Chart(preciosCtx, {
+            type: 'line',
+            data: {
+                labels: evolucionPreciosData.map(d => d.semana),
+                datasets: [{
+                    label: 'Precio Medio',
+                    data: evolucionPreciosData.map(d => d.precio_medio),
+                    borderColor: '#10B981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }, {
+                    label: 'Precio Mediana',
+                    data: evolucionPreciosData.map(d => d.precio_mediana),
+                    borderColor: '#F59E0B',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: textColor }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            callback: function(value) {
+                                return value.toLocaleString() + ' EUR';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Precios por Zona (Bar Chart)
+    const zonasCtx = document.getElementById('preciosPorZonaChart');
+    if (zonasCtx && preciosPorZonaData.length > 0) {
+        new Chart(zonasCtx, {
+            type: 'bar',
+            data: {
+                labels: preciosPorZonaData.map(d => d.zona_clasificada),
+                datasets: [{
+                    label: 'Precio Medio',
+                    data: preciosPorZonaData.map(d => d.precio_medio),
+                    backgroundColor: '#6366F1',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textColor, maxRotation: 45 }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            callback: function(value) {
+                                return (value / 1000) + 'k EUR';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Tipologia de Inmuebles (Doughnut Chart)
+    const tipologiaCtx = document.getElementById('tipologiaChart');
+    if (tipologiaCtx && tipologiaData.length > 0) {
+        new Chart(tipologiaCtx, {
+            type: 'doughnut',
+            data: {
+                labels: tipologiaData.map(d => d.tipo_propiedad),
+                datasets: [{
+                    data: tipologiaData.map(d => d.total),
+                    backgroundColor: [
+                        '#3B82F6', // blue
+                        '#10B981', // emerald
+                        '#F59E0B', // amber
+                        '#EF4444', // red
+                        '#8B5CF6', // violet
+                        '#EC4899', // pink
+                        '#6B7280', // gray
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: textColor,
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = tipologiaData[context.dataIndex];
+                                return `${context.label}: ${context.raw} (${item.porcentaje.toFixed(1)}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+</script>
+{% endblock %}

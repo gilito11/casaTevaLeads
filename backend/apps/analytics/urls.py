@@ -1,7 +1,8 @@
 from django.urls import path
+from .views import analytics_dashboard_view
 
 app_name = 'analytics'
 
 urlpatterns = [
-    # URLs para la app analytics se agregarán aquí
+    path('dashboard/', analytics_dashboard_view, name='dashboard'),
 ]

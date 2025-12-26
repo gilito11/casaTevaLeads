@@ -225,31 +225,37 @@ class BotasaurusPisos(BotasaurusBaseScraper):
                     if habs_match:
                         listing['habitaciones'] = int(habs_match.group(1))
 
-                    # Extract description - Pisos.com uses ad-detail-description or similar
+                    # Extract description - look for substantial text blocks
                     desc_match = re.search(
-                        r'class="[^"]*(?:ad-detail-description|description|comment|detalle)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
+                        r'class="[^"]*(?:ad-detail-description|description|comment|detalle|texto)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
                         html, re.DOTALL | re.IGNORECASE
                     )
                     if not desc_match:
-                        # Try finding paragraphs with substantial text
-                        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
-                        for p in paragraphs:
-                            p_text = re.sub(r'<[^>]+>', '', p).strip()
-                            if len(p_text) > 100 and 'cookie' not in p_text.lower():
-                                listing['descripcion'] = p_text[:2000]
+                        # Find long text blocks (property descriptions are 100+ chars)
+                        text_blocks = re.findall(r'>([^<]{100,})<', html)
+                        for block in text_blocks:
+                            clean_text = block.strip()
+                            if (clean_text and
+                                'cookie' not in clean_text.lower() and
+                                'javascript' not in clean_text.lower() and
+                                'privacy' not in clean_text.lower()):
+                                listing['descripcion'] = clean_text[:2000]
                                 break
                     if desc_match and 'descripcion' not in listing:
-                        desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
-                        listing['descripcion'] = desc_text.strip()[:2000]
+                        desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
+                        desc_text = re.sub(r'\s+', ' ', desc_text).strip()
+                        if len(desc_text) > 50:
+                            listing['descripcion'] = desc_text[:2000]
 
-                    # Extract photos - Pisos.com uses cdn.pisos.com and img.pisos.com
+                    # Extract photos - Pisos.com uses various CDN patterns
+                    # img.pisos.com, cdn.pisos.com, or direct pisos.com paths
                     photos = re.findall(
-                        r'(?:https?:)?//[^"\']*(?:cdn\.pisos|img\.pisos|pisos\.com)[^"\']*\.(?:jpg|jpeg|png|webp)',
+                        r'((?:https?:)?//[^"\'<>\s]*(?:pisos\.com|cdn\.pisos)[^"\'<>\s]*\.(?:jpg|jpeg|png|webp))',
                         html, re.IGNORECASE
                     )
-                    # Also look for srcset or data-src patterns
+                    # Also check data-src and srcset attributes
                     photos += re.findall(
-                        r'(?:src|srcset|data-src)="([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"',
+                        r'data-src="([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"',
                         html, re.IGNORECASE
                     )
                     unique_photos = []
@@ -257,11 +263,13 @@ class BotasaurusPisos(BotasaurusBaseScraper):
                     for photo in photos:
                         if photo.startswith('//'):
                             photo = 'https:' + photo
-                        photo_clean = re.sub(r'\?.*$', '', photo)
-                        if photo_clean not in seen and 'logo' not in photo.lower() and 'icon' not in photo.lower():
-                            if 'pisos' in photo or 'cdn' in photo or '/img/' in photo:
-                                unique_photos.append(photo)
-                                seen.add(photo_clean)
+                        photo_base = re.sub(r'\?.*$', '', photo)
+                        if (photo_base not in seen and
+                            'logo' not in photo.lower() and
+                            'icon' not in photo.lower() and
+                            len(photo_base) > 30):
+                            unique_photos.append(photo)
+                            seen.add(photo_base)
                     listing['fotos'] = unique_photos[:10]
 
                     # Check if particular or agency

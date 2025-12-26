@@ -245,34 +245,44 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                 if habs_match:
                     listing['habitaciones'] = int(habs_match.group(1))
 
-                # Extract description
+                # Extract description - look for substantial text blocks
+                # Fotocasa descriptions are typically in divs or paragraphs
                 desc_match = re.search(
-                    r'class="[^"]*(?:re-DetailDescription|description)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
+                    r'class="[^"]*(?:re-DetailDescription|description|comment|detalle)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
                     html, re.DOTALL | re.IGNORECASE
                 )
                 if not desc_match:
-                    paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
-                    for p in paragraphs:
-                        p_text = re.sub(r'<[^>]+>', '', p).strip()
-                        if len(p_text) > 100 and 'cookie' not in p_text.lower():
-                            listing['descripcion'] = p_text[:2000]
+                    # Find long text blocks (property descriptions tend to be 100+ chars)
+                    text_blocks = re.findall(r'>([^<]{100,})<', html)
+                    for block in text_blocks:
+                        clean_text = block.strip()
+                        if (clean_text and
+                            'cookie' not in clean_text.lower() and
+                            'javascript' not in clean_text.lower() and
+                            'privacy' not in clean_text.lower()):
+                            listing['descripcion'] = clean_text[:2000]
                             break
                 if desc_match and 'descripcion' not in listing:
-                    desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
-                    listing['descripcion'] = desc_text.strip()[:2000]
+                    desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
+                    desc_text = re.sub(r'\s+', ' ', desc_text).strip()
+                    if len(desc_text) > 50:
+                        listing['descripcion'] = desc_text[:2000]
 
-                # Extract photos
+                # Extract photos - Fotocasa uses static.fotocasa.es/images/
+                # Match full UUIDs and paths
                 photos = re.findall(
-                    r'(https?://static\.fotocasa\.es/images/ads/[a-f0-9-]+)',
+                    r'(https?://static\.fotocasa\.es/images/[^"\'<>\s]+)',
                     html, re.IGNORECASE
                 )
                 unique_photos = []
                 seen = set()
                 for photo in photos:
-                    photo_clean = re.sub(r'\?.*$', '', photo)
-                    if photo_clean not in seen:
-                        unique_photos.append(photo_clean + '?rule=original')
-                        seen.add(photo_clean)
+                    # Remove query params for dedup
+                    photo_base = re.sub(r'\?.*$', '', photo)
+                    if photo_base not in seen and len(photo_base) > 50:
+                        # Add original quality param
+                        unique_photos.append(photo_base + '?rule=original')
+                        seen.add(photo_base)
                 listing['fotos'] = unique_photos[:10]
 
                 # Check if particular or agency

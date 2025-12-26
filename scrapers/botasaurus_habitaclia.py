@@ -248,38 +248,37 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                     if ubicacion_match:
                         listing['ubicacion'] = ubicacion_match.group(1).strip()
 
-                    # Extract description - Habitaclia uses list-item-description class
-                    # or look for longer text blocks that are property descriptions
+                    # Extract description - Habitaclia uses .summary class or feature-container
+                    # First try to find summary section
                     desc_match = re.search(
-                        r'class="[^"]*list-item-description[^"]*"[^>]*>(.*?)</(?:div|p|section)',
+                        r'class="[^"]*summary[^"]*"[^>]*>(.*?)</div>',
                         html, re.DOTALL | re.IGNORECASE
                     )
                     if not desc_match:
-                        # Try alternate pattern - look for description in detail section
+                        # Try feature-container
                         desc_match = re.search(
-                            r'<p[^>]*class="[^"]*(?:description|comentario|texto)[^"]*"[^>]*>(.*?)</p>',
+                            r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</(?:div|section)',
                             html, re.DOTALL | re.IGNORECASE
                         )
                     if not desc_match:
-                        # Final fallback - find the longest paragraph with substantial text
-                        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
-                        for p in paragraphs:
-                            p_text = re.sub(r'<[^>]+>', '', p).strip()
-                            if len(p_text) > 100 and 'cookie' not in p_text.lower():
-                                listing['descripcion'] = p_text[:2000]
+                        # Try to find long text blocks (property description)
+                        # Look for text between tags that is substantial
+                        text_blocks = re.findall(r'>([^<]{150,})<', html)
+                        for block in text_blocks:
+                            clean_text = block.strip()
+                            if clean_text and 'cookie' not in clean_text.lower() and 'javascript' not in clean_text.lower():
+                                listing['descripcion'] = clean_text[:2000]
                                 break
                     if desc_match and 'descripcion' not in listing:
-                        desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
-                        listing['descripcion'] = desc_text.strip()[:2000]
+                        desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
+                        desc_text = re.sub(r'\s+', ' ', desc_text).strip()
+                        if len(desc_text) > 50:
+                            listing['descripcion'] = desc_text[:2000]
 
-                    # Extract photos - Habitaclia uses images.habimg.com domain
+                    # Extract photos - Habitaclia uses images.habimg.com/imgh/ structure
+                    # Pattern: //images.habimg.com/imgh/XXX-XXXXXXX/filename.jpg
                     photos = re.findall(
-                        r'(?:https?:)?//images\.habimg\.com/[^"\']+\.(?:jpg|jpeg|png|webp)',
-                        html, re.IGNORECASE
-                    )
-                    # Also try habitaclia.com direct images
-                    photos += re.findall(
-                        r'(https://[^"\']+habitaclia[^"\']+\.(?:jpg|jpeg|png|webp)[^"\']*)',
+                        r'(?:https?:)?//images\.habimg\.com/imgh/[^"\'<>\s]+\.(?:jpg|jpeg|png|webp)',
                         html, re.IGNORECASE
                     )
                     unique_photos = []
@@ -288,10 +287,11 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         # Ensure https://
                         if photo.startswith('//'):
                             photo = 'https:' + photo
-                        photo_clean = re.sub(r'\?.*$', '', photo)
-                        if photo_clean not in seen and 'logo' not in photo.lower() and 'icon' not in photo.lower():
+                        # Remove size suffixes like _G, _XL to get base image
+                        photo_base = re.sub(r'_[A-Z]{1,2}\.', '.', photo)
+                        if photo_base not in seen and 'logo' not in photo.lower() and 'icon' not in photo.lower():
                             unique_photos.append(photo)
-                            seen.add(photo_clean)
+                            seen.add(photo_base)
                     listing['fotos'] = unique_photos[:10]
 
                     # Check if particular or agency

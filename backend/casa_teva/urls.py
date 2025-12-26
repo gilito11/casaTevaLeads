@@ -45,6 +45,7 @@ urlpatterns = [
     path('', dashboard_view, name='dashboard'),
     path('profile/', profile_view, name='profile'),
     path('leads/', include('leads.urls', namespace='leads')),
+    path('analytics/', include('analytics.urls', namespace='analytics')),
 
     # Scrapers
     path('scrapers/', scrapers_view, name='scrapers'),
@@ -61,5 +62,4 @@ urlpatterns = [
     # REST API
     path('api/leads/', include('leads.api_urls')),
     path('api/core/', include('core.api_urls')),
-    path('api/analytics/', include('analytics.urls')),
 ]
