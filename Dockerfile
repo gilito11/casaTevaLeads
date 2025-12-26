@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Stage 3: Runtime - imagen final
 FROM base as runtime
 
-# Instalar dependencias de Playwright (navegadores headless)
+# Instalar dependencias de Playwright y Google Chrome para Botasaurus
 RUN apt-get update && apt-get install -y \
     libnss3 \
     libnspr4 \
@@ -51,6 +51,15 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libatspi2.0-0 \
+    wget \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar Google Chrome para Botasaurus
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar virtual environment desde builder

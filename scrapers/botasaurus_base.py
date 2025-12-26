@@ -148,7 +148,7 @@ class BotasaurusBaseScraper:
         listing_data: Dict[str, Any],
         portal: str
     ) -> bool:
-        """Save listing to PostgreSQL marts.dim_leads."""
+        """Save listing to PostgreSQL raw.raw_listings table."""
         if not self.postgres_conn:
             logger.warning("PostgreSQL not configured")
             return False
@@ -160,54 +160,50 @@ class BotasaurusBaseScraper:
             if not anuncio_id:
                 return False
 
-            lead_id = self._generate_lead_id(portal, anuncio_id)
-
-            # Prepare photos as JSON
-            fotos = listing_data.get('fotos', [])
-            fotos_json = json.dumps(fotos) if isinstance(fotos, list) else '[]'
+            # Prepare raw_data as JSONB (include all listing data)
+            raw_data = {
+                'anuncio_id': anuncio_id,
+                'titulo': listing_data.get('titulo', ''),
+                'telefono': listing_data.get('telefono', ''),
+                'telefono_norm': listing_data.get('telefono_norm', ''),
+                'email': listing_data.get('email'),
+                'nombre': listing_data.get('vendedor') or listing_data.get('nombre', ''),
+                'direccion': listing_data.get('direccion') or listing_data.get('ubicacion', ''),
+                'zona': listing_data.get('zona_geografica') or listing_data.get('zona_busqueda', ''),
+                'zona_busqueda': listing_data.get('zona_busqueda', ''),
+                'zona_geografica': listing_data.get('zona_geografica', ''),
+                'codigo_postal': listing_data.get('codigo_postal'),
+                'tipo_inmueble': listing_data.get('tipo_inmueble', 'piso'),
+                'precio': listing_data.get('precio'),
+                'habitaciones': listing_data.get('habitaciones'),
+                'metros': listing_data.get('metros'),
+                'descripcion': listing_data.get('descripcion', ''),
+                'fotos': listing_data.get('fotos', []),
+                'url': listing_data.get('url_anuncio') or listing_data.get('detail_url', ''),
+                'es_particular': listing_data.get('es_particular', True),
+                'vendedor': listing_data.get('vendedor', ''),
+            }
 
             sql = """
-                INSERT INTO marts.dim_leads (
-                    lead_id, tenant_id, telefono_norm, email, nombre,
-                    direccion, zona_geografica, codigo_postal, tipo_inmueble,
-                    precio, habitaciones, metros, descripcion, fotos,
-                    portal, url_anuncio, data_lake_reference, estado,
-                    numero_intentos, fecha_scraping, created_at, updated_at,
-                    anuncio_id
+                INSERT INTO raw.raw_listings (
+                    tenant_id, portal, data_lake_path, raw_data, scraping_timestamp
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s
+                    %s, %s, %s, %s, %s
                 )
-                ON CONFLICT (lead_id) DO NOTHING
+                ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
+                WHERE raw_data->>'anuncio_id' IS NOT NULL
+                DO NOTHING
             """
 
             now = datetime.now()
+            data_lake_path = f"botasaurus/{portal}/{now.strftime('%Y/%m/%d')}/{anuncio_id}"
 
             cursor.execute(sql, (
-                lead_id,
                 self.tenant_id,
-                listing_data.get('telefono_norm') or '',
-                listing_data.get('email'),
-                listing_data.get('vendedor') or listing_data.get('nombre'),
-                listing_data.get('direccion') or listing_data.get('ubicacion') or 'Sin direccion',
-                listing_data.get('zona_geografica') or listing_data.get('zona_busqueda') or 'Sin zona',
-                listing_data.get('codigo_postal'),
-                listing_data.get('tipo_inmueble') or 'piso',
-                listing_data.get('precio') or 0,
-                listing_data.get('habitaciones'),
-                listing_data.get('metros'),
-                listing_data.get('descripcion'),
-                fotos_json,
                 portal,
-                listing_data.get('url_anuncio') or listing_data.get('detail_url') or '',
-                '',
-                'NUEVO',
-                0,
+                data_lake_path,
+                json.dumps(raw_data),
                 now,
-                now,
-                now,
-                anuncio_id,
             ))
 
             rows_affected = cursor.rowcount

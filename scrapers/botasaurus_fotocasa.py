@@ -176,76 +176,130 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         return enriched_listings
 
     def _enrich_listings(self, listings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Fetch detail pages to extract more info."""
+        """Fetch detail pages to extract more info - one browser per listing."""
+        import random
+        import time
         headless = self.headless
+        results = []
 
-        @browser(headless=headless, block_images=True)
-        def fetch_details(driver: Driver, data: dict):
-            results = []
+        for i, listing in enumerate(listings):
+            url = listing['detail_url']
+            logger.info(f"Fetching detail {i+1}/{len(listings)}: {url[:60]}...")
 
-            for listing in data['listings']:
-                url = listing['detail_url']
-                logger.info(f"Fetching detail: {url[:60]}...")
+            # Random delay between requests (3-8 seconds)
+            if i > 0:
+                delay = random.uniform(3, 8)
+                logger.info(f"Waiting {delay:.1f}s before next request...")
+                time.sleep(delay)
 
+            # Create a new browser session for each listing
+            @browser(headless=headless, block_images=False, reuse_driver=False)
+            def fetch_single_detail(driver: Driver, data: dict):
                 try:
-                    driver.get(url)
-                    driver.sleep(3)
+                    driver.get(data['url'])
+                    driver.sleep(random.uniform(3, 5))
 
-                    html = driver.page_html
+                    # Human-like scrolling
+                    for pos in [300, 600, 900]:
+                        driver.run_js(f'window.scrollTo({{top: {pos}, behavior: "smooth"}})')
+                        driver.sleep(random.uniform(0.5, 1.0))
 
-                    # Extract title
-                    title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
-                    listing['titulo'] = title_match.group(1).strip() if title_match else None
-
-                    # Extract price
-                    price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|euros|€)', html, re.IGNORECASE)
-                    if price_match:
-                        price_str = price_match.group(1).replace('.', '')
-                        listing['precio'] = float(price_str)
-
-                    # Extract phones
-                    phones = self.extract_phones_from_html(html)
-                    if phones:
-                        listing['telefono'] = phones[0]
-                        listing['telefono_norm'] = self.normalize_phone(phones[0])
-
-                    # Extract features
-                    metros_match = re.search(r'(\d+)\s*m[²2]', html)
-                    if metros_match:
-                        listing['metros'] = int(metros_match.group(1))
-
-                    habs_match = re.search(r'(\d+)\s*hab', html, re.IGNORECASE)
-                    if habs_match:
-                        listing['habitaciones'] = int(habs_match.group(1))
-
-                    # Check if particular or agency
-                    is_particular = 'particular' in html.lower()
-                    is_agency = 'inmobiliaria' in html.lower() or 'agencia' in html.lower()
-
-                    if is_agency and not is_particular:
-                        listing['vendedor'] = 'Inmobiliaria'
-                        listing['es_particular'] = False
-                    else:
-                        listing['vendedor'] = 'Particular'
-                        listing['es_particular'] = True
-
-                    results.append(listing)
-
+                    return driver.page_html
                 except Exception as e:
-                    logger.error(f"Error fetching {url}: {e}")
+                    logger.error(f"Error in browser: {e}")
+                    return None
 
-            return results
+            html = fetch_single_detail({'url': url})
 
-        enriched = fetch_details({'listings': listings})
+            if not html:
+                continue
+
+            # Check for blocking
+            if 'SENTIMOS LA INTERRUPCIÓN' in html or 'captcha' in html.lower():
+                logger.warning("Fotocasa anti-bot detected, skipping this listing")
+                continue
+
+            try:
+                # Extract title
+                title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
+                listing['titulo'] = title_match.group(1).strip() if title_match else None
+
+                # Extract price
+                price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|euros|€)', html, re.IGNORECASE)
+                if price_match:
+                    price_str = price_match.group(1).replace('.', '')
+                    listing['precio'] = float(price_str)
+
+                # Extract phones
+                phones = self.extract_phones_from_html(html)
+                if phones:
+                    listing['telefono'] = phones[0]
+                    listing['telefono_norm'] = self.normalize_phone(phones[0])
+
+                # Extract features
+                metros_match = re.search(r'(\d+)\s*m[²2]', html)
+                if metros_match:
+                    listing['metros'] = int(metros_match.group(1))
+
+                habs_match = re.search(r'(\d+)\s*hab', html, re.IGNORECASE)
+                if habs_match:
+                    listing['habitaciones'] = int(habs_match.group(1))
+
+                # Extract description
+                desc_match = re.search(
+                    r'class="[^"]*(?:re-DetailDescription|description)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
+                    html, re.DOTALL | re.IGNORECASE
+                )
+                if not desc_match:
+                    paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
+                    for p in paragraphs:
+                        p_text = re.sub(r'<[^>]+>', '', p).strip()
+                        if len(p_text) > 100 and 'cookie' not in p_text.lower():
+                            listing['descripcion'] = p_text[:2000]
+                            break
+                if desc_match and 'descripcion' not in listing:
+                    desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
+                    listing['descripcion'] = desc_text.strip()[:2000]
+
+                # Extract photos
+                photos = re.findall(
+                    r'(https?://static\.fotocasa\.es/images/ads/[a-f0-9-]+)',
+                    html, re.IGNORECASE
+                )
+                unique_photos = []
+                seen = set()
+                for photo in photos:
+                    photo_clean = re.sub(r'\?.*$', '', photo)
+                    if photo_clean not in seen:
+                        unique_photos.append(photo_clean + '?rule=original')
+                        seen.add(photo_clean)
+                listing['fotos'] = unique_photos[:10]
+
+                # Check if particular or agency
+                is_particular = 'particular' in html.lower()
+                is_agency = 'inmobiliaria' in html.lower() or 'agencia' in html.lower()
+
+                if is_agency and not is_particular:
+                    listing['vendedor'] = 'Inmobiliaria'
+                    listing['es_particular'] = False
+                else:
+                    listing['vendedor'] = 'Particular'
+                    listing['es_particular'] = True
+
+                results.append(listing)
+
+            except Exception as e:
+                logger.error(f"Error processing {url}: {e}")
 
         # Filter out agencies if only_private
         if self.only_private:
-            enriched = [l for l in enriched if l.get('es_particular', True)]
-            filtered = len(listings) - len(enriched)
+            particulares = [l for l in results if l.get('es_particular', True)]
+            filtered = len(results) - len(particulares)
             if filtered > 0:
                 logger.info(f"Filtered out {filtered} agency listings")
+            return particulares
 
-        return enriched
+        return results
 
     def scrape_and_save(self) -> Dict[str, int]:
         """Scrape all zones and save to PostgreSQL."""

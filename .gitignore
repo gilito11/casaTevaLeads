@@ -190,3 +190,23 @@ logs/
 # OS specific
 Thumbs.db
 .DS_Store
+
+# Debug files (scraper testing)
+*_debug.html
+*_debug*.html
+*_detail.html
+*_full.html
+*.debug.png
+milanuncios_debug.png
+milanuncios_cookies.json
+cookies.txt
+nul
+
+# Azure logs (downloaded for debugging)
+azure-logs-*/
+azure-logs-*.zip
+logs_latest/
+logs_latest.zip
+
+# Scraper output
+output/

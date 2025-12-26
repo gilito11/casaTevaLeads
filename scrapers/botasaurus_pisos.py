@@ -225,6 +225,45 @@ class BotasaurusPisos(BotasaurusBaseScraper):
                     if habs_match:
                         listing['habitaciones'] = int(habs_match.group(1))
 
+                    # Extract description - Pisos.com uses ad-detail-description or similar
+                    desc_match = re.search(
+                        r'class="[^"]*(?:ad-detail-description|description|comment|detalle)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
+                        html, re.DOTALL | re.IGNORECASE
+                    )
+                    if not desc_match:
+                        # Try finding paragraphs with substantial text
+                        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
+                        for p in paragraphs:
+                            p_text = re.sub(r'<[^>]+>', '', p).strip()
+                            if len(p_text) > 100 and 'cookie' not in p_text.lower():
+                                listing['descripcion'] = p_text[:2000]
+                                break
+                    if desc_match and 'descripcion' not in listing:
+                        desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
+                        listing['descripcion'] = desc_text.strip()[:2000]
+
+                    # Extract photos - Pisos.com uses cdn.pisos.com and img.pisos.com
+                    photos = re.findall(
+                        r'(?:https?:)?//[^"\']*(?:cdn\.pisos|img\.pisos|pisos\.com)[^"\']*\.(?:jpg|jpeg|png|webp)',
+                        html, re.IGNORECASE
+                    )
+                    # Also look for srcset or data-src patterns
+                    photos += re.findall(
+                        r'(?:src|srcset|data-src)="([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"',
+                        html, re.IGNORECASE
+                    )
+                    unique_photos = []
+                    seen = set()
+                    for photo in photos:
+                        if photo.startswith('//'):
+                            photo = 'https:' + photo
+                        photo_clean = re.sub(r'\?.*$', '', photo)
+                        if photo_clean not in seen and 'logo' not in photo.lower() and 'icon' not in photo.lower():
+                            if 'pisos' in photo or 'cdn' in photo or '/img/' in photo:
+                                unique_photos.append(photo)
+                                seen.add(photo_clean)
+                    listing['fotos'] = unique_photos[:10]
+
                     # Check if particular or agency
                     # Pisos.com uses data-ga-ecom with "particular" or "profesional"
                     is_particular = bool(re.search(r'data-ga-ecom="[^"]*particular', html, re.IGNORECASE))

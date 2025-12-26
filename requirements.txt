@@ -16,6 +16,7 @@ minio==7.2.7
 playwright==1.48.0
 scrapy==2.11.0
 scrapy-playwright==0.0.34
+botasaurus==4.0.72
 
 # Dagster
 dagster==1.5.12

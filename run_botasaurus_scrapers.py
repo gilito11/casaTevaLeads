@@ -37,17 +37,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_postgres_config(use_docker: bool = True) -> Dict[str, str]:
-    """Get PostgreSQL configuration."""
-    if use_docker:
-        return {
-            'host': 'localhost',
-            'port': 5432,
-            'database': 'casa_teva_db',
-            'user': 'casa_teva',
-            'password': 'casateva2024',
-        }
-    else:
+def get_postgres_config(use_azure: bool = False, inside_docker: bool = False) -> Dict[str, str]:
+    """Get PostgreSQL configuration.
+
+    Args:
+        use_azure: Use Azure PostgreSQL (production)
+        inside_docker: Running inside Docker container (use 'postgres' as host)
+    """
+    if use_azure:
         # Azure config
         return {
             'host': 'inmoleads-db.postgres.database.azure.com',
@@ -56,6 +53,15 @@ def get_postgres_config(use_docker: bool = True) -> Dict[str, str]:
             'user': 'inmoleadsadmin',
             'password': 'ataulfo1!',
             'sslmode': 'require',
+        }
+    else:
+        # Local Docker config
+        return {
+            'host': 'postgres' if inside_docker else 'localhost',
+            'port': 5432,
+            'database': 'casa_teva_db',
+            'user': 'casa_teva',
+            'password': 'casateva2024',
         }
 
 
@@ -235,7 +241,10 @@ Examples:
     # Get PostgreSQL config if needed
     postgres_config = None
     if args.postgres:
-        postgres_config = get_postgres_config(use_docker=not args.azure)
+        import os
+        # Detect if running inside Docker container
+        inside_docker = os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER', False)
+        postgres_config = get_postgres_config(use_azure=args.azure, inside_docker=inside_docker)
         logger.info(f"PostgreSQL: {postgres_config['host']}")
 
     # Headless mode

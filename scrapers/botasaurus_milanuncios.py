@@ -5,7 +5,9 @@ This scraper extracts real estate listings from Milanuncios.com
 using Botasaurus for anti-bot bypass (free, open-source).
 """
 
+import json
 import logging
+import os
 import re
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlencode, quote
@@ -15,6 +17,23 @@ from botasaurus.browser import browser, Driver
 from scrapers.botasaurus_base import BotasaurusBaseScraper
 
 logger = logging.getLogger(__name__)
+
+# Cookie file path
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'milanuncios_cookies.json')
+
+def load_milanuncios_cookies():
+    """Load cookies from file if exists."""
+    if os.path.exists(COOKIES_FILE):
+        try:
+            with open(COOKIES_FILE, 'r') as f:
+                data = json.load(f)
+                cookies = data.get('cookies', [])
+                if cookies:
+                    logger.info(f"Loaded {len(cookies)} cookies from {COOKIES_FILE}")
+                return cookies
+        except Exception as e:
+            logger.warning(f"Could not load cookies: {e}")
+    return []
 
 
 # Geographic zones configuration
@@ -133,9 +152,26 @@ class BotasaurusMilanuncios(BotasaurusBaseScraper):
             title_match = re.search(r'<h2[^>]*>([^<]+)</h2>', card_html)
             titulo = title_match.group(1).strip() if title_match else None
 
-            # Extract URL and ID
+            # Extract URL and ID - try multiple patterns
+            # Pattern 1: Standard format with dash before ID
             url_match = re.search(r'href="(/[^"]+\-(\d+)\.htm)"', card_html)
+
+            # Pattern 2: Try any .htm URL with ID at end
             if not url_match:
+                url_match = re.search(r'href="(/[^"]*?(\d{6,})\.htm)"', card_html)
+
+            # Pattern 3: Look for anuncio ID in data attributes
+            if not url_match:
+                anuncio_id_match = re.search(r'data-ad-id="(\d+)"', card_html)
+                href_match = re.search(r'href="(/[^"]+\.htm)"', card_html)
+                if anuncio_id_match and href_match:
+                    url_match = type('obj', (object,), {
+                        'group': lambda self, n: href_match.group(1) if n == 1 else anuncio_id_match.group(1)
+                    })()
+
+            if not url_match:
+                # Log some card content to debug
+                logger.debug(f"No URL found in card. First 200 chars: {card_html[:200]}")
                 return None
 
             detail_path = url_match.group(1)
@@ -203,6 +239,82 @@ class BotasaurusMilanuncios(BotasaurusBaseScraper):
         match = re.search(r'\d+', text)
         return int(match.group()) if match else None
 
+    @staticmethod
+    def _scrape_detail_page_internal(driver: Driver, detail_url: str, parse_price_func) -> Dict[str, Any]:
+        """
+        Visit detail page and extract full listing data (internal method for use within browser session).
+
+        Returns dict with: descripcion, telefono, fotos, precio (if not already set)
+        """
+        try:
+            logger.info(f"Visiting detail page: {detail_url}")
+            driver.get(detail_url)
+            driver.sleep(2)
+
+            html = driver.page_html
+            result = {}
+
+            # Extract description
+            desc_match = re.search(
+                r'class="[^"]*AdDetail-description[^"]*"[^>]*>(.*?)</div>',
+                html, re.DOTALL
+            )
+            if desc_match:
+                desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
+                result['descripcion'] = desc_text.strip()
+
+            # Extract phone number - look for "Ver teléfono" button or revealed number
+            phone_match = re.search(r'tel:(\d{9,})', html)
+            if phone_match:
+                result['telefono'] = phone_match.group(1)
+            else:
+                # Try to find phone in description or specific elements
+                phone_in_text = re.search(r'(\d{3}[\s.-]?\d{3}[\s.-]?\d{3})', html)
+                if phone_in_text:
+                    result['telefono'] = re.sub(r'[\s.-]', '', phone_in_text.group(1))
+
+            # Extract all photos
+            photos = re.findall(
+                r'(https://[^"\']+\.(?:jpg|jpeg|png|webp)[^"\']*)',
+                html, re.IGNORECASE
+            )
+            # Filter to unique, full-size images (from milanuncios CDN)
+            unique_photos = []
+            seen = set()
+            for photo in photos:
+                # Only keep milanuncios images
+                if 'milanuncios' not in photo.lower():
+                    continue
+                # Skip thumbnails and duplicates
+                if 'thumbnail' not in photo.lower() and photo not in seen:
+                    photo_clean = re.sub(r'\?.*$', '', photo)
+                    if photo_clean not in seen:
+                        unique_photos.append(photo)
+                        seen.add(photo_clean)
+            result['fotos'] = unique_photos[:10]  # Max 10 photos
+
+            # Extract price if not already set (from detail page)
+            price_match = re.search(
+                r'class="[^"]*AdDetail[^"]*[Pp]rice[^"]*"[^>]*>([^<]+)',
+                html
+            )
+            if price_match:
+                result['precio_detail'] = parse_price_func(price_match.group(1))
+
+            # Extract seller name
+            seller_match = re.search(
+                r'class="[^"]*AdDetail-sellerName[^"]*"[^>]*>([^<]+)',
+                html
+            )
+            if seller_match:
+                result['vendedor'] = seller_match.group(1).strip()
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error scraping detail page {detail_url}: {e}")
+            return {}
+
     def scrape(self) -> List[Dict[str, Any]]:
         """Run the scraper and return all listings."""
         all_listings = []
@@ -216,59 +328,178 @@ class BotasaurusMilanuncios(BotasaurusBaseScraper):
         return all_listings
 
     def _scrape_zone(self, zona_key: str) -> List[Dict[str, Any]]:
-        """Scrape a single zone."""
+        """Scrape a single zone by clicking on each card to visit detail pages."""
         url = self.build_url(zona_key)
         headless = self.headless
+        scraper_self = self  # Reference for inner function
+        parse_price_func = self._parse_price
+        should_scrape_func = self.should_scrape
+        zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
-        @browser(headless=headless, block_images=True)
-        def scrape_page(driver: Driver, data: dict):
+        # Use full stealth mode with realistic user agent
+        @browser(
+            headless=headless,
+            block_images=False,  # Need images for photos
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        )
+        def scrape_zone_by_clicking(driver: Driver, data: dict):
             url = data['url']
             zona_key = data['zona_key']
 
             logger.info(f"Loading: {url}")
             driver.get(url)
-            driver.sleep(4)
+            driver.sleep(5)  # Wait longer for full page load
 
             html = driver.page_html
+            logger.info(f"Page HTML length: {len(html)}")
 
-            # Check for blocking
-            if len(html) < 10000 or 'captcha' in html.lower():
-                logger.warning("Possible blocking detected")
+            # Check for blocking - be more lenient
+            if len(html) < 5000:
+                logger.warning(f"Page too short ({len(html)} chars), possible blocking")
                 return []
 
-            # Extract listing cards
-            cards = re.findall(
-                r'data-testid="AD_CARD"[^>]*>(.*?)</article>',
-                html,
-                re.DOTALL
-            )
+            # Check for AD_CARD presence as the primary validation
+            has_cards = 'data-testid="AD_CARD"' in html or 'AD_LIST' in html
+            if not has_cards:
+                # Save HTML for debugging
+                with open('/app/output/milanuncios_failed.html', 'w') as f:
+                    f.write(html)
+                logger.warning(f"No listing cards found in HTML. Saved to milanuncios_failed.html")
+                return []
 
-            logger.info(f"Found {len(cards)} listing cards")
-            return {'html': html, 'cards': cards, 'zona_key': zona_key}
+            logger.info("Page loaded successfully with listings")
 
-        result = scrape_page({'url': url, 'zona_key': zona_key})
+            # Find all listing URLs in the full page HTML
+            # Search for URLs with numeric IDs (like -568292696.htm)
+            listing_urls = driver.run_js('''
+                const html = document.documentElement.outerHTML;
+                const urlPattern = /href="(\\/[\\w-]+\\/[\\w-]+-\\d+\\.htm)"/g;
+                const urls = [];
+                let match;
+                while ((match = urlPattern.exec(html)) !== null) {
+                    // Filter to real estate URLs only
+                    const url = match[1];
+                    if (url.includes('venta-de-') || url.includes('alquiler-de-')) {
+                        urls.push(url);
+                    }
+                }
+                return [...new Set(urls)];  // Remove duplicates
+            ''')
 
-        if not result or not result.get('cards'):
-            return []
+            logger.info(f"Found {len(listing_urls)} listing URLs in page")
 
-        listings = []
-        for card_html in result['cards']:
-            listing = self.parse_listing_card(card_html, zona_key)
-            if listing:
-                self.stats['total_listings'] += 1
+            listings = []
 
-                # Apply filters
-                if listing.get('precio') and listing['precio'] < 5000:
-                    self.stats['filtered_out'] += 1
-                    continue
+            for i, path in enumerate(listing_urls):
+                try:
+                    scraper_self.stats['total_listings'] += 1
 
-                if not self.should_scrape(listing):
-                    self.stats['filtered_out'] += 1
-                    continue
+                    detail_url = f"https://www.milanuncios.com{path}"
+                    logger.info(f"Listing {i+1}/{len(listing_urls)}: {detail_url[:70]}...")
 
-                listings.append(listing)
+                    driver.get(detail_url)
+                    driver.sleep(2)
 
-        return listings
+                    # Extract anuncio_id from URL
+                    id_match = re.search(r'-(\d+)\.htm', detail_url)
+                    if not id_match:
+                        logger.warning(f"Listing {i+1}: No ID in URL {detail_url}")
+                        continue
+
+                    anuncio_id = id_match.group(1)
+
+                    # Extract data from detail page
+                    detail_html = driver.page_html
+
+                    # Extract title
+                    title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', detail_html)
+                    titulo = title_match.group(1).strip() if title_match else None
+
+                    # Extract description
+                    desc_match = re.search(
+                        r'class="[^"]*AdDetail-description[^"]*"[^>]*>(.*?)</div>',
+                        detail_html, re.DOTALL
+                    )
+                    descripcion = None
+                    if desc_match:
+                        descripcion = re.sub(r'<[^>]+>', '', desc_match.group(1)).strip()
+
+                    # Extract price
+                    price_match = re.search(r'class="[^"]*[Pp]rice[^"]*"[^>]*>([^<]+)', detail_html)
+                    precio = parse_price_func(price_match.group(1)) if price_match else None
+
+                    # Extract location
+                    location_match = re.search(r'class="[^"]*AdDetail[^"]*[Ll]ocation[^"]*"[^>]*>([^<]+)', detail_html)
+                    ubicacion = location_match.group(1).strip() if location_match else None
+
+                    # Extract phone
+                    phone_match = re.search(r'tel:(\d{9,})', detail_html)
+                    telefono = phone_match.group(1) if phone_match else None
+                    if not telefono:
+                        phone_in_text = re.search(r'(\d{3}[\s.-]?\d{3}[\s.-]?\d{3})', detail_html)
+                        if phone_in_text:
+                            telefono = re.sub(r'[\s.-]', '', phone_in_text.group(1))
+
+                    # Extract photos
+                    photos = re.findall(
+                        r'(https://[^"\']+\.(?:jpg|jpeg|png|webp)[^"\']*)',
+                        detail_html, re.IGNORECASE
+                    )
+                    unique_photos = []
+                    seen = set()
+                    for photo in photos:
+                        if 'milanuncios' not in photo.lower():
+                            continue
+                        if 'thumbnail' in photo.lower():
+                            continue
+                        photo_clean = re.sub(r'\?.*$', '', photo)
+                        if photo_clean not in seen:
+                            unique_photos.append(photo)
+                            seen.add(photo_clean)
+                    fotos = unique_photos[:10]
+
+                    # Build listing
+                    listing = {
+                        'anuncio_id': anuncio_id,
+                        'titulo': titulo,
+                        'precio': precio,
+                        'ubicacion': ubicacion,
+                        'descripcion': descripcion,
+                        'telefono': telefono,
+                        'telefono_norm': telefono,
+                        'fotos': fotos,
+                        'detail_url': detail_url,
+                        'url_anuncio': detail_url,
+                        'portal': 'milanuncios',
+                        'zona_busqueda': zona_info.get('nombre', zona_key),
+                        'zona_geografica': zona_info.get('nombre', zona_key),
+                        'vendedor': 'Particular',
+                    }
+
+                    # Apply price filter
+                    if precio and precio < 5000:
+                        logger.info(f"Listing {i+1}: Filtered (price {precio} < 5000)")
+                        scraper_self.stats['filtered_out'] += 1
+                        continue
+
+                    # Apply particular filter
+                    if not should_scrape_func(listing):
+                        logger.info(f"Listing {i+1}: Filtered (not particular)")
+                        scraper_self.stats['filtered_out'] += 1
+                        continue
+
+                    logger.info(f"Listing {i+1}: OK - {titulo[:40] if titulo else 'No title'}... | {precio}€ | Phone: {telefono}")
+                    listings.append(listing)
+
+                    # Small delay
+                    driver.sleep(1)
+
+                except Exception as e:
+                    logger.error(f"Listing {i+1}: Error - {e}")
+
+            return listings
+
+        return scrape_zone_by_clicking({'url': url, 'zona_key': zona_key})
 
     def scrape_and_save(self) -> Dict[str, int]:
         """Scrape all zones and save to PostgreSQL."""
