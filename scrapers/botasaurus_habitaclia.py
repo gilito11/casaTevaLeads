@@ -20,69 +20,133 @@ logger = logging.getLogger(__name__)
 
 # Geographic zones configuration
 ZONAS_GEOGRAFICAS = {
-    # Provinces
+    # =============================================================
+    # PROVINCES (use 'viviendas-{slug}.htm' format without 'particulares')
+    # =============================================================
     'tarragona_provincia': {
         'nombre': 'Tarragona Provincia',
-        'url_slug': 'tarragona_provincia',
+        'url_slug': 'tarragona',
+        'is_province': True,
     },
     'lleida_provincia': {
         'nombre': 'Lleida Provincia',
-        'url_slug': 'lleida_provincia',
-    },
-    # Cities - Tarragona
-    'tarragona': {
-        'nombre': 'Tarragona',
-        'url_slug': 'tarragona',
-    },
-    'salou': {
-        'nombre': 'Salou',
-        'url_slug': 'salou',
-    },
-    'cambrils': {
-        'nombre': 'Cambrils',
-        'url_slug': 'cambrils',
-    },
-    'reus': {
-        'nombre': 'Reus',
-        'url_slug': 'reus',
-    },
-    'calafell': {
-        'nombre': 'Calafell',
-        'url_slug': 'calafell',
-    },
-    'torredembarra': {
-        'nombre': 'Torredembarra',
-        'url_slug': 'torredembarra',
-    },
-    'vendrell': {
-        'nombre': 'El Vendrell',
-        'url_slug': 'el_vendrell',
-    },
-    'valls': {
-        'nombre': 'Valls',
-        'url_slug': 'valls',
-    },
-    'tortosa': {
-        'nombre': 'Tortosa',
-        'url_slug': 'tortosa',
-    },
-    'amposta': {
-        'nombre': 'Amposta',
-        'url_slug': 'amposta',
-    },
-    # Cities - Lleida
-    'lleida': {
-        'nombre': 'Lleida',
         'url_slug': 'lleida',
+        'is_province': True,
     },
-    'balaguer': {
-        'nombre': 'Balaguer',
-        'url_slug': 'balaguer',
+
+    # =============================================================
+    # COMARCAS - Composite zones (list of cities to scrape)
+    # =============================================================
+    # -- TARRAGONA COMARCAS --
+    'tarragones': {
+        'nombre': 'Tarragonès',
+        'composite': ['tarragona', 'torredembarra', 'altafulla', 'constantí', 'el_morell'],
     },
-    'mollerussa': {
-        'nombre': 'Mollerussa',
-        'url_slug': 'mollerussa',
+    'baix_camp': {
+        'nombre': 'Baix Camp',
+        'composite': ['reus', 'cambrils', 'salou', 'vila-seca', 'mont-roig_del_camp', 'riudoms'],
     },
+    'alt_camp': {
+        'nombre': 'Alt Camp',
+        'composite': ['valls', 'alcover'],
+    },
+    'conca_barbera': {
+        'nombre': 'Conca de Barberà',
+        'composite': ['montblanc', 'l_espluga_de_francolí', 'santa_coloma_de_queralt'],
+    },
+    'baix_penedes': {
+        'nombre': 'Baix Penedès',
+        'composite': ['el_vendrell', 'calafell', 'cunit'],
+    },
+    'baix_ebre': {
+        'nombre': 'Baix Ebre',
+        'composite': ['tortosa', 'deltebre', 'l_ametlla_de_mar'],
+    },
+    'montsia': {
+        'nombre': 'Montsià',
+        'composite': ['amposta', 'sant_carles_de_la_rapita', 'alcanar', 'ulldecona'],
+    },
+    'priorat': {
+        'nombre': 'Priorat',
+        'composite': ['falset'],
+    },
+    # Costa Daurada (tourist area grouping)
+    'costa_daurada': {
+        'nombre': 'Costa Daurada',
+        'composite': ['salou', 'cambrils', 'tarragona', 'torredembarra', 'altafulla', 'calafell', 'el_vendrell', 'miami_platja'],
+    },
+
+    # -- LLEIDA COMARCAS --
+    'segria': {
+        'nombre': 'Segrià',
+        'composite': ['lleida', 'alcarras', 'almacelles', 'alpicat'],
+    },
+    'noguera': {
+        'nombre': 'Noguera',
+        'composite': ['balaguer', 'artesa_de_segre', 'ponts'],
+    },
+    'pla_urgell': {
+        'nombre': "Pla d'Urgell",
+        'composite': ['mollerussa', 'bellpuig', 'linyola'],
+    },
+    'urgell': {
+        'nombre': 'Urgell',
+        'composite': ['tarrega', 'agramunt'],
+    },
+    'garrigues': {
+        'nombre': 'Les Garrigues',
+        'composite': ['les_borges_blanques', 'juneda'],
+    },
+
+    # =============================================================
+    # CITIES - Single municipality searches
+    # =============================================================
+    # -- TARRAGONA CITIES --
+    'tarragona': {'nombre': 'Tarragona', 'url_slug': 'tarragona'},
+    'salou': {'nombre': 'Salou', 'url_slug': 'salou'},
+    'cambrils': {'nombre': 'Cambrils', 'url_slug': 'cambrils'},
+    'reus': {'nombre': 'Reus', 'url_slug': 'reus'},
+    'calafell': {'nombre': 'Calafell', 'url_slug': 'calafell'},
+    'torredembarra': {'nombre': 'Torredembarra', 'url_slug': 'torredembarra'},
+    'vendrell': {'nombre': 'El Vendrell', 'url_slug': 'el_vendrell'},
+    'el_vendrell': {'nombre': 'El Vendrell', 'url_slug': 'el_vendrell'},
+    'valls': {'nombre': 'Valls', 'url_slug': 'valls'},
+    'tortosa': {'nombre': 'Tortosa', 'url_slug': 'tortosa'},
+    'amposta': {'nombre': 'Amposta', 'url_slug': 'amposta'},
+    'montblanc': {'nombre': 'Montblanc', 'url_slug': 'montblanc'},
+    'altafulla': {'nombre': 'Altafulla', 'url_slug': 'altafulla'},
+    'vila-seca': {'nombre': 'Vila-seca', 'url_slug': 'vila-seca'},
+    'mont-roig_del_camp': {'nombre': 'Mont-roig del Camp', 'url_slug': 'mont-roig_del_camp'},
+    'miami_platja': {'nombre': 'Miami Platja', 'url_slug': 'miami_platja'},
+    'riudoms': {'nombre': 'Riudoms', 'url_slug': 'riudoms'},
+    'alcover': {'nombre': 'Alcover', 'url_slug': 'alcover'},
+    'constantí': {'nombre': 'Constantí', 'url_slug': 'constanti'},
+    'el_morell': {'nombre': 'El Morell', 'url_slug': 'el_morell'},
+    'cunit': {'nombre': 'Cunit', 'url_slug': 'cunit'},
+    'deltebre': {'nombre': 'Deltebre', 'url_slug': 'deltebre'},
+    'l_ametlla_de_mar': {'nombre': "L'Ametlla de Mar", 'url_slug': 'l_ametlla_de_mar'},
+    'sant_carles_de_la_rapita': {'nombre': 'Sant Carles de la Ràpita', 'url_slug': 'sant_carles_de_la_rapita'},
+    'alcanar': {'nombre': 'Alcanar', 'url_slug': 'alcanar'},
+    'ulldecona': {'nombre': 'Ulldecona', 'url_slug': 'ulldecona'},
+    'falset': {'nombre': 'Falset', 'url_slug': 'falset'},
+    'l_espluga_de_francolí': {'nombre': "L'Espluga de Francolí", 'url_slug': 'l_espluga_de_francoli'},
+    'santa_coloma_de_queralt': {'nombre': 'Santa Coloma de Queralt', 'url_slug': 'santa_coloma_de_queralt'},
+
+    # -- LLEIDA CITIES --
+    'lleida': {'nombre': 'Lleida', 'url_slug': 'lleida'},
+    'balaguer': {'nombre': 'Balaguer', 'url_slug': 'balaguer'},
+    'mollerussa': {'nombre': 'Mollerussa', 'url_slug': 'mollerussa'},
+    'tarrega': {'nombre': 'Tàrrega', 'url_slug': 'tarrega'},
+    'alcarras': {'nombre': 'Alcarràs', 'url_slug': 'alcarras'},
+    'almacelles': {'nombre': 'Almacelles', 'url_slug': 'almacelles'},
+    'alpicat': {'nombre': 'Alpicat', 'url_slug': 'alpicat'},
+    'artesa_de_segre': {'nombre': 'Artesa de Segre', 'url_slug': 'artesa_de_segre'},
+    'ponts': {'nombre': 'Ponts', 'url_slug': 'ponts'},
+    'bellpuig': {'nombre': 'Bellpuig', 'url_slug': 'bellpuig'},
+    'linyola': {'nombre': 'Linyola', 'url_slug': 'linyola'},
+    'agramunt': {'nombre': 'Agramunt', 'url_slug': 'agramunt'},
+    'les_borges_blanques': {'nombre': 'Les Borges Blanques', 'url_slug': 'les_borges_blanques'},
+    'juneda': {'nombre': 'Juneda', 'url_slug': 'juneda'},
 }
 
 
@@ -91,6 +155,54 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
     PORTAL_NAME = 'habitaclia'
     BASE_URL = 'https://www.habitaclia.com'
+
+    def _extract_habitaclia_phone(self, html: str) -> Optional[str]:
+        """
+        Extract phone number from Habitaclia detail page.
+
+        IMPORTANT: Only extract phones from legitimate contact sections.
+        Do NOT scan entire HTML for 9-digit numbers as this can pick up
+        listing IDs, tracking codes, or other non-phone numbers.
+
+        Returns None if no phone is found in a contact-related context.
+        """
+        # Pattern 1: Phone in a visible tel: link (most reliable)
+        tel_link = re.search(r'href="tel:(\+?34)?([679]\d{8})"', html)
+        if tel_link:
+            return tel_link.group(2)
+
+        # Pattern 2: Phone displayed near contact button/section
+        # Look for phone in a contact-related container
+        contact_section = re.search(
+            r'(?:class="[^"]*(?:contact|phone|telefono|llamar)[^"]*"[^>]*>.*?'
+            r'|data-phone[^>]*>.*?'
+            r'|id="[^"]*phone[^"]*"[^>]*>.*?)'
+            r'([679]\d[\d\s\.\-]{7,12})',
+            html, re.IGNORECASE | re.DOTALL
+        )
+        if contact_section:
+            phone = re.sub(r'[\s\.\-]', '', contact_section.group(1))
+            if len(phone) == 9:
+                return phone
+
+        # Pattern 3: Phone after "Teléfono:" or "Tel:" label
+        phone_label = re.search(
+            r'(?:tel[ée]fono|tel\.?|llamar|phone)\s*:?\s*([679]\d[\d\s\.\-]{7,12})',
+            html, re.IGNORECASE
+        )
+        if phone_label:
+            phone = re.sub(r'[\s\.\-]', '', phone_label.group(1))
+            if len(phone) == 9:
+                return phone
+
+        # Pattern 4: Phone in JSON-LD structured data
+        json_phone = re.search(r'"telephone"\s*:\s*"(\+?34)?([679]\d{8})"', html)
+        if json_phone:
+            return json_phone.group(2)
+
+        # NO phone found in legitimate contact contexts
+        # Do NOT fall back to scanning entire HTML
+        return None
 
     def __init__(
         self,
@@ -110,15 +222,24 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         if not zona:
             raise ValueError(f"Zone not found: {zona_key}")
 
-        # Use /viviendas-particulares-{zona}.htm to filter private sellers
-        if self.only_private:
-            url = f"{self.BASE_URL}/viviendas-particulares-{zona['url_slug']}.htm"
+        slug = zona['url_slug']
+        is_province = zona.get('is_province', False)
+
+        # Province searches don't support -particulares- filter in URL
+        # We'll filter agencies later in the scraper
+        if is_province:
+            url = f"{self.BASE_URL}/viviendas-{slug}.htm"
             if page > 1:
-                url = f"{self.BASE_URL}/viviendas-particulares-{zona['url_slug']}-pag{page}.htm"
+                url = f"{self.BASE_URL}/viviendas-{slug}-pag{page}.htm"
+        elif self.only_private:
+            # City searches can use -particulares- filter
+            url = f"{self.BASE_URL}/viviendas-particulares-{slug}.htm"
+            if page > 1:
+                url = f"{self.BASE_URL}/viviendas-particulares-{slug}-pag{page}.htm"
         else:
-            url = f"{self.BASE_URL}/viviendas-{zona['url_slug']}.htm"
+            url = f"{self.BASE_URL}/viviendas-{slug}.htm"
             if page > 1:
-                url = f"{self.BASE_URL}/viviendas-{zona['url_slug']}-pag{page}.htm"
+                url = f"{self.BASE_URL}/viviendas-{slug}-pag{page}.htm"
 
         return url
 
@@ -135,12 +256,34 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         return all_listings
 
     def _scrape_zone(self, zona_key: str) -> List[Dict[str, Any]]:
-        """Scrape a single zone."""
+        """Scrape a single zone (or composite zone with multiple cities)."""
+        zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+
+        # Handle composite zones (comarcas) - scrape each city
+        if 'composite' in zona_info:
+            logger.info(f"Composite zone {zona_key}: {zona_info['composite']}")
+            all_listings = []
+            for city_key in zona_info['composite']:
+                if city_key in ZONAS_GEOGRAFICAS:
+                    logger.info(f"  Scraping city: {city_key}")
+                    city_listings = self._scrape_single_zone(city_key, zona_info['nombre'])
+                    all_listings.extend(city_listings)
+                else:
+                    logger.warning(f"  City not found in config: {city_key}")
+            return all_listings
+
+        # Single zone
+        return self._scrape_single_zone(zona_key)
+
+    def _scrape_single_zone(self, zona_key: str, parent_zone_name: str = None) -> List[Dict[str, Any]]:
+        """Scrape a single municipality zone."""
         url = self.build_url(zona_key)
         headless = self.headless
         base_url = self.BASE_URL
         portal = self.PORTAL_NAME
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+        # Use parent zone name for composite zones (comarca name)
+        zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
         @browser(headless=headless, block_images=True)
         def scrape_page(driver: Driver, data: dict):
@@ -184,8 +327,8 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                     'detail_url': link,
                     'url_anuncio': link,
                     'portal': portal,
-                    'zona_busqueda': zona_info.get('nombre', zona_key),
-                    'zona_geografica': zona_info.get('nombre', zona_key),
+                    'zona_busqueda': zone_display_name,
+                    'zona_geografica': zone_display_name,
                 })
 
             return listings
@@ -228,11 +371,13 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         price_str = price_match.group(1).replace('.', '')
                         listing['precio'] = float(price_str)
 
-                    # Extract phones
-                    phones = self.extract_phones_from_html(html)
-                    if phones:
-                        listing['telefono'] = phones[0]
-                        listing['telefono_norm'] = self.normalize_phone(phones[0])
+                    # Extract phones - ONLY from contact section, NOT from entire HTML
+                    # Habitaclia typically hides phone behind "Ver teléfono" button
+                    # We should NOT invent phones from random numbers in the page
+                    phone = self._extract_habitaclia_phone(html)
+                    if phone:
+                        listing['telefono'] = phone
+                        listing['telefono_norm'] = self.normalize_phone(phone)
 
                     # Extract features
                     metros_match = re.search(r'(\d+)\s*m[²2]', html)

@@ -1,25 +1,46 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db import connection
+from django.http import JsonResponse
+from decimal import Decimal
 import json
+
+from core.models import ZONAS_PREESTABLECIDAS
+
+
+def convert_decimals(obj):
+    """Convert Decimal objects to float for JSON serialization."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimals(item) for item in obj]
+    return obj
 
 
 def dict_fetchall(cursor):
-    """Return all rows from a cursor as a list of dicts."""
+    """Return all rows from a cursor as a list of dicts with Decimals converted."""
     columns = [col[0] for col in cursor.description]
-    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    return convert_decimals(rows)
 
 
 def dict_fetchone(cursor):
-    """Return one row from a cursor as a dict."""
+    """Return one row from a cursor as a dict with Decimals converted."""
     columns = [col[0] for col in cursor.description]
     row = cursor.fetchone()
-    return dict(zip(columns, row)) if row else {}
+    result = dict(zip(columns, row)) if row else {}
+    return convert_decimals(result)
 
 
 @login_required
 def analytics_dashboard_view(request):
-    """Dashboard de analytics con KPIs, gráficos y métricas."""
+    """Dashboard de analytics con KPIs, gráficos y métricas.
+
+    NOTA: Las vistas de analytics no existen aún, así que usamos queries directas
+    que combinan marts.dim_leads con leads_lead_estado para obtener estados reales.
+    """
     tenant_id = request.session.get('tenant_id', 1)
 
     context = {
@@ -33,26 +54,35 @@ def analytics_dashboard_view(request):
     }
 
     with connection.cursor() as cursor:
-        # KPIs principales
+        # KPIs principales - query directa combinando leads con estados
         try:
             cursor.execute("""
+                WITH lead_con_estado AS (
+                    SELECT
+                        l.*,
+                        COALESCE(e.estado, 'NUEVO') as estado_real
+                    FROM marts.dim_leads l
+                    LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
+                    WHERE l.tenant_id = %s
+                )
                 SELECT
-                    COALESCE(total_leads, 0) as total_leads,
-                    COALESCE(leads_nuevos, 0) as leads_nuevos,
-                    COALESCE(leads_en_proceso, 0) as leads_en_proceso,
-                    COALESCE(leads_interesados, 0) as leads_interesados,
-                    COALESCE(leads_convertidos, 0) as leads_convertidos,
-                    COALESCE(leads_descartados, 0) as leads_descartados,
-                    COALESCE(tasa_conversion, 0) as tasa_conversion,
-                    COALESCE(tasa_descarte, 0) as tasa_descarte,
-                    COALESCE(valor_pipeline, 0) as valor_pipeline,
-                    COALESCE(valor_convertido, 0) as valor_convertido,
-                    COALESCE(score_medio, 0) as score_medio,
-                    COALESCE(dias_medio_primer_contacto, 0) as dias_medio_primer_contacto,
-                    COALESCE(leads_ultima_semana, 0) as leads_ultima_semana,
-                    COALESCE(leads_este_mes, 0) as leads_este_mes
-                FROM analytics.analytics_kpis_tenant
-                WHERE tenant_id = %s
+                    COUNT(*) as total_leads,
+                    COUNT(*) FILTER (WHERE estado_real = 'NUEVO') as leads_nuevos,
+                    COUNT(*) FILTER (WHERE estado_real = 'EN_PROCESO') as leads_en_proceso,
+                    COUNT(*) FILTER (WHERE estado_real = 'INTERESADO') as leads_interesados,
+                    COUNT(*) FILTER (WHERE estado_real = 'CLIENTE') as leads_convertidos,
+                    COUNT(*) FILTER (WHERE estado_real IN ('NO_INTERESADO', 'NO_CONTACTAR', 'YA_VENDIDO')) as leads_descartados,
+                    COUNT(*) FILTER (WHERE estado_real = 'CONTACTADO_SIN_RESPUESTA') as leads_contactados,
+                    COUNT(*) FILTER (WHERE estado_real = 'EN_ESPERA') as leads_en_espera,
+                    ROUND(
+                        CASE WHEN COUNT(*) > 0
+                        THEN 100.0 * COUNT(*) FILTER (WHERE estado_real = 'CLIENTE') / COUNT(*)
+                        ELSE 0 END, 1
+                    ) as tasa_conversion,
+                    COALESCE(SUM(precio) FILTER (WHERE estado_real NOT IN ('NO_INTERESADO', 'NO_CONTACTAR', 'YA_VENDIDO')), 0) as valor_pipeline,
+                    COUNT(*) FILTER (WHERE fecha_scraping >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
+                    COUNT(*) FILTER (WHERE fecha_scraping >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes
+                FROM lead_con_estado
             """, [tenant_id])
             context['kpis'] = dict_fetchone(cursor)
         except Exception as e:
@@ -60,22 +90,49 @@ def analytics_dashboard_view(request):
             context['kpis'] = {
                 'total_leads': 0, 'leads_nuevos': 0, 'leads_en_proceso': 0,
                 'leads_interesados': 0, 'leads_convertidos': 0, 'tasa_conversion': 0,
-                'valor_pipeline': 0, 'score_medio': 0, 'leads_ultima_semana': 0,
-                'dias_medio_primer_contacto': 0
+                'valor_pipeline': 0, 'leads_ultima_semana': 0, 'leads_contactados': 0,
+                'leads_en_espera': 0, 'leads_descartados': 0, 'leads_este_mes': 0
             }
 
-        # Embudo de conversión
+        # Embudo de conversión - estados ordenados
         try:
             cursor.execute("""
+                WITH lead_con_estado AS (
+                    SELECT
+                        COALESCE(e.estado, 'NUEVO') as estado_real,
+                        l.precio
+                    FROM marts.dim_leads l
+                    LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
+                    WHERE l.tenant_id = %s
+                ),
+                total AS (SELECT COUNT(*) as cnt FROM lead_con_estado),
+                estados AS (
+                    SELECT
+                        estado_real as estado,
+                        COUNT(*) as total_leads,
+                        COALESCE(AVG(precio), 0) as precio_medio,
+                        CASE estado_real
+                            WHEN 'NUEVO' THEN 1
+                            WHEN 'EN_PROCESO' THEN 2
+                            WHEN 'CONTACTADO_SIN_RESPUESTA' THEN 3
+                            WHEN 'EN_ESPERA' THEN 4
+                            WHEN 'INTERESADO' THEN 5
+                            WHEN 'CLIENTE' THEN 6
+                            WHEN 'NO_INTERESADO' THEN 7
+                            WHEN 'YA_VENDIDO' THEN 8
+                            WHEN 'NO_CONTACTAR' THEN 9
+                            ELSE 10
+                        END as orden_embudo
+                    FROM lead_con_estado
+                    GROUP BY estado_real
+                )
                 SELECT
-                    estado,
-                    COALESCE(total_leads, 0) as total_leads,
-                    COALESCE(score_medio, 0) as score_medio,
-                    COALESCE(precio_medio, 0) as precio_medio,
-                    COALESCE(porcentaje, 0) as porcentaje,
-                    COALESCE(orden_embudo, 0) as orden_embudo
-                FROM analytics.analytics_embudo_conversion
-                WHERE tenant_id = %s
+                    e.estado,
+                    e.total_leads,
+                    ROUND(e.precio_medio::numeric, 0) as precio_medio,
+                    ROUND(100.0 * e.total_leads / GREATEST(t.cnt, 1), 1) as porcentaje,
+                    e.orden_embudo
+                FROM estados e, total t
                 ORDER BY orden_embudo
             """, [tenant_id])
             context['embudo'] = dict_fetchall(cursor)
@@ -86,20 +143,20 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    fecha,
-                    COALESCE(SUM(leads_captados), 0) as leads_captados,
-                    COALESCE(SUM(leads_unicos), 0) as leads_unicos,
-                    COALESCE(AVG(precio_medio), 0) as precio_medio
-                FROM analytics.analytics_leads_por_dia
+                    DATE(fecha_scraping) as fecha,
+                    COUNT(*) as leads_captados,
+                    COUNT(DISTINCT telefono_norm) as leads_unicos,
+                    COALESCE(AVG(precio), 0) as precio_medio
+                FROM marts.dim_leads
                 WHERE tenant_id = %s
-                  AND fecha >= CURRENT_DATE - INTERVAL '30 days'
-                GROUP BY fecha
+                  AND fecha_scraping >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY DATE(fecha_scraping)
                 ORDER BY fecha
             """, [tenant_id])
             rows = dict_fetchall(cursor)
-            # Convert dates to strings for JSON
             for row in rows:
                 row['fecha'] = row['fecha'].strftime('%Y-%m-%d') if row['fecha'] else ''
+                row['precio_medio'] = float(row['precio_medio']) if row['precio_medio'] else 0
             context['leads_por_dia'] = rows
         except Exception as e:
             print(f"Error fetching leads por dia: {e}")
@@ -108,20 +165,26 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    semana,
-                    COALESCE(precio_medio, 0) as precio_medio,
-                    COALESCE(precio_mediana, 0) as precio_mediana,
-                    COALESCE(min_precio, 0) as min_precio,
-                    COALESCE(max_precio, 0) as max_precio
-                FROM analytics.analytics_evolucion_precios
+                    DATE_TRUNC('week', fecha_scraping)::date as semana,
+                    COALESCE(AVG(precio), 0) as precio_medio,
+                    COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
+                    COALESCE(MIN(precio), 0) as min_precio,
+                    COALESCE(MAX(precio), 0) as max_precio
+                FROM marts.dim_leads
                 WHERE tenant_id = %s
+                  AND precio > 0
+                  AND fecha_scraping >= CURRENT_DATE - INTERVAL '12 weeks'
+                GROUP BY DATE_TRUNC('week', fecha_scraping)
                 ORDER BY semana DESC
                 LIMIT 12
             """, [tenant_id])
             rows = dict_fetchall(cursor)
-            # Convert dates to strings and reverse order
             for row in rows:
                 row['semana'] = row['semana'].strftime('%Y-%m-%d') if row['semana'] else ''
+                row['precio_medio'] = float(row['precio_medio']) if row['precio_medio'] else 0
+                row['precio_mediana'] = float(row['precio_mediana']) if row['precio_mediana'] else 0
+                row['min_precio'] = float(row['min_precio']) if row['min_precio'] else 0
+                row['max_precio'] = float(row['max_precio']) if row['max_precio'] else 0
             context['evolucion_precios'] = list(reversed(rows))
         except Exception as e:
             print(f"Error fetching evolucion precios: {e}")
@@ -129,22 +192,44 @@ def analytics_dashboard_view(request):
         # Comparativa de portales
         try:
             cursor.execute("""
+                WITH lead_con_estado AS (
+                    SELECT
+                        l.portal,
+                        l.telefono_norm,
+                        l.precio,
+                        l.metros,
+                        COALESCE(e.estado, 'NUEVO') as estado_real
+                    FROM marts.dim_leads l
+                    LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
+                    WHERE l.tenant_id = %s
+                )
                 SELECT
                     portal,
-                    COALESCE(total_leads, 0) as total_leads,
-                    COALESCE(leads_unicos, 0) as leads_unicos,
-                    COALESCE(convertidos, 0) as convertidos,
-                    COALESCE(tasa_conversion, 0) as tasa_conversion,
-                    COALESCE(contactados, 0) as contactados,
-                    COALESCE(tasa_contacto, 0) as tasa_contacto,
-                    COALESCE(score_medio, 0) as score_medio,
-                    COALESCE(precio_medio, 0) as precio_medio,
-                    COALESCE(precio_m2_medio, 0) as precio_m2_medio
-                FROM analytics.analytics_comparativa_portales
-                WHERE tenant_id = %s
+                    COUNT(*) as total_leads,
+                    COUNT(DISTINCT telefono_norm) as leads_unicos,
+                    COUNT(*) FILTER (WHERE estado_real = 'CLIENTE') as convertidos,
+                    ROUND(
+                        CASE WHEN COUNT(*) > 0
+                        THEN 100.0 * COUNT(*) FILTER (WHERE estado_real = 'CLIENTE') / COUNT(*)
+                        ELSE 0 END, 1
+                    ) as tasa_conversion,
+                    COUNT(*) FILTER (WHERE estado_real IN ('CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'CLIENTE')) as contactados,
+                    ROUND(
+                        CASE WHEN COUNT(*) > 0
+                        THEN 100.0 * COUNT(*) FILTER (WHERE estado_real IN ('CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'CLIENTE')) / COUNT(*)
+                        ELSE 0 END, 1
+                    ) as tasa_contacto,
+                    COALESCE(AVG(precio), 0) as precio_medio,
+                    COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio
+                FROM lead_con_estado
+                GROUP BY portal
                 ORDER BY total_leads DESC
             """, [tenant_id])
-            context['comparativa_portales'] = dict_fetchall(cursor)
+            rows = dict_fetchall(cursor)
+            for row in rows:
+                row['precio_medio'] = float(row['precio_medio']) if row['precio_medio'] else 0
+                row['precio_m2_medio'] = float(row['precio_m2_medio']) if row['precio_m2_medio'] else 0
+            context['comparativa_portales'] = rows
         except Exception as e:
             print(f"Error fetching comparativa portales: {e}")
 
@@ -152,19 +237,26 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    zona_clasificada,
-                    COALESCE(precio_medio, 0) as precio_medio,
-                    COALESCE(precio_mediana, 0) as precio_mediana,
-                    COALESCE(precio_m2_medio, 0) as precio_m2_medio,
-                    COALESCE(total_inmuebles, 0) as total_inmuebles
-                FROM analytics.analytics_precios_por_zona
+                    zona_geografica as zona_clasificada,
+                    COALESCE(AVG(precio), 0) as precio_medio,
+                    COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
+                    COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio,
+                    COUNT(*) as total_inmuebles
+                FROM marts.dim_leads
                 WHERE tenant_id = %s
-                  AND zona_clasificada IS NOT NULL
-                  AND zona_clasificada != ''
+                  AND zona_geografica IS NOT NULL
+                  AND zona_geografica != ''
+                  AND precio > 0
+                GROUP BY zona_geografica
                 ORDER BY total_inmuebles DESC
                 LIMIT 15
             """, [tenant_id])
-            context['precios_por_zona'] = dict_fetchall(cursor)
+            rows = dict_fetchall(cursor)
+            for row in rows:
+                row['precio_medio'] = float(row['precio_medio']) if row['precio_medio'] else 0
+                row['precio_mediana'] = float(row['precio_mediana']) if row['precio_mediana'] else 0
+                row['precio_m2_medio'] = float(row['precio_m2_medio']) if row['precio_m2_medio'] else 0
+            context['precios_por_zona'] = rows
         except Exception as e:
             print(f"Error fetching precios por zona: {e}")
 
@@ -172,17 +264,22 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    tipo_propiedad,
-                    COALESCE(total, 0) as total,
-                    COALESCE(porcentaje, 0) as porcentaje,
-                    COALESCE(precio_medio, 0) as precio_medio,
-                    COALESCE(precio_m2_medio, 0) as precio_m2_medio
-                FROM analytics.analytics_tipologia_inmuebles
+                    COALESCE(tipo_inmueble, 'Sin especificar') as tipo_propiedad,
+                    COUNT(*) as total,
+                    ROUND(100.0 * COUNT(*) / GREATEST((SELECT COUNT(*) FROM marts.dim_leads WHERE tenant_id = %s), 1), 1) as porcentaje,
+                    COALESCE(AVG(precio), 0) as precio_medio,
+                    COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio
+                FROM marts.dim_leads
                 WHERE tenant_id = %s
-                  AND tipo_propiedad IS NOT NULL
+                GROUP BY tipo_inmueble
                 ORDER BY total DESC
-            """, [tenant_id])
-            context['tipologia_inmuebles'] = dict_fetchall(cursor)
+            """, [tenant_id, tenant_id])
+            rows = dict_fetchall(cursor)
+            for row in rows:
+                row['precio_medio'] = float(row['precio_medio']) if row['precio_medio'] else 0
+                row['precio_m2_medio'] = float(row['precio_m2_medio']) if row['precio_m2_medio'] else 0
+                row['porcentaje'] = float(row['porcentaje']) if row['porcentaje'] else 0
+            context['tipologia_inmuebles'] = rows
         except Exception as e:
             print(f"Error fetching tipologia: {e}")
 
@@ -194,3 +291,148 @@ def analytics_dashboard_view(request):
     context['tipologia_json'] = json.dumps(context['tipologia_inmuebles'])
 
     return render(request, 'analytics/dashboard.html', context)
+
+
+@login_required
+def map_view(request):
+    """Vista del mapa de leads por zona geográfica."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    # Get leads grouped by zona_geografica
+    zones_data = []
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute("""
+                SELECT
+                    zona_geografica,
+                    COUNT(*) as total_leads,
+                    COUNT(*) FILTER (WHERE precio > 0) as con_precio,
+                    COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio,
+                    COALESCE(MIN(precio) FILTER (WHERE precio > 0), 0) as precio_min,
+                    COALESCE(MAX(precio) FILTER (WHERE precio > 0), 0) as precio_max
+                FROM marts.dim_leads
+                WHERE tenant_id = %s
+                  AND zona_geografica IS NOT NULL
+                  AND zona_geografica != ''
+                GROUP BY zona_geografica
+                ORDER BY total_leads DESC
+            """, [tenant_id])
+            rows = dict_fetchall(cursor)
+
+            for row in rows:
+                zona_nombre = row['zona_geografica']
+
+                # Try to find coordinates from ZONAS_PREESTABLECIDAS
+                coords = None
+                for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
+                    # Match by name (case insensitive, partial match)
+                    if (zona_data['nombre'].lower() in zona_nombre.lower() or
+                        zona_nombre.lower() in zona_data['nombre'].lower() or
+                        slug.replace('_', ' ') in zona_nombre.lower()):
+                        coords = {
+                            'lat': zona_data['lat'],
+                            'lon': zona_data['lon'],
+                            'region': zona_data.get('region_nombre', ''),
+                        }
+                        break
+
+                if coords:
+                    zones_data.append({
+                        'nombre': zona_nombre,
+                        'lat': coords['lat'],
+                        'lon': coords['lon'],
+                        'region': coords['region'],
+                        'total_leads': row['total_leads'],
+                        'precio_medio': round(float(row['precio_medio']), 0),
+                        'precio_min': round(float(row['precio_min']), 0),
+                        'precio_max': round(float(row['precio_max']), 0),
+                    })
+
+        except Exception as e:
+            print(f"Error fetching map data: {e}")
+
+    # Calculate map center (average of all points)
+    if zones_data:
+        center_lat = sum(z['lat'] for z in zones_data) / len(zones_data)
+        center_lon = sum(z['lon'] for z in zones_data) / len(zones_data)
+    else:
+        # Default to Tarragona area
+        center_lat = 41.1189
+        center_lon = 1.2445
+
+    # Create map config as JSON to avoid locale issues with decimals
+    map_config = {
+        'center': [float(center_lat), float(center_lon)],
+        'zones': zones_data,
+    }
+
+    context = {
+        'zones_data': zones_data,
+        'map_config_json': json.dumps(map_config),
+        'total_leads': sum(z['total_leads'] for z in zones_data),
+        'total_zones': len(zones_data),
+    }
+
+    return render(request, 'analytics/map.html', context)
+
+
+@login_required
+def map_data_api(request):
+    """API endpoint para obtener datos del mapa (para actualizaciones AJAX)."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    zones_data = []
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute("""
+                SELECT
+                    zona_geografica,
+                    portal,
+                    COUNT(*) as total_leads,
+                    COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio
+                FROM marts.dim_leads
+                WHERE tenant_id = %s
+                  AND zona_geografica IS NOT NULL
+                  AND zona_geografica != ''
+                GROUP BY zona_geografica, portal
+                ORDER BY zona_geografica, total_leads DESC
+            """, [tenant_id])
+            rows = dict_fetchall(cursor)
+
+            # Group by zone
+            zones_dict = {}
+            for row in rows:
+                zona = row['zona_geografica']
+                if zona not in zones_dict:
+                    zones_dict[zona] = {
+                        'nombre': zona,
+                        'total_leads': 0,
+                        'portales': {},
+                        'coords': None,
+                    }
+                zones_dict[zona]['total_leads'] += row['total_leads']
+                zones_dict[zona]['portales'][row['portal']] = {
+                    'count': row['total_leads'],
+                    'precio_medio': round(float(row['precio_medio']), 0),
+                }
+
+            # Add coordinates
+            for zona_nombre, zona_data in zones_dict.items():
+                for slug, preset in ZONAS_PREESTABLECIDAS.items():
+                    if (preset['nombre'].lower() in zona_nombre.lower() or
+                        zona_nombre.lower() in preset['nombre'].lower()):
+                        zona_data['coords'] = {
+                            'lat': preset['lat'],
+                            'lon': preset['lon'],
+                        }
+                        break
+
+                if zona_data['coords']:
+                    zones_data.append(zona_data)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'zones': zones_data})

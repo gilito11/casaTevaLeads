@@ -16,9 +16,11 @@ from scrapers.botasaurus_base import BotasaurusBaseScraper
 logger = logging.getLogger(__name__)
 
 
-# Geographic zones configuration (from existing pisos_scraper.py)
+# Geographic zones configuration
 ZONAS_GEOGRAFICAS = {
-    # Provinces
+    # =============================================================
+    # PROVINCES
+    # =============================================================
     'tarragona_provincia': {
         'nombre': 'Tarragona Provincia',
         'url_path': 'pisos-tarragona',
@@ -27,51 +29,68 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Lleida Provincia',
         'url_path': 'pisos-lleida',
     },
-    # Cities
-    'tarragona_capital': {
-        'nombre': 'Tarragona Capital',
-        'url_path': 'pisos-tarragona_capital',
+
+    # =============================================================
+    # COMARCAS - Composite zones (list of cities to scrape)
+    # =============================================================
+    # -- TARRAGONA COMARCAS --
+    'tarragones': {
+        'nombre': 'Tarragonès',
+        'composite': ['tarragona_capital', 'torredembarra', 'altafulla'],
     },
-    'lleida_capital': {
-        'nombre': 'Lleida Capital',
-        'url_path': 'pisos-lleida_capital',
+    'baix_camp': {
+        'nombre': 'Baix Camp',
+        'composite': ['reus', 'cambrils', 'salou', 'vila_seca'],
     },
-    'salou': {
-        'nombre': 'Salou',
-        'url_path': 'pisos-salou',
+    'alt_camp': {
+        'nombre': 'Alt Camp',
+        'composite': ['valls'],
     },
-    'cambrils': {
-        'nombre': 'Cambrils',
-        'url_path': 'pisos-cambrils',
+    'conca_barbera': {
+        'nombre': 'Conca de Barberà',
+        'composite': ['montblanc'],
     },
-    'reus': {
-        'nombre': 'Reus',
-        'url_path': 'pisos-reus',
+    'baix_penedes': {
+        'nombre': 'Baix Penedès',
+        'composite': ['vendrell', 'calafell'],
     },
-    'calafell': {
-        'nombre': 'Calafell',
-        'url_path': 'pisos-calafell',
+    'baix_ebre': {
+        'nombre': 'Baix Ebre',
+        'composite': ['tortosa'],
     },
-    'torredembarra': {
-        'nombre': 'Torredembarra',
-        'url_path': 'pisos-torredembarra',
+    'montsia': {
+        'nombre': 'Montsià',
+        'composite': ['amposta'],
     },
-    'vendrell': {
-        'nombre': 'El Vendrell',
-        'url_path': 'pisos-el_vendrell',
+    # Costa Daurada (tourist area grouping)
+    'costa_daurada': {
+        'nombre': 'Costa Daurada',
+        'composite': ['salou', 'cambrils', 'tarragona_capital', 'torredembarra', 'calafell', 'vendrell'],
     },
-    'valls': {
-        'nombre': 'Valls',
-        'url_path': 'pisos-valls',
+
+    # -- LLEIDA COMARCAS --
+    'segria': {
+        'nombre': 'Segrià',
+        'composite': ['lleida_capital'],
     },
-    'tortosa': {
-        'nombre': 'Tortosa',
-        'url_path': 'pisos-tortosa',
-    },
-    'amposta': {
-        'nombre': 'Amposta',
-        'url_path': 'pisos-amposta',
-    },
+
+    # =============================================================
+    # CITIES - Single municipality searches
+    # =============================================================
+    'tarragona_capital': {'nombre': 'Tarragona Capital', 'url_path': 'pisos-tarragona_capital'},
+    'lleida_capital': {'nombre': 'Lleida Capital', 'url_path': 'pisos-lleida_capital'},
+    'salou': {'nombre': 'Salou', 'url_path': 'pisos-salou'},
+    'cambrils': {'nombre': 'Cambrils', 'url_path': 'pisos-cambrils'},
+    'reus': {'nombre': 'Reus', 'url_path': 'pisos-reus'},
+    'calafell': {'nombre': 'Calafell', 'url_path': 'pisos-calafell'},
+    'torredembarra': {'nombre': 'Torredembarra', 'url_path': 'pisos-torredembarra'},
+    'vendrell': {'nombre': 'El Vendrell', 'url_path': 'pisos-el_vendrell'},
+    'valls': {'nombre': 'Valls', 'url_path': 'pisos-valls'},
+    'tortosa': {'nombre': 'Tortosa', 'url_path': 'pisos-tortosa'},
+    'amposta': {'nombre': 'Amposta', 'url_path': 'pisos-amposta'},
+    'altafulla': {'nombre': 'Altafulla', 'url_path': 'pisos-altafulla'},
+    'vila_seca': {'nombre': 'Vila-seca', 'url_path': 'pisos-vila_seca'},
+    'montblanc': {'nombre': 'Montblanc', 'url_path': 'pisos-montblanc'},
 }
 
 
@@ -117,12 +136,34 @@ class BotasaurusPisos(BotasaurusBaseScraper):
         return all_listings
 
     def _scrape_zone(self, zona_key: str) -> List[Dict[str, Any]]:
-        """Scrape a single zone."""
+        """Scrape a single zone (or composite zone with multiple cities)."""
+        zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+
+        # Handle composite zones (comarcas) - scrape each city
+        if 'composite' in zona_info:
+            logger.info(f"Composite zone {zona_key}: {zona_info['composite']}")
+            all_listings = []
+            for city_key in zona_info['composite']:
+                if city_key in ZONAS_GEOGRAFICAS:
+                    logger.info(f"  Scraping city: {city_key}")
+                    city_listings = self._scrape_single_zone(city_key, zona_info['nombre'])
+                    all_listings.extend(city_listings)
+                else:
+                    logger.warning(f"  City not found in config: {city_key}")
+            return all_listings
+
+        # Single zone
+        return self._scrape_single_zone(zona_key)
+
+    def _scrape_single_zone(self, zona_key: str, parent_zone_name: str = None) -> List[Dict[str, Any]]:
+        """Scrape a single municipality zone."""
         url = self.build_url(zona_key)
         headless = self.headless
         base_url = self.BASE_URL
         portal = self.PORTAL_NAME
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+        # Use parent zone name for composite zones (comarca name)
+        zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
         @browser(headless=headless, block_images=False)
         def scrape_page(driver: Driver, data: dict):
@@ -166,8 +207,8 @@ class BotasaurusPisos(BotasaurusBaseScraper):
                     'detail_url': detail_url,
                     'url_anuncio': detail_url,
                     'portal': portal,
-                    'zona_busqueda': zona_info.get('nombre', zona_key),
-                    'zona_geografica': zona_info.get('nombre', zona_key),
+                    'zona_busqueda': zone_display_name,
+                    'zona_geografica': zone_display_name,
                 })
 
             return listings

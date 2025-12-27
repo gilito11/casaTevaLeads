@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.http import JsonResponse
 from datetime import timedelta
 
-from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS, ScrapingJob
+from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS, ZONAS_POR_REGION, ScrapingJob
 from leads.models import Lead
 
 
@@ -203,17 +203,24 @@ def scrapers_view(request):
         if tenant:
             zonas = ZonaGeografica.objects.filter(tenant=tenant)
 
-    # Zonas preestablecidas disponibles
-    zonas_disponibles = []
+    # Zonas activas del tenant
     zonas_activas_slugs = [z.slug for z in zonas]
-    for slug, data in ZONAS_PREESTABLECIDAS.items():
-        zonas_disponibles.append({
-            'slug': slug,
-            'nombre': data['nombre'],
-            'lat': data['lat'],
-            'lon': data['lon'],
-            'provincia_id': data.get('provincia_id'),
-            'activa': slug in zonas_activas_slugs,
+
+    # Zonas agrupadas por región
+    zonas_por_region = []
+    for region_key, region_data in ZONAS_POR_REGION.items():
+        region_zonas = []
+        for zona_slug, zona_data in region_data['zonas'].items():
+            region_zonas.append({
+                'slug': zona_slug,
+                'nombre': zona_data['nombre'],
+                'radio_default': zona_data.get('radio_default', 20),
+                'activa': zona_slug in zonas_activas_slugs,
+            })
+        zonas_por_region.append({
+            'key': region_key,
+            'nombre': region_data['nombre'],
+            'zonas': region_zonas,
         })
 
     # Scrapers disponibles (activos con Botasaurus)
@@ -227,7 +234,7 @@ def scrapers_view(request):
     context = {
         'tenant': tenant,
         'zonas': zonas,
-        'zonas_disponibles': zonas_disponibles,
+        'zonas_por_region': zonas_por_region,
         'scrapers': scrapers,
         'running_scrapers': _running_scrapers,
     }
@@ -238,6 +245,8 @@ def scrapers_view(request):
 @login_required
 def add_zona_view(request):
     """Añadir una zona preestablecida al tenant"""
+    is_htmx = request.headers.get('HX-Request') == 'true'
+
     if request.method == 'POST':
         zona_slug = request.POST.get('zona_slug')
         tenant_id = request.session.get('tenant_id')
@@ -249,24 +258,77 @@ def add_zona_view(request):
                     # Verificar si ya existe
                     if not ZonaGeografica.objects.filter(tenant=tenant, slug=zona_slug).exists():
                         ZonaGeografica.crear_desde_preestablecida(tenant, zona_slug)
-                        messages.success(request, f'Zona "{zona_slug}" añadida correctamente')
+                        if not is_htmx:
+                            messages.success(request, f'Zona "{zona_slug}" añadida correctamente')
                     else:
-                        messages.warning(request, f'La zona "{zona_slug}" ya está configurada')
+                        if not is_htmx:
+                            messages.warning(request, f'La zona "{zona_slug}" ya está configurada')
                 except ValueError as e:
-                    messages.error(request, str(e))
+                    if not is_htmx:
+                        messages.error(request, str(e))
+
+    # Para HTMX: devolver ambos paneles actualizados
+    if is_htmx:
+        return zonas_partial_view(request)
 
     return redirect('scrapers')
 
 
 @login_required
+def zonas_partial_view(request):
+    """Vista parcial que devuelve ambos paneles de zonas (HTMX)."""
+    tenant_id = request.session.get('tenant_id')
+    tenant = None
+    zonas = []
+
+    if tenant_id:
+        tenant = Tenant.objects.filter(tenant_id=tenant_id).first()
+        if tenant:
+            zonas = ZonaGeografica.objects.filter(tenant=tenant)
+
+    # Zonas activas del tenant
+    zonas_activas_slugs = [z.slug for z in zonas]
+
+    # Zonas agrupadas por región
+    zonas_por_region = []
+    for region_key, region_data in ZONAS_POR_REGION.items():
+        region_zonas = []
+        for zona_slug, zona_data in region_data['zonas'].items():
+            region_zonas.append({
+                'slug': zona_slug,
+                'nombre': zona_data['nombre'],
+                'radio_default': zona_data.get('radio_default', 20),
+                'activa': zona_slug in zonas_activas_slugs,
+            })
+        zonas_por_region.append({
+            'key': region_key,
+            'nombre': region_data['nombre'],
+            'zonas': region_zonas,
+        })
+
+    context = {
+        'zonas': zonas,
+        'zonas_por_region': zonas_por_region,
+    }
+    return render(request, 'scrapers/partials/zonas_panels.html', context)
+
+
+@login_required
 def remove_zona_view(request, zona_id):
     """Eliminar una zona del tenant"""
+    is_htmx = request.headers.get('HX-Request') == 'true'
     tenant_id = request.session.get('tenant_id')
+
     if tenant_id:
         zona = get_object_or_404(ZonaGeografica, id=zona_id, tenant_id=tenant_id)
         nombre = zona.nombre
         zona.delete()
-        messages.success(request, f'Zona "{nombre}" eliminada')
+        if not is_htmx:
+            messages.success(request, f'Zona "{nombre}" eliminada')
+
+    # Para HTMX: devolver ambos paneles actualizados
+    if is_htmx:
+        return zonas_partial_view(request)
 
     return redirect('scrapers')
 
@@ -703,3 +765,39 @@ def scraping_job_detail_view(request, job_id):
         'started_at': job.started_at.isoformat() if job.started_at else None,
         'completed_at': job.completed_at.isoformat() if job.completed_at else None,
     })
+
+
+@login_required
+def clear_scraping_jobs_view(request):
+    """Limpiar trabajos de scraping completados o con error."""
+    if request.method == 'POST':
+        tenant_id = request.session.get('tenant_id')
+        if tenant_id:
+            # Eliminar jobs que no están en ejecución
+            deleted_count, _ = ScrapingJob.objects.filter(
+                tenant_id=tenant_id,
+                status__in=['completed', 'error']
+            ).delete()
+
+    # Devolver el partial actualizado
+    return scraping_jobs_partial_view(request)
+
+
+@login_required
+def update_zona_radio_view(request, zona_id):
+    """Actualizar el radio de búsqueda de una zona (HTMX)."""
+    if request.method == 'POST':
+        tenant_id = request.session.get('tenant_id')
+        if tenant_id:
+            zona = get_object_or_404(ZonaGeografica, id=zona_id, tenant_id=tenant_id)
+            try:
+                radio_km = int(request.POST.get('radio_km', 20))
+                if 5 <= radio_km <= 50:
+                    zona.radio_km = radio_km
+                    zona.save(update_fields=['radio_km'])
+            except (ValueError, TypeError):
+                pass
+
+    # HTMX swap=none, just return 200
+    from django.http import HttpResponse
+    return HttpResponse(status=200)

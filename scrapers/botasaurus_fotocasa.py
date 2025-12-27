@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 # Geographic zones configuration
 ZONAS_GEOGRAFICAS = {
-    # Provinces
+    # =============================================================
+    # PROVINCES
+    # =============================================================
     'tarragona_provincia': {
         'nombre': 'Tarragona Provincia',
         'url_path': 'tarragona-provincia/todas-las-zonas',
@@ -27,39 +29,97 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Lleida Provincia',
         'url_path': 'lleida-provincia/todas-las-zonas',
     },
-    # Cities
-    'tarragona': {
-        'nombre': 'Tarragona',
-        'url_path': 'tarragona/todas-las-zonas',
+
+    # =============================================================
+    # COMARCAS - Composite zones (list of cities to scrape)
+    # =============================================================
+    # -- TARRAGONA COMARCAS --
+    'tarragones': {
+        'nombre': 'Tarragonès',
+        'composite': ['tarragona', 'torredembarra', 'altafulla'],
     },
-    'lleida': {
-        'nombre': 'Lleida',
-        'url_path': 'lleida/todas-las-zonas',
+    'baix_camp': {
+        'nombre': 'Baix Camp',
+        'composite': ['reus', 'cambrils', 'salou', 'vila_seca', 'miami_platja'],
     },
-    'salou': {
-        'nombre': 'Salou',
-        'url_path': 'salou/todas-las-zonas',
+    'alt_camp': {
+        'nombre': 'Alt Camp',
+        'composite': ['valls'],
     },
-    'cambrils': {
-        'nombre': 'Cambrils',
-        'url_path': 'cambrils/todas-las-zonas',
+    'conca_barbera': {
+        'nombre': 'Conca de Barberà',
+        'composite': ['montblanc'],
     },
-    'reus': {
-        'nombre': 'Reus',
-        'url_path': 'reus/todas-las-zonas',
+    'baix_penedes': {
+        'nombre': 'Baix Penedès',
+        'composite': ['vendrell', 'calafell', 'coma_ruga'],
     },
-    'calafell': {
-        'nombre': 'Calafell',
-        'url_path': 'calafell/todas-las-zonas',
+    'baix_ebre': {
+        'nombre': 'Baix Ebre',
+        'composite': ['tortosa', 'deltebre', 'ametlla_mar'],
     },
-    'torredembarra': {
-        'nombre': 'Torredembarra',
-        'url_path': 'torredembarra/todas-las-zonas',
+    'montsia': {
+        'nombre': 'Montsià',
+        'composite': ['amposta', 'sant_carles_rapita'],
     },
-    'valls': {
-        'nombre': 'Valls',
-        'url_path': 'valls/todas-las-zonas',
+    # Costa Daurada (tourist area grouping)
+    'costa_daurada': {
+        'nombre': 'Costa Daurada',
+        'composite': ['salou', 'cambrils', 'tarragona', 'torredembarra', 'altafulla', 'calafell', 'vendrell', 'miami_platja'],
     },
+
+    # -- LLEIDA COMARCAS --
+    'segria': {
+        'nombre': 'Segrià',
+        'composite': ['lleida'],
+    },
+    'noguera': {
+        'nombre': 'Noguera',
+        'composite': ['balaguer'],
+    },
+    'pla_urgell': {
+        'nombre': "Pla d'Urgell",
+        'composite': ['mollerussa'],
+    },
+    'urgell': {
+        'nombre': 'Urgell',
+        'composite': ['tarrega'],
+    },
+    'pallars_jussa': {
+        'nombre': 'Pallars Jussà',
+        'composite': ['tremp'],
+    },
+
+    # =============================================================
+    # CITIES - Single municipality searches
+    # =============================================================
+    # -- LLEIDA CITIES --
+    'lleida': {'nombre': 'Lleida', 'url_path': 'lleida/todas-las-zonas'},
+    'balaguer': {'nombre': 'Balaguer', 'url_path': 'balaguer/todas-las-zonas'},
+    'mollerussa': {'nombre': 'Mollerussa', 'url_path': 'mollerussa/todas-las-zonas'},
+    'tremp': {'nombre': 'Tremp', 'url_path': 'tremp/todas-las-zonas'},
+    'tarrega': {'nombre': 'Tàrrega', 'url_path': 'tarrega/todas-las-zonas'},
+
+    # -- TARRAGONA CITIES --
+    'tarragona': {'nombre': 'Tarragona', 'url_path': 'tarragona/todas-las-zonas'},
+    'reus': {'nombre': 'Reus', 'url_path': 'reus/todas-las-zonas'},
+    'salou': {'nombre': 'Salou', 'url_path': 'salou/todas-las-zonas'},
+    'cambrils': {'nombre': 'Cambrils', 'url_path': 'cambrils/todas-las-zonas'},
+    'miami_platja': {'nombre': 'Miami Platja', 'url_path': 'miami-platja/todas-las-zonas'},
+    'hospitalet_infant': {'nombre': "L'Hospitalet de l'Infant", 'url_path': 'l-hospitalet-de-l-infant/todas-las-zonas'},
+    'calafell': {'nombre': 'Calafell', 'url_path': 'calafell/todas-las-zonas'},
+    'vendrell': {'nombre': 'El Vendrell', 'url_path': 'el-vendrell/todas-las-zonas'},
+    'altafulla': {'nombre': 'Altafulla', 'url_path': 'altafulla/todas-las-zonas'},
+    'torredembarra': {'nombre': 'Torredembarra', 'url_path': 'torredembarra/todas-las-zonas'},
+    'coma_ruga': {'nombre': 'Coma-ruga', 'url_path': 'coma-ruga/todas-las-zonas'},
+    'vila_seca': {'nombre': 'Vila-seca', 'url_path': 'vila-seca/todas-las-zonas'},
+    'valls': {'nombre': 'Valls', 'url_path': 'valls/todas-las-zonas'},
+    'montblanc': {'nombre': 'Montblanc', 'url_path': 'montblanc/todas-las-zonas'},
+    'tortosa': {'nombre': 'Tortosa', 'url_path': 'tortosa/todas-las-zonas'},
+    'amposta': {'nombre': 'Amposta', 'url_path': 'amposta/todas-las-zonas'},
+    'deltebre': {'nombre': 'Deltebre', 'url_path': 'deltebre/todas-las-zonas'},
+    'ametlla_mar': {'nombre': "L'Ametlla de Mar", 'url_path': 'l-ametlla-de-mar/todas-las-zonas'},
+    'sant_carles_rapita': {'nombre': 'Sant Carles de la Ràpita', 'url_path': 'sant-carles-de-la-rapita/todas-las-zonas'},
 }
 
 
@@ -108,12 +168,34 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         return all_listings
 
     def _scrape_zone(self, zona_key: str) -> List[Dict[str, Any]]:
-        """Scrape a single zone."""
+        """Scrape a single zone (or composite zone with multiple cities)."""
+        zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+
+        # Handle composite zones (comarcas) - scrape each city
+        if 'composite' in zona_info:
+            logger.info(f"Composite zone {zona_key}: {zona_info['composite']}")
+            all_listings = []
+            for city_key in zona_info['composite']:
+                if city_key in ZONAS_GEOGRAFICAS:
+                    logger.info(f"  Scraping city: {city_key}")
+                    city_listings = self._scrape_single_zone(city_key, zona_info['nombre'])
+                    all_listings.extend(city_listings)
+                else:
+                    logger.warning(f"  City not found in config: {city_key}")
+            return all_listings
+
+        # Single zone
+        return self._scrape_single_zone(zona_key)
+
+    def _scrape_single_zone(self, zona_key: str, parent_zone_name: str = None) -> List[Dict[str, Any]]:
+        """Scrape a single municipality zone."""
         url = self.build_url(zona_key)
         headless = self.headless
         base_url = self.BASE_URL
         portal = self.PORTAL_NAME
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+        # Use parent zone name for composite zones (comarca name)
+        zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
         @browser(headless=headless, block_images=False)
         def scrape_page(driver: Driver, data: dict):
@@ -159,8 +241,8 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                     'detail_url': detail_url,
                     'url_anuncio': detail_url,
                     'portal': portal,
-                    'zona_busqueda': zona_info.get('nombre', zona_key),
-                    'zona_geografica': zona_info.get('nombre', zona_key),
+                    'zona_busqueda': zone_display_name,
+                    'zona_geografica': zone_display_name,
                 })
 
             return listings
@@ -285,16 +367,67 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                         seen.add(photo_base)
                 listing['fotos'] = unique_photos[:10]
 
-                # Check if particular or agency
-                is_particular = 'particular' in html.lower()
-                is_agency = 'inmobiliaria' in html.lower() or 'agencia' in html.lower()
+                # Check if particular or agency - look for specific contact box patterns
+                # Fotocasa shows agency logo in contact form with specific patterns
 
-                if is_agency and not is_particular:
-                    listing['vendedor'] = 'Inmobiliaria'
+                # PRIMARY: Agency logo in contact form (most reliable)
+                # Pattern: <a class="...re-FormContactDetail-logo..." href="/es/inmobiliaria-...">
+                has_agency_logo = bool(re.search(
+                    r'class="[^"]*re-FormContactDetail-logo[^"]*"',
+                    html, re.IGNORECASE
+                ))
+
+                # Agency URL pattern in contact section
+                has_agency_url = bool(re.search(
+                    r'href="[^"]*/(inmobiliaria-|agencia-|profesional-)[^"]*"',
+                    html, re.IGNORECASE
+                ))
+
+                # "Anunciante profesional" text
+                is_professional_text = bool(re.search(
+                    r'anunciante\s+profesional',
+                    html, re.IGNORECASE
+                ))
+
+                # Secondary checks for agency indicators
+                agency_patterns = [
+                    r'profesional\s+inmobiliario',
+                    r'agencia\s+inmobiliaria',
+                    r'RE/MAX|Century\s*21|Tecnocasa|Engel\s*&\s*Völkers|Keller\s*Williams|INMOSEGUR',
+                    r'class="[^"]*advertiser-professional[^"]*"',
+                    r'class="[^"]*agency-logo[^"]*"',
+                    r'class="[^"]*professional-badge[^"]*"',
+                    r'alt="[^"]*inmobiliaria[^"]*"',  # Image alt text with "inmobiliaria"
+                    r'title="[^"]*inmobiliaria[^"]*"',  # Title with "inmobiliaria"
+                ]
+
+                has_agency_indicator = any(
+                    re.search(pattern, html, re.IGNORECASE)
+                    for pattern in agency_patterns
+                )
+
+                # Check for explicit "Particular" label
+                is_particular_explicit = bool(re.search(
+                    r'>Particular<|anunciante:\s*particular|vendedor\s+particular',
+                    html, re.IGNORECASE
+                ))
+
+                # Final determination: is agency if ANY agency indicator found AND not explicitly particular
+                is_agency = (has_agency_logo or has_agency_url or is_professional_text or has_agency_indicator) and not is_particular_explicit
+
+                if is_agency:
+                    listing['vendedor'] = 'Profesional'
                     listing['es_particular'] = False
+                    reason = []
+                    if has_agency_logo: reason.append('logo')
+                    if has_agency_url: reason.append('url')
+                    if is_professional_text: reason.append('text')
+                    if has_agency_indicator: reason.append('pattern')
+                    logger.info(f"FILTERED ({','.join(reason)}): {listing.get('titulo', 'N/A')[:50]}")
                 else:
                     listing['vendedor'] = 'Particular'
                     listing['es_particular'] = True
+                    logger.info(f"ACCEPTED (Particular): {listing.get('titulo', 'N/A')[:50]}")
 
                 results.append(listing)
 
