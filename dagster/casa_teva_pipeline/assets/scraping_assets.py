@@ -254,11 +254,17 @@ def run_scraper(
         )
 
         if result.returncode != 0:
-            context.log.error(f"Error en {scraper_name}: {result.stderr[:500]}")
+            # Capture last 2000 chars of both stderr and stdout for debugging
+            error_msg = result.stderr[-2000:] if result.stderr else ''
+            stdout_msg = result.stdout[-1000:] if result.stdout else ''
+            context.log.error(f"Error en {scraper_name} (returncode={result.returncode})")
+            context.log.error(f"STDERR: {error_msg}")
+            if stdout_msg:
+                context.log.error(f"STDOUT (last 1000): {stdout_msg}")
             return {
                 'scraper': scraper_name,
                 'status': 'error',
-                'error': result.stderr[:500],
+                'error': error_msg,
                 'zones': zones,
                 'leads_found': 0,
             }
