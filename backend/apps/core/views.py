@@ -460,7 +460,7 @@ def _run_all_scrapers_process(tenant_id, zonas, scraper_key):
                 [sys.executable, script_path, '--zones', zone_slugs, '--postgres'],
                 capture_output=True,
                 text=True,
-                timeout=1800,  # 30 minutos timeout para todas las zonas
+                timeout=2700,  # 45 minutos timeout (Botasaurus con --single-process es más lento)
                 cwd=project_root,
                 env=scraper_env
             )

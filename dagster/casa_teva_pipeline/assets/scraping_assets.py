@@ -248,7 +248,7 @@ def run_scraper(
             cmd,
             capture_output=True,
             text=True,
-            timeout=1800,  # 30 minutos timeout
+            timeout=2700,  # 45 minutos timeout (Botasaurus con --single-process es más lento)
             cwd=project_root,
             env=env,
         )
