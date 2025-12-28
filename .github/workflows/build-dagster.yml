@@ -1,5 +1,5 @@
-# Build and push Dagster image to Azure Container Registry
-name: Build Dagster Image
+# Build, push and deploy Dagster image to Azure Container Apps
+name: Build and Deploy Dagster
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
       - 'Dockerfile'
       - 'dagster/**'
       - 'scrapers/**'
+      - 'run_*_scraper.py'
       - 'requirements.txt'
       - '.github/workflows/build-dagster.yml'
   workflow_dispatch:  # Permite ejecutar manualmente
@@ -16,6 +17,8 @@ on:
 env:
   REGISTRY: inmoleadsacr.azurecr.io
   IMAGE_NAME: casa-teva-dagster
+  CONTAINER_APP_NAME: dagster-scrapers
+  RESOURCE_GROUP: inmoleads-crm
 
 jobs:
   build-and-push:
@@ -55,3 +58,35 @@ jobs:
       - name: Output image info
         run: |
           echo "Image pushed to: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Generate revision suffix
+        id: revision
+        run: echo "suffix=$(date +'%b%d%H%M' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --revision-suffix ${{ steps.revision.outputs.suffix }}
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          az containerapp revision list \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[0].{name:name, status:properties.runningState, health:properties.healthState}" \
+            -o table
