@@ -290,7 +290,16 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         # Use parent zone name for composite zones (comarca name)
         zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
-        @browser(headless=headless, block_images=True)
+        # Chrome flags for container environments
+        container_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-setuid-sandbox',
+            '--single-process',
+        ]
+
+        @browser(headless=headless, block_images=True, add_arguments=container_args)
         def scrape_page(driver: Driver, data: dict):
             url = data['url']
 
@@ -361,7 +370,16 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         """Fetch detail pages to extract more info."""
         headless = self.headless
 
-        @browser(headless=headless, block_images=True)
+        # Chrome flags for container environments
+        container_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-setuid-sandbox',
+            '--single-process',
+        ]
+
+        @browser(headless=headless, block_images=True, add_arguments=container_args)
         def fetch_details(driver: Driver, data: dict):
             results = []
 

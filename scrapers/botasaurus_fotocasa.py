@@ -202,7 +202,16 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         # Use parent zone name for composite zones (comarca name)
         zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
-        @browser(headless=headless, block_images=False)
+        # Chrome flags for container environments
+        container_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-setuid-sandbox',
+            '--single-process',
+        ]
+
+        @browser(headless=headless, block_images=False, add_arguments=container_args)
         def scrape_page(driver: Driver, data: dict):
             url = data['url']
 
@@ -288,8 +297,17 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                 logger.info(f"Waiting {delay:.1f}s before next request...")
                 time.sleep(delay)
 
+            # Chrome flags for container environments
+            container_args = [
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-setuid-sandbox',
+                '--single-process',
+            ]
+
             # Create a new browser session for each listing
-            @browser(headless=headless, block_images=False, reuse_driver=False)
+            @browser(headless=headless, block_images=False, reuse_driver=False, add_arguments=container_args)
             def fetch_single_detail(driver: Driver, data: dict):
                 try:
                     driver.get(data['url'])

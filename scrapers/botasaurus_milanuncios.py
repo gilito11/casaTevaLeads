@@ -336,11 +336,21 @@ class BotasaurusMilanuncios(BotasaurusBaseScraper):
         should_scrape_func = self.should_scrape
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
+        # Chrome flags for container environments
+        container_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-setuid-sandbox',
+            '--single-process',
+        ]
+
         # Use full stealth mode with realistic user agent
         @browser(
             headless=headless,
             block_images=False,  # Need images for photos
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            add_arguments=container_args,
         )
         def scrape_zone_by_clicking(driver: Driver, data: dict):
             url = data['url']
