@@ -98,6 +98,79 @@ ZONA_MAPPING_PISOS = {
     'sant_carles_rapita': 'tarragona_provincia',
 }
 
+# Mapping para Habitaclia (Botasaurus)
+ZONA_MAPPING_HABITACLIA = {
+    # Lleida
+    'lleida_ciudad': 'lleida',
+    'lleida_20km': 'lleida_provincia',
+    'lleida_30km': 'lleida_provincia',
+    'lleida_40km': 'lleida_provincia',
+    'lleida_50km': 'lleida_provincia',
+    'balaguer': 'balaguer',
+    'mollerussa': 'mollerussa',
+    'tarrega': 'tarrega',
+    # Tarragona
+    'tarragona_ciudad': 'tarragona',
+    'tarragona_20km': 'tarragona_provincia',
+    'tarragona_30km': 'tarragona_provincia',
+    'tarragona_40km': 'tarragona_provincia',
+    'tarragona_50km': 'tarragona_provincia',
+    # Costa Daurada
+    'salou': 'salou',
+    'cambrils': 'cambrils',
+    'reus': 'reus',
+    'vendrell': 'vendrell',
+    'calafell': 'calafell',
+    'torredembarra': 'torredembarra',
+    'altafulla': 'altafulla',
+    'miami_platja': 'miami_platja',
+    'vila_seca': 'vila-seca',
+    'valls': 'valls',
+    'montblanc': 'montblanc',
+    # Terres de l'Ebre
+    'tortosa': 'tortosa',
+    'amposta': 'amposta',
+    'sant_carles_rapita': 'sant_carles_de_la_rapita',
+}
+
+# Mapping para Fotocasa (Botasaurus)
+ZONA_MAPPING_FOTOCASA = {
+    # Lleida
+    'lleida_ciudad': 'lleida',
+    'lleida_20km': 'lleida_provincia',
+    'lleida_30km': 'lleida_provincia',
+    'lleida_40km': 'lleida_provincia',
+    'lleida_50km': 'lleida_provincia',
+    'balaguer': 'balaguer',
+    'mollerussa': 'mollerussa',
+    'tarrega': 'tarrega',
+    'tremp': 'tremp',
+    # Tarragona
+    'tarragona_ciudad': 'tarragona',
+    'tarragona_20km': 'tarragona_provincia',
+    'tarragona_30km': 'tarragona_provincia',
+    'tarragona_40km': 'tarragona_provincia',
+    'tarragona_50km': 'tarragona_provincia',
+    # Costa Daurada
+    'salou': 'salou',
+    'cambrils': 'cambrils',
+    'reus': 'reus',
+    'vendrell': 'vendrell',
+    'calafell': 'calafell',
+    'torredembarra': 'torredembarra',
+    'altafulla': 'altafulla',
+    'miami_platja': 'miami_platja',
+    'vila_seca': 'vila_seca',
+    'valls': 'valls',
+    'montblanc': 'montblanc',
+    # Terres de l'Ebre
+    'tortosa': 'tortosa',
+    'amposta': 'amposta',
+    'deltebre': 'deltebre',
+    'ametlla_mar': 'ametlla_mar',
+    'sant_carles_rapita': 'sant_carles_rapita',
+}
+
 
 def get_project_root() -> str:
     """Obtiene el directorio raíz del proyecto."""
@@ -310,6 +383,34 @@ def scraping_all_portals(
         # Ejecutar Pisos.com
         if pisos_zones:
             result = run_scraper(context, 'pisos', pisos_zones, tenant_id)
+            all_results.append(result)
+            total_leads += result.get('leads_found', 0)
+
+        # Mapear zonas para Habitaclia (Botasaurus)
+        habitaclia_zones = []
+        for slug in zone_slugs:
+            if slug in ZONA_MAPPING_HABITACLIA:
+                mapped = ZONA_MAPPING_HABITACLIA[slug]
+                if mapped not in habitaclia_zones:
+                    habitaclia_zones.append(mapped)
+
+        # Ejecutar Habitaclia
+        if habitaclia_zones:
+            result = run_scraper(context, 'habitaclia', habitaclia_zones, tenant_id)
+            all_results.append(result)
+            total_leads += result.get('leads_found', 0)
+
+        # Mapear zonas para Fotocasa (Botasaurus)
+        fotocasa_zones = []
+        for slug in zone_slugs:
+            if slug in ZONA_MAPPING_FOTOCASA:
+                mapped = ZONA_MAPPING_FOTOCASA[slug]
+                if mapped not in fotocasa_zones:
+                    fotocasa_zones.append(mapped)
+
+        # Ejecutar Fotocasa
+        if fotocasa_zones:
+            result = run_scraper(context, 'fotocasa', fotocasa_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 

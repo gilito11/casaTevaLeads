@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """
-Script para ejecutar el scraper de Fotocasa con Botasaurus.
+Script para ejecutar el scraper de Habitaclia con Botasaurus.
 
 Uso:
-    python run_fotocasa_scraper.py [--zones ZONE1 ZONE2] [--postgres] [--tenant-id=1]
+    python run_habitaclia_scraper.py [--zones ZONE1 ZONE2] [--postgres] [--tenant-id=1]
 
 Ejemplos:
-    python run_fotocasa_scraper.py --zones salou
-    python run_fotocasa_scraper.py --zones costa_daurada --postgres
-    python run_fotocasa_scraper.py --zones baix_camp tarragones --postgres
+    python run_habitaclia_scraper.py --zones salou
+    python run_habitaclia_scraper.py --zones costa_daurada --postgres
+    python run_habitaclia_scraper.py --zones baix_camp tarragones --postgres
 """
 
 import sys
@@ -19,8 +19,8 @@ import logging
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from scrapers.botasaurus_fotocasa import (
-    BotasaurusFotocasa,
+from scrapers.botasaurus_habitaclia import (
+    BotasaurusHabitaclia,
     ZONAS_GEOGRAFICAS,
 )
 
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Ejecutar scraper de Fotocasa (Botasaurus)',
+        description='Ejecutar scraper de Habitaclia (Botasaurus)',
     )
     parser.add_argument(
         '--zones',
@@ -67,11 +67,11 @@ def main():
     args = parser.parse_args()
 
     if args.list_zones:
-        print("\nZonas disponibles en Fotocasa:")
+        print("\nZonas disponibles en Habitaclia:")
         print("-" * 50)
         print("\nPROVINCIAS:")
         for key, zona in ZONAS_GEOGRAFICAS.items():
-            if 'provincia' in key:
+            if zona.get('is_province'):
                 print(f"  {key:25} - {zona['nombre']}")
         print("\nCOMARCAS:")
         for key, zona in ZONAS_GEOGRAFICAS.items():
@@ -82,7 +82,7 @@ def main():
                 print(f"  {key:25} - {zona['nombre']} [{cities}]")
         print("\nCIUDADES:")
         for key, zona in ZONAS_GEOGRAFICAS.items():
-            if 'url_path' in zona and 'provincia' not in key:
+            if 'url_slug' in zona and not zona.get('is_province'):
                 print(f"  {key:25} - {zona['nombre']}")
         return
 
@@ -119,14 +119,14 @@ def main():
             }
 
     print(f"\n{'='*60}")
-    print("SCRAPER DE FOTOCASA (Botasaurus)")
+    print("SCRAPER DE HABITACLIA (Botasaurus)")
     print(f"{'='*60}")
     print(f"Tenant ID: {args.tenant_id}")
     print(f"Zonas: {', '.join(args.zones)}")
     print(f"PostgreSQL: {'Habilitado' if args.postgres else 'Deshabilitado'}")
     print(f"{'='*60}\n")
 
-    with BotasaurusFotocasa(
+    with BotasaurusHabitaclia(
         tenant_id=args.tenant_id,
         zones=args.zones,
         postgres_config=postgres_config,
