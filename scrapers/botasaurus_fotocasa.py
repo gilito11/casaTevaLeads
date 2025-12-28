@@ -161,8 +161,13 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
 
         for zona_key in self.zones:
             logger.info(f"Scraping zone: {zona_key}")
-            listings = self._scrape_zone(zona_key)
-            all_listings.extend(listings)
+            try:
+                listings = self._scrape_zone(zona_key)
+                all_listings.extend(listings)
+                logger.info(f"Zone {zona_key}: {len(listings)} listings")
+            except Exception as e:
+                logger.error(f"Failed to scrape zone {zona_key}: {e}")
+                continue  # Continue with next zone
 
         logger.info(f"Total listings scraped: {len(all_listings)}")
         return all_listings
@@ -247,13 +252,22 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
 
             return listings
 
-        basic_listings = scrape_page({'url': url})
+        try:
+            basic_listings = scrape_page({'url': url})
+        except Exception as e:
+            logger.error(f"Error scraping {zona_key}: {e}")
+            return []
 
         if not basic_listings:
             return []
 
         # Enrich with detail page data
-        enriched_listings = self._enrich_listings(basic_listings[:10])  # Limit for speed
+        try:
+            enriched_listings = self._enrich_listings(basic_listings[:10])  # Limit for speed
+        except Exception as e:
+            logger.error(f"Error enriching listings for {zona_key}: {e}")
+            # Return basic listings without enrichment
+            return basic_listings[:10]
 
         return enriched_listings
 
