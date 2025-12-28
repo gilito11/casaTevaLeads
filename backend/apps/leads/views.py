@@ -58,6 +58,23 @@ def lead_list_view(request):
     if zona:
         leads_qs = leads_qs.filter(zona_geografica=zona)
 
+    # Filtrar por estado usando LeadEstado
+    if estado:
+        # Obtener lead_ids que tienen el estado especificado en LeadEstado
+        lead_ids_with_estado = LeadEstado.objects.filter(
+            estado=estado
+        ).values_list('lead_id', flat=True)
+
+        if estado == 'NUEVO':
+            # Para estado NUEVO: leads que no tienen LeadEstado O tienen estado NUEVO
+            leads_qs = leads_qs.filter(
+                Q(lead_id__in=[lid for lid in lead_ids_with_estado]) |
+                ~Q(lead_id__in=LeadEstado.objects.values_list('lead_id', flat=True))
+            )
+        else:
+            # Para otros estados: solo los que tienen ese estado en LeadEstado
+            leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_with_estado])
+
     # Ordenar
     leads_qs = leads_qs.order_by('-fecha_scraping')
 
@@ -77,21 +94,19 @@ def lead_list_view(request):
     for lead in leads:
         lead.estado_actual = lead_estados.get(str(lead.lead_id), lead.estado)
 
-    # Filtrar por estado después de obtener estados reales
-    if estado:
-        # Filtrar leads cuyo estado_actual coincida
-        leads_filtered = [l for l in leads if l.estado_actual == estado]
-        # Recalcular total para el filtro de estado
-        # Nota: Este filtro es aproximado, idealmente se haría en la query
-
-    # Zonas para filtro
-    zonas = Lead.objects.values_list('zona_geografica', flat=True).distinct()
+    # Zonas para filtro - obtener zonas únicas no vacías
+    zonas = (Lead.objects
+             .exclude(zona_geografica__isnull=True)
+             .exclude(zona_geografica='')
+             .values_list('zona_geografica', flat=True)
+             .distinct()
+             .order_by('zona_geografica'))
 
     context = {
         'leads': leads,
         'total_leads': paginator.count,
         'estados': Lead.ESTADO_CHOICES,
-        'zonas': zonas,
+        'zonas': list(zonas),
     }
 
     # Si es peticion HTMX, devolver solo la tabla
