@@ -6,7 +6,7 @@ casa_teva:
   outputs:
     dev:
       type: postgres
-      host: localhost
+      host: "{{ env_var('DBT_HOST', 'postgres') }}"
       port: 5432
       user: casa_teva
       password: "{{ env_var('CASA_TEVA_DB_PASSWORD', 'casateva2024') }}"
