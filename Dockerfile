@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Stage 3: Runtime - imagen final
 FROM base as runtime
 
-# Instalar dependencias de Playwright y Google Chrome para Botasaurus
+# Instalar dependencias de Playwright, Botasaurus y Camoufox
 RUN apt-get update && apt-get install -y \
     libnss3 \
     libnspr4 \
@@ -53,6 +53,10 @@ RUN apt-get update && apt-get install -y \
     libatspi2.0-0 \
     wget \
     gnupg \
+    # Camoufox dependencies (Firefox-based anti-detect browser)
+    xvfb \
+    libgtk-3-0 \
+    libdbus-glib-1-2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar Google Chrome para Botasaurus

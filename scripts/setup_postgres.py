@@ -131,7 +131,7 @@ def create_raw_listings_table(conn):
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
         -- Constraints
-        CONSTRAINT valid_portal CHECK (portal IN ('fotocasa', 'milanuncios', 'wallapop'))
+        CONSTRAINT valid_portal CHECK (portal IN ('fotocasa', 'milanuncios', 'wallapop', 'pisos', 'habitaclia', 'idealista'))
     );
     """
 

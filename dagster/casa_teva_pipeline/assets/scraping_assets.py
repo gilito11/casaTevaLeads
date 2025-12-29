@@ -463,31 +463,30 @@ def scraping_all_portals(
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
-        # === ScrapingBee scrapers (only if API key is configured) ===
+        # === Milanuncios with ScrapingBee (if API key is configured) ===
         if is_scrapingbee_enabled():
-            context.log.info("ScrapingBee API key detected, running premium scrapers")
-
-            # Ejecutar Milanuncios con ScrapingBee (replaces Botasaurus version)
+            context.log.info("ScrapingBee API key detected, running Milanuncios with ScrapingBee")
             if milanuncios_zones:
                 result = run_scraper(context, 'scrapingbee_milanuncios', milanuncios_zones, tenant_id)
                 all_results.append(result)
                 total_leads += result.get('leads_found', 0)
-
-            # Mapear zonas para Idealista (ScrapingBee)
-            idealista_zones = []
-            for slug in zone_slugs:
-                if slug in ZONA_MAPPING_IDEALISTA:
-                    mapped = ZONA_MAPPING_IDEALISTA[slug]
-                    if mapped not in idealista_zones:
-                        idealista_zones.append(mapped)
-
-            # Ejecutar Idealista con ScrapingBee
-            if idealista_zones:
-                result = run_scraper(context, 'scrapingbee_idealista', idealista_zones, tenant_id)
-                all_results.append(result)
-                total_leads += result.get('leads_found', 0)
         else:
-            context.log.info("ScrapingBee API key not configured, skipping Milanuncios and Idealista")
+            context.log.info("ScrapingBee API key not configured, skipping Milanuncios")
+
+        # === Idealista with Camoufox (FREE - no API key needed) ===
+        # Camoufox is an open-source anti-detect browser that bypasses DataDome
+        idealista_zones = []
+        for slug in zone_slugs:
+            if slug in ZONA_MAPPING_IDEALISTA:
+                mapped = ZONA_MAPPING_IDEALISTA[slug]
+                if mapped not in idealista_zones:
+                    idealista_zones.append(mapped)
+
+        if idealista_zones:
+            context.log.info("Running Idealista with Camoufox (free anti-detect browser)")
+            result = run_scraper(context, 'camoufox_idealista', idealista_zones, tenant_id)
+            all_results.append(result)
+            total_leads += result.get('leads_found', 0)
 
     # Preparar resumen
     completed = sum(1 for r in all_results if r['status'] == 'completed')
