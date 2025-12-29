@@ -94,7 +94,6 @@ COPY --chown=casateva:casateva dbt_project/ /app/dbt_project/
 COPY --chown=casateva:casateva scrapers/ /app/scrapers/
 COPY --chown=casateva:casateva scripts/ /app/scripts/
 COPY --chown=casateva:casateva run_*_scraper.py /app/
-COPY --chown=casateva:casateva run_camoufox_*.py /app/
 COPY --chown=casateva:casateva run_all_scrapers.py /app/
 COPY --chown=casateva:casateva scrapy.cfg /app/
 
