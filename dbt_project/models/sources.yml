@@ -3,11 +3,10 @@ version: 2
 sources:
   - name: raw
     description: "Raw data layer containing scraped listings from various portals"
-    database: casa_teva_db
     schema: raw
     tables:
       - name: raw_listings
-        description: "Raw listings scraped from real estate portals (Fotocasa, Milanuncios, Wallapop)"
+        description: "Raw listings scraped from real estate portals"
         columns:
           - name: id
             description: "Primary key - auto-incrementing ID"
@@ -21,11 +20,11 @@ sources:
               - not_null
 
           - name: portal
-            description: "Source portal name (fotocasa, milanuncios, wallapop)"
+            description: "Source portal name"
             tests:
               - not_null
               - accepted_values:
-                  values: ['fotocasa', 'milanuncios', 'wallapop']
+                  values: ['fotocasa', 'milanuncios', 'wallapop', 'habitaclia', 'pisos']
 
           - name: data_lake_path
             description: "Path to the JSON file in MinIO Data Lake"

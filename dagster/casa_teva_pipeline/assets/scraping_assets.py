@@ -454,10 +454,110 @@ def scraping_all_portals(
 
 
 @asset(
+    description="Ejecuta dbt para transformar raw -> staging -> marts",
+    compute_kind="dbt",
+    group_name="transform",
+    deps=["scraping_all_portals"],
+)
+def dbt_transform(
+    context: AssetExecutionContext,
+) -> Output[Dict[str, Any]]:
+    """
+    Ejecuta dbt run para transformar los datos de raw a marts.
+
+    Flujo: raw.raw_listings -> staging.stg_* -> marts.dim_leads
+    """
+    context.log.info("Iniciando transformación dbt...")
+
+    # Parse DATABASE_URL para obtener credenciales
+    database_url = os.environ.get('DATABASE_URL', '')
+
+    dbt_env = os.environ.copy()
+
+    if database_url and 'azure' in database_url:
+        from urllib.parse import urlparse
+        parsed = urlparse(database_url)
+        dbt_env['DBT_HOST'] = parsed.hostname or 'localhost'
+        dbt_env['DBT_PORT'] = str(parsed.port or 5432)
+        dbt_env['DBT_USER'] = parsed.username or ''
+        dbt_env['DBT_PASSWORD'] = parsed.password or ''
+        dbt_env['DBT_DATABASE'] = parsed.path.lstrip('/') if parsed.path else ''
+        dbt_env['DBT_SSLMODE'] = 'require'
+        context.log.info(f"Configurado para Azure: {dbt_env['DBT_HOST']}")
+    else:
+        # Local/Docker config
+        dbt_env['DBT_HOST'] = os.environ.get('POSTGRES_HOST', 'postgres')
+        dbt_env['DBT_PORT'] = os.environ.get('POSTGRES_PORT', '5432')
+        dbt_env['DBT_USER'] = os.environ.get('POSTGRES_USER', 'casa_teva')
+        dbt_env['DBT_PASSWORD'] = os.environ.get('POSTGRES_PASSWORD', 'casateva2024')
+        dbt_env['DBT_DATABASE'] = os.environ.get('POSTGRES_DB', 'casa_teva_db')
+        dbt_env['DBT_SSLMODE'] = 'prefer'
+        context.log.info(f"Configurado para local: {dbt_env['DBT_HOST']}")
+
+    # Ejecutar dbt run
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    dbt_project_dir = os.path.join(project_root, 'dbt_project')
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable, '-m', 'dbt', 'run',
+                '--project-dir', dbt_project_dir,
+                '--profiles-dir', dbt_project_dir,
+                '--target', 'prod',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 minutos
+            env=dbt_env,
+            cwd=dbt_project_dir,
+        )
+
+        if result.returncode != 0:
+            context.log.error(f"dbt run falló: {result.stderr[-1000:]}")
+            return Output(
+                value={
+                    'status': 'error',
+                    'error': result.stderr[-500:],
+                    'stdout': result.stdout[-500:],
+                },
+                metadata={
+                    'status': MetadataValue.text('ERROR'),
+                }
+            )
+
+        context.log.info("dbt run completado exitosamente")
+        context.log.info(result.stdout[-1000:] if result.stdout else "No output")
+
+        return Output(
+            value={
+                'status': 'success',
+                'output': result.stdout[-1000:] if result.stdout else '',
+            },
+            metadata={
+                'status': MetadataValue.text('SUCCESS'),
+            }
+        )
+
+    except subprocess.TimeoutExpired:
+        context.log.error("dbt run excedió el timeout")
+        return Output(
+            value={'status': 'timeout'},
+            metadata={'status': MetadataValue.text('TIMEOUT')}
+        )
+    except Exception as e:
+        context.log.error(f"Error ejecutando dbt: {e}")
+        return Output(
+            value={'status': 'error', 'error': str(e)},
+            metadata={'status': MetadataValue.text('ERROR')}
+        )
+
+
+@asset(
     description="Estadísticas del último scraping",
     compute_kind="python",
     group_name="reporting",
-    deps=["scraping_all_portals"],
+    deps=["dbt_transform"],
 )
 def scraping_stats(
     context: AssetExecutionContext,
