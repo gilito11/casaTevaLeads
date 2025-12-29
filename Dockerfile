@@ -76,6 +76,9 @@ RUN mkdir -p /opt/playwright && \
     playwright install chromium && \
     chmod -R 755 /opt/playwright
 
+# Descargar browser de Camoufox (Firefox anti-detect)
+RUN camoufox fetch
+
 # Crear directorios
 WORKDIR /app
 RUN mkdir -p /app/backend /app/dagster /app/dbt_project /app/scrapers
@@ -91,6 +94,7 @@ COPY --chown=casateva:casateva dbt_project/ /app/dbt_project/
 COPY --chown=casateva:casateva scrapers/ /app/scrapers/
 COPY --chown=casateva:casateva scripts/ /app/scripts/
 COPY --chown=casateva:casateva run_*_scraper.py /app/
+COPY --chown=casateva:casateva run_camoufox_*.py /app/
 COPY --chown=casateva:casateva run_all_scrapers.py /app/
 COPY --chown=casateva:casateva scrapy.cfg /app/
 

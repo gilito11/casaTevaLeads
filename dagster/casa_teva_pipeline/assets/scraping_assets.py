@@ -171,7 +171,7 @@ ZONA_MAPPING_FOTOCASA = {
     'sant_carles_rapita': 'sant_carles_rapita',
 }
 
-# Mapping para Idealista (ScrapingBee - stealth proxy)
+# Mapping para Idealista (Camoufox - free anti-detect browser)
 ZONA_MAPPING_IDEALISTA = {
     # Lleida
     'lleida_ciudad': 'lleida',
@@ -207,12 +207,6 @@ ZONA_MAPPING_IDEALISTA = {
     'deltebre': 'deltebre',
     'sant_carles_rapita': 'sant_carles_rapita',
 }
-
-# Check if ScrapingBee is enabled
-def is_scrapingbee_enabled() -> bool:
-    """Check if ScrapingBee API key is configured."""
-    return bool(os.environ.get('SCRAPINGBEE_API_KEY', ''))
-
 
 def get_project_root() -> str:
     """Obtiene el directorio raíz del proyecto."""
@@ -422,10 +416,10 @@ def scraping_all_portals(
                 if mapped not in pisos_zones:
                     pisos_zones.append(mapped)
 
-        # Ejecutar Milanuncios (Botasaurus - fallback when ScrapingBee not configured)
-        # Note: ScrapingBee version runs at the end if API key is configured
-        if milanuncios_zones and not is_scrapingbee_enabled():
-            result = run_scraper(context, 'milanuncios', milanuncios_zones, tenant_id)
+        # === Milanuncios with Camoufox (FREE - bypasses GeeTest) ===
+        if milanuncios_zones:
+            context.log.info("Running Milanuncios with Camoufox (free anti-detect browser)")
+            result = run_scraper(context, 'camoufox_milanuncios', milanuncios_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
@@ -462,16 +456,6 @@ def scraping_all_portals(
             result = run_scraper(context, 'fotocasa', fotocasa_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
-
-        # === Milanuncios with ScrapingBee (if API key is configured) ===
-        if is_scrapingbee_enabled():
-            context.log.info("ScrapingBee API key detected, running Milanuncios with ScrapingBee")
-            if milanuncios_zones:
-                result = run_scraper(context, 'scrapingbee_milanuncios', milanuncios_zones, tenant_id)
-                all_results.append(result)
-                total_leads += result.get('leads_found', 0)
-        else:
-            context.log.info("ScrapingBee API key not configured, skipping Milanuncios")
 
         # === Idealista with Camoufox (FREE - no API key needed) ===
         # Camoufox is an open-source anti-detect browser that bypasses DataDome

@@ -1,14 +1,16 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
+> **Last Updated**: December 2025 (almost 2026!)
+
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de portales inmobiliarios con CRM para gestion de contactos.
 
 ## Stack Tecnologico
 - **Backend**: Django 5.x + Django REST Framework
 - **Base de datos**: PostgreSQL 16 (Azure PostgreSQL en produccion)
-- **Scrapers**:
-  - Botasaurus (gratuito): Pisos.com, Habitaclia, Fotocasa
-  - ScrapingBee API (pago): Milanuncios, Idealista (bypass anti-bot)
+- **Scrapers** (todos GRATUITOS):
+  - **Camoufox**: Milanuncios, Idealista (anti-detect browser, bypasses GeeTest/DataDome)
+  - **Botasaurus**: Pisos.com, Habitaclia, Fotocasa
 - **Orquestacion**: Dagster (pipelines)
 - **ETL**: dbt (raw -> staging -> marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
@@ -17,14 +19,14 @@ Sistema de captacion de leads inmobiliarios mediante scraping de portales inmobi
 ## Arquitectura de Datos
 
 ```
-Scrapers (Botasaurus/ScrapingBee)
-    ↓
+Scrapers (Camoufox/Botasaurus)
+    |
 raw.raw_listings (JSONB)
-    ↓ dbt
+    | dbt
 staging.stg_* (vista por portal)
-    ↓ dbt
+    | dbt
 marts.dim_leads (tabla unificada)
-    ↓
+    |
 Django Lead model
 ```
 
@@ -62,8 +64,9 @@ docker-compose logs web --tail 50
 docker-compose logs web -f  # seguir en tiempo real
 
 # Ejecutar scraper manualmente
-docker exec casa-teva-web python run_milanuncios_scraper.py --zones cambrils --postgres
-docker exec casa-teva-web python run_pisos_scraper.py --zones salou --postgres
+python run_camoufox_milanuncios.py salou cambrils
+python run_camoufox_idealista.py salou cambrils
+python run_pisos_scraper.py --zones salou --postgres
 
 # Consultar base de datos
 docker exec casa-teva-postgres psql -U casa_teva -d casa_teva_db -c "SELECT COUNT(*) FROM marts.dim_leads;"
@@ -96,19 +99,52 @@ casa-teva-lead-system/
 │   ├── templates/
 │   └── casa_teva/         # Settings Django
 ├── scrapers/
-│   ├── milanuncios_scraper.py  # Scraper principal
-│   ├── pisos_scraper.py        # Scraper Pisos.com
-│   └── base_scraper.py         # Clase base con PostgreSQL
+│   ├── camoufox_milanuncios.py  # Milanuncios (anti-detect, FREE)
+│   ├── camoufox_idealista.py    # Idealista (anti-detect, FREE)
+│   ├── botasaurus_pisos.py      # Pisos.com
+│   ├── botasaurus_habitaclia.py # Habitaclia
+│   └── botasaurus_fotocasa.py   # Fotocasa
 ├── dagster/                    # Pipelines de orquestacion
 │   └── casa_teva_pipeline/
 │       ├── assets/             # scraping_assets.py
 │       ├── resources/          # postgres_resource.py
 │       └── schedules/          # scraping_schedule.py
+├── dbt_project/                # ETL transformations
 ├── .github/workflows/          # CI/CD
 │   └── build-dagster.yml       # Build y push a ACR
-├── run_*_scraper.py            # Scripts de ejecucion
+├── run_camoufox_*.py           # Runner scripts (Camoufox)
+├── run_*_scraper.py            # Runner scripts (Botasaurus)
 ├── Dockerfile                  # Imagen para Dagster
 └── docker-compose.yml          # Desarrollo local
+```
+
+## Scrapers - Tecnologias
+
+### Camoufox (Milanuncios + Idealista)
+Camoufox es un browser anti-detect basado en Firefox con inyeccion de fingerprints a nivel C++.
+**Coste: GRATIS** (open source)
+
+Bypasses:
+- **GeeTest** (Milanuncios): Captcha de deslizar
+- **DataDome** (Idealista): Anti-bot avanzado
+
+```bash
+# Ejecucion manual
+python run_camoufox_milanuncios.py salou cambrils --max-pages 2
+python run_camoufox_idealista.py salou cambrils --max-pages 2
+
+# Ver zonas disponibles
+python run_camoufox_idealista.py --list-zones
+```
+
+### Botasaurus (Pisos.com, Habitaclia, Fotocasa)
+Framework de scraping con Chrome, para portales sin anti-bot agresivo.
+**Coste: GRATIS** (open source)
+
+```bash
+python run_pisos_scraper.py --zones salou --postgres
+python run_habitaclia_scraper.py --zones salou --postgres
+python run_fotocasa_scraper.py --zones salou --postgres
 ```
 
 ## Decisiones de Diseno Importantes
@@ -118,9 +154,8 @@ casa-teva-lead-system/
 3. **Lead tabla (managed=False)**: Django no gestiona migraciones de marts.dim_leads
 4. **Estados en LeadEstado**: Tabla separada para estados CRM (permite actualizar sin tocar lead)
 5. **Playwright en /opt/playwright**: Navegadores instalados en el contenedor
-6. **Scrapers activos**:
-   - **Gratuitos (Botasaurus)**: Pisos.com, Habitaclia, Fotocasa
-   - **Pago (ScrapingBee)**: Milanuncios, Idealista (requiere SCRAPINGBEE_API_KEY)
+6. **Camoufox necesita Xvfb**: Para headless mode en contenedores Linux
+7. **Todos los scrapers son GRATUITOS**: Ya no usamos ScrapingBee (era de pago)
 
 ## Credenciales
 
@@ -149,64 +184,22 @@ ACR (Container Registry):
 
 ## Zonas de Scraping Disponibles
 
-### Milanuncios (todas las zonas)
-- **Lleida**: lleida_ciudad, lleida_20km, lleida_30km, lleida_40km, lleida_50km, la_bordeta, balaguer, mollerussa, tremp, tarrega
-- **Tarragona**: tarragona_ciudad, tarragona_20km, tarragona_30km, tarragona_40km, tarragona_50km
-- **Costa Daurada**: salou, cambrils, reus, vendrell, altafulla, torredembarra, miami_platja, hospitalet_infant, calafell, coma_ruga, valls, montblanc, vila_seca
-- **Terres de l'Ebre**: tortosa, amposta, deltebre, ametlla_mar, sant_carles_rapita
+### Milanuncios / Idealista (Camoufox)
+- **Lleida**: lleida_ciudad, balaguer, mollerussa, tarrega
+- **Tarragona**: tarragona_ciudad
+- **Costa Daurada**: salou, cambrils, reus, vendrell, altafulla, torredembarra, calafell, valls
+- **Terres de l'Ebre**: tortosa, amposta
 
-### Pisos.com
+### Pisos.com / Habitaclia / Fotocasa (Botasaurus)
 - **Lleida**: lleida_capital, lleida_provincia
 - **Tarragona**: tarragona_capital, tarragona_provincia
 - **Ciudades**: salou, cambrils, reus, vendrell, calafell, torredembarra, altafulla, valls, tortosa, amposta
 
-## ScrapingBee (Milanuncios + Idealista)
-
-ScrapingBee se usa para portales con anti-bot agresivo (GeeTest, DataDome).
-
-### Presupuesto Plan 50€/mes
-- 250,000 creditos/mes
-- Stealth proxy: 75 creditos/request
-- ~3,333 paginas/mes maximo
-
-### Configuracion
-
-**Local (Docker):**
-```bash
-# Crear archivo .env
-echo "SCRAPINGBEE_API_KEY=tu_api_key_aqui" > .env
-docker-compose up -d
-```
-
-**Azure (Container Apps):**
-```bash
-# Añadir variable de entorno
-az containerapp update -n dagster-scrapers -g inmoleads-crm \
-  --set-env-vars "SCRAPINGBEE_API_KEY=tu_api_key_aqui"
-```
-
-**GitHub Secrets (CI/CD):**
-```bash
-gh secret set SCRAPINGBEE_API_KEY --repo gilito11/casaTevaLeads
-```
-
-### Ejecucion Manual
-```bash
-# Milanuncios con ScrapingBee
-python run_scrapingbee_milanuncios.py --zones salou cambrils --max-pages 2
-
-# Idealista con ScrapingBee
-python run_scrapingbee_idealista.py --zones salou cambrils --max-pages 2
-
-# Ver zonas disponibles
-python run_scrapingbee_idealista.py --list-zones
-```
-
 ## Problemas Conocidos
 
-- Sin SCRAPINGBEE_API_KEY: Milanuncios e Idealista no se ejecutan (Dagster los omite)
 - La tabla `marts.dim_leads` debe existir para que Django funcione
-- Wallapop scraper desactivado (API privada)
+- Camoufox necesita Xvfb y GTK3 en Linux (ya instalados en Dockerfile)
+- Wallapop scraper desactivado (API privada, no scrapeable)
 
 ## GitHub y CI/CD
 
