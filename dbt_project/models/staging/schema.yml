@@ -47,3 +47,43 @@ models:
             - tenant_id
             - telefono_norm
             - scraping_timestamp
+
+  - name: stg_pisos
+    description: "Staging model for Pisos.com listings - extracts and normalizes raw data"
+    columns:
+      - name: raw_listing_id
+        description: "ID from raw.raw_listings table"
+        tests:
+          - not_null
+      - name: tenant_id
+        description: "Tenant identifier"
+        tests:
+          - not_null
+      - name: telefono_norm
+        description: "Normalized phone number"
+        tests:
+          - not_null
+      - name: precio
+        description: "Property price in EUR"
+        tests:
+          - not_null
+
+  - name: stg_habitaclia
+    description: "Staging model for Habitaclia listings - extracts and normalizes raw data"
+    columns:
+      - name: raw_listing_id
+        description: "ID from raw.raw_listings table"
+        tests:
+          - not_null
+      - name: tenant_id
+        description: "Tenant identifier"
+        tests:
+          - not_null
+      - name: telefono_norm
+        description: "Normalized phone number"
+        tests:
+          - not_null
+      - name: precio
+        description: "Property price in EUR"
+        tests:
+          - not_null
