@@ -1,26 +1,38 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
 ## Resumen
-Sistema de captacion de leads inmobiliarios mediante scraping de portales (Milanuncios, Pisos.com) con CRM para gestion de contactos.
+Sistema de captacion de leads inmobiliarios mediante scraping de portales inmobiliarios con CRM para gestion de contactos.
 
 ## Stack Tecnologico
 - **Backend**: Django 5.x + Django REST Framework
 - **Base de datos**: PostgreSQL 16 (Azure PostgreSQL en produccion)
-- **Scrapers**: Scrapy + Playwright (headless Chromium)
+- **Scrapers**:
+  - Botasaurus (gratuito): Pisos.com, Habitaclia, Fotocasa
+  - ScrapingBee API (pago): Milanuncios, Idealista (bypass anti-bot)
 - **Orquestacion**: Dagster (pipelines)
+- **ETL**: dbt (raw -> staging -> marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
 - **Contenedores**: Docker Compose (local) / Azure Container Apps (produccion)
 
 ## Arquitectura de Datos
 
 ```
-Scrapers → marts.dim_leads (tabla) → Django Lead model
+Scrapers (Botasaurus/ScrapingBee)
+    ↓
+raw.raw_listings (JSONB)
+    ↓ dbt
+staging.stg_* (vista por portal)
+    ↓ dbt
+marts.dim_leads (tabla unificada)
+    ↓
+Django Lead model
 ```
 
-- `marts.dim_leads`: Tabla principal donde se guardan los leads
-- `Lead` model: `managed=False`, apunta a la tabla
-- `lead_id`: INTEGER (hash truncado del anuncio_id)
-- `LeadEstado`: Tabla separada para gestionar estados CRM
+- `raw.raw_listings`: Datos crudos de todos los portales (JSONB)
+- `staging.stg_*`: Vistas normalizadas por portal (stg_milanuncios, stg_idealista, etc.)
+- `marts.dim_leads`: Tabla principal con leads deduplicados
+- `Lead` model: `managed=False`, apunta a marts.dim_leads
+- `LeadEstado`: Tabla separada para estados CRM
 
 ## Entornos
 
@@ -106,7 +118,9 @@ casa-teva-lead-system/
 3. **Lead tabla (managed=False)**: Django no gestiona migraciones de marts.dim_leads
 4. **Estados en LeadEstado**: Tabla separada para estados CRM (permite actualizar sin tocar lead)
 5. **Playwright en /opt/playwright**: Navegadores instalados en el contenedor
-6. **Scrapers activos**: Solo Milanuncios y Pisos.com funcionan actualmente
+6. **Scrapers activos**:
+   - **Gratuitos (Botasaurus)**: Pisos.com, Habitaclia, Fotocasa
+   - **Pago (ScrapingBee)**: Milanuncios, Idealista (requiere SCRAPINGBEE_API_KEY)
 
 ## Credenciales
 
@@ -146,11 +160,53 @@ ACR (Container Registry):
 - **Tarragona**: tarragona_capital, tarragona_provincia
 - **Ciudades**: salou, cambrils, reus, vendrell, calafell, torredembarra, altafulla, valls, tortosa, amposta
 
+## ScrapingBee (Milanuncios + Idealista)
+
+ScrapingBee se usa para portales con anti-bot agresivo (GeeTest, DataDome).
+
+### Presupuesto Plan 50€/mes
+- 250,000 creditos/mes
+- Stealth proxy: 75 creditos/request
+- ~3,333 paginas/mes maximo
+
+### Configuracion
+
+**Local (Docker):**
+```bash
+# Crear archivo .env
+echo "SCRAPINGBEE_API_KEY=tu_api_key_aqui" > .env
+docker-compose up -d
+```
+
+**Azure (Container Apps):**
+```bash
+# Añadir variable de entorno
+az containerapp update -n dagster-scrapers -g inmoleads-crm \
+  --set-env-vars "SCRAPINGBEE_API_KEY=tu_api_key_aqui"
+```
+
+**GitHub Secrets (CI/CD):**
+```bash
+gh secret set SCRAPINGBEE_API_KEY --repo gilito11/casaTevaLeads
+```
+
+### Ejecucion Manual
+```bash
+# Milanuncios con ScrapingBee
+python run_scrapingbee_milanuncios.py --zones salou cambrils --max-pages 2
+
+# Idealista con ScrapingBee
+python run_scrapingbee_idealista.py --zones salou cambrils --max-pages 2
+
+# Ver zonas disponibles
+python run_scrapingbee_idealista.py --list-zones
+```
+
 ## Problemas Conocidos
 
-- Milanuncios puede bloquear sin cookies (anti-bot) - ejecutar `python scrapers/capture_cookies.py`
-- Wallapop y Fotocasa scrapers estan desactivados (no funcionan actualmente)
+- Sin SCRAPINGBEE_API_KEY: Milanuncios e Idealista no se ejecutan (Dagster los omite)
 - La tabla `marts.dim_leads` debe existir para que Django funcione
+- Wallapop scraper desactivado (API privada)
 
 ## GitHub y CI/CD
 

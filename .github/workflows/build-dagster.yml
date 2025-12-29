@@ -9,6 +9,7 @@ on:
       - 'Dockerfile'
       - 'dagster/**'
       - 'scrapers/**'
+      - 'dbt_project/**'
       - 'run_*_scraper.py'
       - 'requirements.txt'
       - '.github/workflows/build-dagster.yml'
@@ -79,7 +80,8 @@ jobs:
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-            --revision-suffix ${{ steps.revision.outputs.suffix }}
+            --revision-suffix ${{ steps.revision.outputs.suffix }} \
+            --set-env-vars "SCRAPINGBEE_API_KEY=${{ secrets.SCRAPINGBEE_API_KEY }}"
 
       - name: Verify deployment
         run: |

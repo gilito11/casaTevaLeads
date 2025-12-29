@@ -12,10 +12,14 @@
     Dimension table for leads from all portals.
 
     This model:
-    - Unions all staging models (Fotocasa, Milanuncios, Wallapop)
+    - Unions all staging models (Fotocasa, Milanuncios, Wallapop, Pisos, Habitaclia, Idealista)
     - Deduplicates by tenant_id + telefono_norm (keeps most recent)
     - Adds CRM fields for lead management
     - Uses incremental materialization for efficiency
+
+    Data sources:
+    - Botasaurus scrapers: Fotocasa, Pisos.com, Habitaclia (free)
+    - ScrapingBee scrapers: Milanuncios, Idealista (paid API - stealth proxy)
 */
 
 WITH all_staging_sources AS (
@@ -193,6 +197,42 @@ WITH all_staging_sources AS (
         fecha_publicacion,
         raw_data
     FROM {{ ref('stg_habitaclia') }}
+
+    {% if is_incremental() %}
+    WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
+    {% endif %}
+
+    UNION ALL
+
+    -- Idealista listings (ScrapingBee)
+    SELECT
+        raw_listing_id,
+        tenant_id,
+        portal,
+        data_lake_path,
+        scraping_timestamp,
+        created_at,
+        url,
+        titulo,
+        descripcion,
+        ubicacion,
+        zona_clasificada,
+        telefono_raw,
+        telefono_norm,
+        email,
+        nombre_contacto,
+        anunciante,
+        tipo_propiedad,
+        superficie_m2,
+        habitaciones,
+        banos,
+        precio,
+        precio_por_m2,
+        es_particular,
+        permite_inmobiliarias,
+        fecha_publicacion,
+        raw_data
+    FROM {{ ref('stg_idealista') }}
 
     {% if is_incremental() %}
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})

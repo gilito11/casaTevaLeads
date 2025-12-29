@@ -21,28 +21,6 @@ services:
     networks:
       - casa-teva-network
 
-  # MinIO - Data Lake (S3-compatible)
-  minio:
-    image: minio/minio:latest
-    container_name: casa-teva-minio
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"  # API endpoint
-      - "9001:9001"  # Web Console
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - casa-teva-network
-
   # Django Web Application
   web:
     build:
@@ -54,18 +32,18 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://casa_teva:casateva2024@postgres:5432/casa_teva_db
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
       DJANGO_SECRET_KEY: django-insecure-docker-dev-key
       DEBUG: "True"
     volumes:
       - ./backend:/app/backend
       - ./scrapers:/app/scrapers
+      - ./output:/app/output
+      - ./run_botasaurus_scrapers.py:/app/run_botasaurus_scrapers.py
+      - ./run_milanuncios_scraper.py:/app/run_milanuncios_scraper.py
+      - ./run_pisos_scraper.py:/app/run_pisos_scraper.py
+      - ./run_all_scrapers.py:/app/run_all_scrapers.py
     depends_on:
       postgres:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     networks:
       - casa-teva-network
@@ -88,17 +66,16 @@ services:
       DAGSTER_POSTGRES_PASSWORD: casateva2024
       DAGSTER_HOME: /opt/dagster/dagster_home
       TMPDIR: /tmp/dagster
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      # ScrapingBee API key (optional - enables Milanuncios and Idealista scrapers)
+      SCRAPINGBEE_API_KEY: ${SCRAPINGBEE_API_KEY:-}
     volumes:
       - ./dagster:/app/dagster
       - ./dbt_project:/app/dbt_project
       - ./scrapers:/app/scrapers
+      - ./run_scrapingbee_milanuncios.py:/app/run_scrapingbee_milanuncios.py
+      - ./run_scrapingbee_idealista.py:/app/run_scrapingbee_idealista.py
     depends_on:
       postgres:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     networks:
       - casa-teva-network
@@ -110,6 +87,4 @@ networks:
 
 volumes:
   postgres_data:
-    driver: local
-  minio_data:
     driver: local

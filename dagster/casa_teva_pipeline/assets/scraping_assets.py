@@ -171,6 +171,48 @@ ZONA_MAPPING_FOTOCASA = {
     'sant_carles_rapita': 'sant_carles_rapita',
 }
 
+# Mapping para Idealista (ScrapingBee - stealth proxy)
+ZONA_MAPPING_IDEALISTA = {
+    # Lleida
+    'lleida_ciudad': 'lleida',
+    'lleida_20km': 'lleida_provincia',
+    'lleida_30km': 'lleida_provincia',
+    'lleida_40km': 'lleida_provincia',
+    'lleida_50km': 'lleida_provincia',
+    'balaguer': 'balaguer',
+    'mollerussa': 'mollerussa',
+    'tarrega': 'tarrega',
+    'tremp': 'tremp',
+    # Tarragona
+    'tarragona_ciudad': 'tarragona',
+    'tarragona_20km': 'tarragona_provincia',
+    'tarragona_30km': 'tarragona_provincia',
+    'tarragona_40km': 'tarragona_provincia',
+    'tarragona_50km': 'tarragona_provincia',
+    # Costa Daurada
+    'salou': 'salou',
+    'cambrils': 'cambrils',
+    'reus': 'reus',
+    'vendrell': 'vendrell',
+    'calafell': 'calafell',
+    'torredembarra': 'torredembarra',
+    'altafulla': 'altafulla',
+    'miami_platja': 'miami_platja',
+    'vila_seca': 'vila_seca',
+    'valls': 'valls',
+    'montblanc': 'montblanc',
+    # Terres de l'Ebre
+    'tortosa': 'tortosa',
+    'amposta': 'amposta',
+    'deltebre': 'deltebre',
+    'sant_carles_rapita': 'sant_carles_rapita',
+}
+
+# Check if ScrapingBee is enabled
+def is_scrapingbee_enabled() -> bool:
+    """Check if ScrapingBee API key is configured."""
+    return bool(os.environ.get('SCRAPINGBEE_API_KEY', ''))
+
 
 def get_project_root() -> str:
     """Obtiene el directorio raíz del proyecto."""
@@ -380,8 +422,9 @@ def scraping_all_portals(
                 if mapped not in pisos_zones:
                     pisos_zones.append(mapped)
 
-        # Ejecutar Milanuncios
-        if milanuncios_zones:
+        # Ejecutar Milanuncios (Botasaurus - fallback when ScrapingBee not configured)
+        # Note: ScrapingBee version runs at the end if API key is configured
+        if milanuncios_zones and not is_scrapingbee_enabled():
             result = run_scraper(context, 'milanuncios', milanuncios_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
@@ -419,6 +462,32 @@ def scraping_all_portals(
             result = run_scraper(context, 'fotocasa', fotocasa_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
+
+        # === ScrapingBee scrapers (only if API key is configured) ===
+        if is_scrapingbee_enabled():
+            context.log.info("ScrapingBee API key detected, running premium scrapers")
+
+            # Ejecutar Milanuncios con ScrapingBee (replaces Botasaurus version)
+            if milanuncios_zones:
+                result = run_scraper(context, 'scrapingbee_milanuncios', milanuncios_zones, tenant_id)
+                all_results.append(result)
+                total_leads += result.get('leads_found', 0)
+
+            # Mapear zonas para Idealista (ScrapingBee)
+            idealista_zones = []
+            for slug in zone_slugs:
+                if slug in ZONA_MAPPING_IDEALISTA:
+                    mapped = ZONA_MAPPING_IDEALISTA[slug]
+                    if mapped not in idealista_zones:
+                        idealista_zones.append(mapped)
+
+            # Ejecutar Idealista con ScrapingBee
+            if idealista_zones:
+                result = run_scraper(context, 'scrapingbee_idealista', idealista_zones, tenant_id)
+                all_results.append(result)
+                total_leads += result.get('leads_found', 0)
+        else:
+            context.log.info("ScrapingBee API key not configured, skipping Milanuncios and Idealista")
 
     # Preparar resumen
     completed = sum(1 for r in all_results if r['status'] == 'completed')

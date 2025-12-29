@@ -17,6 +17,7 @@ playwright==1.48.0
 scrapy==2.11.0
 scrapy-playwright==0.0.34
 botasaurus==4.0.72
+requests>=2.31.0  # For ScrapingBee API client
 
 # Dagster
 dagster==1.5.12
