@@ -62,7 +62,7 @@ class HttpPisosScraper:
     Uses requests + BeautifulSoup for fast, reliable scraping.
     """
 
-    PORTAL_NAME = 'pisos.com'
+    PORTAL_NAME = 'pisos'
     BASE_URL = 'https://www.pisos.com'
 
     # Standard browser headers to avoid basic blocking
