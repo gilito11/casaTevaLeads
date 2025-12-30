@@ -94,6 +94,10 @@ RUN mkdir -p /app/error_logs /app/output /app/profiles && \
 RUN mkdir -p /home/casateva/.cache && \
     chown -R casateva:casateva /home/casateva
 
+# Dar permisos a casateva en /opt/venv para que camoufox fetch pueda escribir
+# browserforge necesita descargar datos al directorio de site-packages
+RUN chown -R casateva:casateva /opt/venv
+
 # Copiar código de la aplicación
 COPY --chown=casateva:casateva backend/ /app/backend/
 COPY --chown=casateva:casateva dagster/ /app/dagster/
