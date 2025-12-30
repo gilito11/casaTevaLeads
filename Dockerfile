@@ -87,6 +87,11 @@ RUN mkdir -p /app/backend /app/dagster /app/dbt_project /app/scrapers
 RUN mkdir -p /tmp/dagster /opt/dagster/dagster_home && \
     chown -R casateva:casateva /tmp/dagster /opt/dagster
 
+# Crear directorios para Botasaurus (error_logs, output, profiles)
+# Botasaurus requiere estos directorios con permisos de escritura
+RUN mkdir -p /app/error_logs /app/output /app/profiles && \
+    chown -R casateva:casateva /app/error_logs /app/output /app/profiles
+
 # Copiar código de la aplicación
 COPY --chown=casateva:casateva backend/ /app/backend/
 COPY --chown=casateva:casateva dagster/ /app/dagster/
