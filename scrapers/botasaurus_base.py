@@ -234,11 +234,32 @@ class BotasaurusBaseScraper:
         self.close()
 
 
-# Reusable browser decorator with optimal settings
+# Reusable browser decorator with optimal settings for containers
 def create_browser_scraper(headless: bool = True):
-    """Create a browser decorator with optimal anti-bot settings."""
+    """Create a browser decorator with optimal anti-bot settings.
+
+    Includes Chrome flags required for running in containers (Docker, Azure Container Apps).
+    """
     return browser(
         headless=headless,
         block_images=True,
         user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        # Container-specific Chrome flags to prevent crashes
+        add_arguments=[
+            '--no-sandbox',                    # Required for containers (no sandboxing)
+            '--disable-dev-shm-usage',         # Prevents /dev/shm size issues
+            '--disable-gpu',                   # No GPU in containers
+            '--disable-software-rasterizer',   # Disable software GPU
+            '--single-process',                # Use less memory
+            '--no-zygote',                     # Disable zygote process
+            '--disable-setuid-sandbox',        # Disable setuid sandbox
+            '--disable-extensions',            # No extensions needed
+            '--disable-background-networking', # Reduce network activity
+            '--disable-sync',                  # No sync needed
+            '--disable-translate',             # No translation needed
+            '--mute-audio',                    # No audio
+            '--hide-scrollbars',               # Hide scrollbars
+            '--metrics-recording-only',        # Disable metrics
+            '--no-first-run',                  # Skip first run
+        ],
     )
