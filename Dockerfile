@@ -76,9 +76,6 @@ RUN mkdir -p /opt/playwright && \
     playwright install chromium && \
     chmod -R 755 /opt/playwright
 
-# Descargar browser de Camoufox (Firefox anti-detect)
-RUN camoufox fetch
-
 # Crear directorios
 WORKDIR /app
 RUN mkdir -p /app/backend /app/dagster /app/dbt_project /app/scrapers
@@ -92,6 +89,11 @@ RUN mkdir -p /tmp/dagster /opt/dagster/dagster_home && \
 RUN mkdir -p /app/error_logs /app/output /app/profiles && \
     chown -R casateva:casateva /app/error_logs /app/output /app/profiles
 
+# Crear directorio .cache para Camoufox con permisos de casateva
+# Camoufox guarda el browser en ~/.cache/camoufox/
+RUN mkdir -p /home/casateva/.cache && \
+    chown -R casateva:casateva /home/casateva
+
 # Copiar código de la aplicación
 COPY --chown=casateva:casateva backend/ /app/backend/
 COPY --chown=casateva:casateva dagster/ /app/dagster/
@@ -104,6 +106,10 @@ COPY --chown=casateva:casateva scrapy.cfg /app/
 
 # Cambiar a usuario no-root
 USER casateva
+
+# Descargar browser de Camoufox como usuario casateva
+# (IMPORTANTE: debe ejecutarse como casateva para que guarde en ~/.cache/camoufox/)
+RUN camoufox fetch
 
 # Variables de entorno
 ENV PYTHONUNBUFFERED=1

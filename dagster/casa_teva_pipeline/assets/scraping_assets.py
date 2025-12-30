@@ -307,6 +307,12 @@ def run_scraper(
 
         context.log.info(f"{scraper_name} completado exitosamente")
 
+        # Log stdout for debugging
+        if result.stdout:
+            context.log.info(f"STDOUT (last 2000 chars):\n{result.stdout[-2000:]}")
+        if result.stderr:
+            context.log.warning(f"STDERR:\n{result.stderr[-1000:]}")
+
         # Intentar extraer número de leads del output
         leads_found = 0
         if 'leads guardados' in result.stdout.lower():
