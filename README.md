@@ -1,58 +1,69 @@
 # Casa Teva Lead System
 
-Sistema de captación de leads inmobiliarios mediante web scraping de portales españoles, con CRM integrado para gestión de contactos.
+Sistema de captacion de leads inmobiliarios mediante web scraping de portales espanoles, con CRM integrado para gestion de contactos.
 
-## Características
+## Caracteristicas
 
-- **Scraping automatizado** de portales inmobiliarios (Milanuncios, Pisos.com)
-- **CRM web** para gestión de leads con estados, notas y asignaciones
-- **Orquestación con Dagster** para ejecución programada
+- **Scraping automatizado** de 5 portales inmobiliarios (Milanuncios, Idealista, Habitaclia, Fotocasa, Pisos.com)
+- **100% GRATUITO** - Sin APIs de pago, usando Camoufox y Botasaurus
+- **CRM web** para gestion de leads con estados, notas y asignaciones
+- **Dashboard de analytics** con metricas de leads por portal, zona y estado
+- **Extraccion de fotos** de las propiedades desde los portales
+- **Orquestacion con Dagster** para ejecucion programada
 - **Filtrado inteligente** de particulares vs inmobiliarias
-- **Detección de duplicados** mediante anuncio_id único
+- **Deteccion de duplicados** mediante anuncio_id unico
 - **Blacklist** para evitar re-scrapear anuncios descartados
 - **Operaciones bulk** para cambio masivo de estados
 
-## Stack Tecnológico
+## Stack Tecnologico
 
-| Componente | Tecnología |
+| Componente | Tecnologia |
 |------------|------------|
 | Backend | Django 5.x + Django REST Framework |
 | Base de datos | PostgreSQL 16 |
-| Scrapers | Scrapy + Playwright (headless Chromium) |
-| Orquestación | Dagster |
+| Scrapers (anti-bot) | Camoufox (Milanuncios, Idealista) |
+| Scrapers (browser) | Botasaurus (Habitaclia, Fotocasa) |
+| Scrapers (HTTP) | requests+BeautifulSoup (Pisos.com) |
+| ETL | dbt (raw -> staging -> marts) |
+| Orquestacion | Dagster |
 | Frontend | Django Templates + HTMX + TailwindCSS |
-| Contenedores | Docker Compose |
-| Cloud | Azure Container Apps + Azure PostgreSQL |
+| Contenedores | Docker Compose (local) / Azure Container Apps (prod) |
 
 ## Arquitectura
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Milanuncios   │     │    Pisos.com    │     │   (Futuro)      │
-│    Scraper      │     │    Scraper      │     │   Scrapers      │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌────────────▼────────────┐
-                    │      Dagster           │
-                    │   (Orquestación)       │
-                    │   Puerto: 3000         │
-                    └────────────┬────────────┘
-                                 │
-                    ┌────────────▼────────────┐
-                    │     PostgreSQL          │
-                    │   marts.dim_leads       │
-                    │   Puerto: 5432          │
-                    └────────────┬────────────┘
-                                 │
-                    ┌────────────▼────────────┐
-                    │      Django CRM         │
-                    │   Puerto: 8000          │
-                    └─────────────────────────┘
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│   Milanuncios   │  │    Idealista    │  │    Pisos.com    │
+│   (Camoufox)    │  │   (Camoufox)    │  │  (Botasaurus)   │
+└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
+         │                    │                    │
+┌────────┴────────┐  ┌────────┴────────┐          │
+│   Habitaclia    │  │    Fotocasa     │          │
+│  (Botasaurus)   │  │  (Botasaurus)   │          │
+└────────┬────────┘  └────────┬────────┘          │
+         │                    │                    │
+         └────────────────────┼────────────────────┘
+                              │
+                 ┌────────────▼────────────┐
+                 │      Dagster            │
+                 │   (Orquestacion)        │
+                 │   Puerto: 3000          │
+                 └────────────┬────────────┘
+                              │
+                 ┌────────────▼────────────┐
+                 │     PostgreSQL          │
+                 │   raw -> dbt -> marts   │
+                 │   Puerto: 5432          │
+                 └────────────┬────────────┘
+                              │
+                 ┌────────────▼────────────┐
+                 │      Django CRM         │
+                 │   + Analytics Dashboard │
+                 │   Puerto: 8000          │
+                 └─────────────────────────┘
 ```
 
-## Inicio Rápido (Local)
+## Inicio Rapido (Local)
 
 ```bash
 # Clonar repositorio
@@ -69,43 +80,62 @@ docker-compose up -d
 
 ## Despliegue en Azure
 
-El proyecto está desplegado en Azure con:
+El proyecto esta desplegado en Azure con:
 - **Azure Container Apps**: Dagster + Scrapers
 - **Azure App Service**: Django CRM
 - **Azure PostgreSQL**: Base de datos
 
-### URLs de Producción
+### URLs de Produccion
 - CRM: https://inmoleads-crm.azurewebsites.net
 - Dagster: https://dagster-scrapers.happysky-957a1351.spaincentral.azurecontainerapps.io
 
-## Ejecución de Scrapers
+## Ejecucion de Scrapers
 
-### Manual (local)
+### Camoufox (Milanuncios, Idealista)
+Anti-detect browser que bypasea GeeTest y DataDome. **GRATIS**.
+
 ```bash
-# Ejecutar scraper de Milanuncios
-docker exec casa-teva-web python run_milanuncios_scraper.py --zones lleida_ciudad,salou --postgres
+# Milanuncios
+python run_camoufox_milanuncios.py salou cambrils --max-pages 2
 
-# Ejecutar scraper de Pisos.com
-docker exec casa-teva-web python run_pisos_scraper.py --zones lleida_capital,tarragona_capital --postgres
+# Idealista
+python run_camoufox_idealista.py salou cambrils --max-pages 2
+
+# Ver zonas disponibles
+python run_camoufox_idealista.py --list-zones
+```
+
+### Pisos.com (HTTP puro - sin browser)
+Scraping con requests+BeautifulSoup. **10x mas rapido**. Pisos.com no tiene anti-bot.
+
+```bash
+python run_pisos_scraper.py --zones salou --postgres --max-pages 2
+```
+
+### Botasaurus (Habitaclia, Fotocasa)
+Framework de scraping con Chrome. **GRATIS**.
+
+```bash
+python run_habitaclia_scraper.py --zones salou --postgres
+python run_fotocasa_scraper.py --zones salou --postgres
 ```
 
 ### Automatizado (Dagster)
-Los scrapers se ejecutan automáticamente a las horas configuradas (horario español):
-- 9:00, 11:00, 13:00, 15:00, 17:00, 19:00
-
-Para ejecución manual, acceder a Dagster UI y hacer clic en "Materialize all".
+Los scrapers se ejecutan automaticamente segun el schedule configurado en Dagster.
+Para ejecucion manual, acceder a Dagster UI y hacer clic en "Materialize all".
 
 ## Zonas Disponibles
 
-### Milanuncios
-- **Lleida**: lleida_ciudad, lleida_20km, lleida_30km, lleida_40km, lleida_50km, la_bordeta, balaguer, mollerussa, tremp, tarrega
-- **Tarragona**: tarragona_ciudad, tarragona_20km, tarragona_30km, tarragona_40km, tarragona_50km
-- **Costa Daurada**: salou, cambrils, reus, vendrell, altafulla, torredembarra, miami_platja, hospitalet_infant, calafell, coma_ruga, valls, montblanc, vila_seca
-- **Terres de l'Ebre**: tortosa, amposta, deltebre, ametlla_mar, sant_carles_rapita
+### Milanuncios / Idealista (Camoufox)
+- **Lleida**: lleida_ciudad, balaguer, mollerussa, tarrega
+- **Tarragona**: tarragona_ciudad
+- **Costa Daurada**: salou, cambrils, reus, vendrell, altafulla, torredembarra, calafell, valls
+- **Terres de l'Ebre**: tortosa, amposta
 
-### Pisos.com
+### Pisos.com / Habitaclia / Fotocasa (Botasaurus)
 - **Lleida**: lleida_capital, lleida_provincia
-- **Tarragona**: tarragona_capital, tarragona_provincia, salou, cambrils, reus, vendrell, calafell, torredembarra, valls, tortosa, amposta
+- **Tarragona**: tarragona_capital, tarragona_provincia
+- **Ciudades**: salou, cambrils, reus, vendrell, calafell, torredembarra, altafulla, valls, tortosa, amposta
 
 ## Estructura del Proyecto
 
@@ -114,26 +144,32 @@ casa-teva-lead-system/
 ├── backend/                 # Django application
 │   ├── apps/
 │   │   ├── core/           # Tenants, usuarios
-│   │   └── leads/          # Modelo Lead, notas, estados
+│   │   └── leads/          # Modelo Lead, notas, estados, analytics
 │   └── templates/          # HTML templates
 ├── scrapers/               # Web scrapers
-│   ├── milanuncios_scraper.py
-│   ├── pisos_scraper.py
-│   └── base_scraper.py
+│   ├── http_pisos.py             # Pisos.com (HTTP - rapido)
+│   ├── camoufox_milanuncios.py   # Milanuncios (Camoufox)
+│   ├── camoufox_idealista.py     # Idealista (Camoufox)
+│   ├── botasaurus_habitaclia.py  # Habitaclia (Botasaurus)
+│   └── botasaurus_fotocasa.py    # Fotocasa (Botasaurus)
 ├── dagster/                # Pipeline orchestration
 │   └── casa_teva_pipeline/
+├── dbt_project/            # ETL transformations
 ├── docker-compose.yml      # Local development
 ├── Dockerfile              # Container image
 └── .github/workflows/      # CI/CD
 ```
 
-## Contribuir
+## CI/CD
 
-1. Fork del repositorio
-2. Crear rama feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit cambios (`git commit -m 'Add nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abrir Pull Request
+- **Repo**: gilito11/casaTevaLeads
+- **CI/CD**: GitHub Actions -> Azure Container Registry -> Azure Container Apps
+
+### Workflow de Despliegue
+1. Push a master
+2. GitHub Actions construye imagen Docker
+3. Push a Azure Container Registry (inmoleadsacr.azurecr.io)
+4. Despliegue automatico a Azure Container Apps
 
 ## Licencia
 
