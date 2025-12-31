@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 
 from botasaurus.browser import browser, Driver
 
-from scrapers.botasaurus_base import BotasaurusBaseScraper
+from scrapers.botasaurus_base import BotasaurusBaseScraper, CONTAINER_CHROME_ARGS
 
 logger = logging.getLogger(__name__)
 
@@ -202,16 +202,7 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         # Use parent zone name for composite zones (comarca name)
         zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
-        # Chrome flags for container environments
-        container_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-setuid-sandbox',
-            '--single-process',
-        ]
-
-        @browser(headless=headless, block_images=False, add_arguments=container_args)
+        @browser(headless=headless, block_images=False, add_arguments=CONTAINER_CHROME_ARGS)
         def scrape_page(driver: Driver, data: dict):
             url = data['url']
 
@@ -297,17 +288,8 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                 logger.info(f"Waiting {delay:.1f}s before next request...")
                 time.sleep(delay)
 
-            # Chrome flags for container environments
-            container_args = [
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-setuid-sandbox',
-                '--single-process',
-            ]
-
             # Create a new browser session for each listing
-            @browser(headless=headless, block_images=False, reuse_driver=False, add_arguments=container_args)
+            @browser(headless=headless, block_images=False, reuse_driver=False, add_arguments=CONTAINER_CHROME_ARGS)
             def fetch_single_detail(driver: Driver, data: dict):
                 try:
                     driver.get(data['url'])
@@ -466,14 +448,7 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
             except Exception as e:
                 logger.error(f"Error processing {url}: {e}")
 
-        # Filter out agencies if only_private
-        if self.only_private:
-            particulares = [l for l in results if l.get('es_particular', True)]
-            filtered = len(results) - len(particulares)
-            if filtered > 0:
-                logger.info(f"Filtered out {filtered} agency listings")
-            return particulares
-
+        # No filtering - return all listings
         return results
 
     def scrape_and_save(self) -> Dict[str, int]:
@@ -481,11 +456,7 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         listings = self.scrape()
 
         for listing in listings:
-            # Additional filter check
-            if not self.should_scrape(listing):
-                self.stats['filtered_out'] += 1
-                continue
-
+            # No filtering - save all listings
             if self.save_to_postgres(listing, self.PORTAL_NAME):
                 self.stats['saved'] += 1
 

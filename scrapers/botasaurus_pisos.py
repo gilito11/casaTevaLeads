@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 
 from botasaurus.browser import browser, Driver
 
-from scrapers.botasaurus_base import BotasaurusBaseScraper
+from scrapers.botasaurus_base import BotasaurusBaseScraper, CONTAINER_CHROME_ARGS
 
 logger = logging.getLogger(__name__)
 
@@ -165,16 +165,7 @@ class BotasaurusPisos(BotasaurusBaseScraper):
         # Use parent zone name for composite zones (comarca name)
         zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
-        # Chrome flags for container environments
-        container_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-setuid-sandbox',
-            '--single-process',
-        ]
-
-        @browser(headless=headless, block_images=False, add_arguments=container_args)
+        @browser(headless=headless, block_images=False, add_arguments=CONTAINER_CHROME_ARGS)
         def scrape_page(driver: Driver, data: dict):
             url = data['url']
 
@@ -236,16 +227,7 @@ class BotasaurusPisos(BotasaurusBaseScraper):
         """Fetch detail pages to extract more info."""
         headless = self.headless
 
-        # Chrome flags for container environments
-        container_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-setuid-sandbox',
-            '--single-process',
-        ]
-
-        @browser(headless=headless, block_images=True, add_arguments=container_args)
+        @browser(headless=headless, block_images=True, add_arguments=CONTAINER_CHROME_ARGS)
         def fetch_details(driver: Driver, data: dict):
             results = []
 
@@ -332,19 +314,22 @@ class BotasaurusPisos(BotasaurusBaseScraper):
                     listing['fotos'] = unique_photos[:10]
 
                     # Check if particular or agency
-                    # Pisos.com uses data-ga-ecom with "particular" or "profesional"
-                    is_particular = bool(re.search(r'data-ga-ecom="[^"]*particular', html, re.IGNORECASE))
-                    is_profesional = bool(re.search(r'data-ga-ecom="[^"]*profesional', html, re.IGNORECASE))
+                    # Detection based on:
+                    # 1. /inmobiliaria- links in owner section = Agency
+                    # 2. "Inmobiliaria recomendada" badge = Agency
+                    # 3. Agency profile links in owner-info = Agency
+                    has_agency_link = bool(re.search(r'href="[^"]*\/inmobiliaria-', html, re.IGNORECASE))
+                    has_agency_badge = bool(re.search(r'Inmobiliaria\s+recomendada', html, re.IGNORECASE))
+                    has_agency_profile = bool(re.search(r'owner-info[^>]*>.*?/inmobiliaria-', html, re.IGNORECASE | re.DOTALL))
 
-                    if is_particular:
-                        listing['vendedor'] = 'Particular'
-                        listing['es_particular'] = True
-                    elif is_profesional:
+                    is_agency = has_agency_link or has_agency_badge or has_agency_profile
+
+                    if is_agency:
                         listing['vendedor'] = 'Inmobiliaria'
                         listing['es_particular'] = False
                     else:
-                        # Default to particular if unknown
-                        listing['vendedor'] = 'Desconocido'
+                        # No agency indicators found - assume particular
+                        listing['vendedor'] = 'Particular'
                         listing['es_particular'] = True
 
                     results.append(listing)
@@ -356,15 +341,8 @@ class BotasaurusPisos(BotasaurusBaseScraper):
 
         enriched = fetch_details({'listings': listings})
 
-        # Filter to only particulares
-        particulares = [l for l in enriched if l.get('es_particular') is not False]
-        filtered = len(enriched) - len(particulares)
-
-        if filtered > 0:
-            logger.info(f"Filtered out {filtered} agency listings")
-            self.stats['filtered_out'] += filtered
-
-        return particulares
+        # No filtering - return all listings
+        return enriched
 
     def scrape_and_save(self) -> Dict[str, int]:
         """Scrape all zones and save to PostgreSQL."""
@@ -372,12 +350,7 @@ class BotasaurusPisos(BotasaurusBaseScraper):
 
         for listing in listings:
             self.stats['total_listings'] += 1
-
-            # Additional filter check
-            if not self.should_scrape(listing):
-                self.stats['filtered_out'] += 1
-                continue
-
+            # No filtering - save all listings
             if self.save_to_postgres(listing, self.PORTAL_NAME):
                 self.stats['saved'] += 1
 

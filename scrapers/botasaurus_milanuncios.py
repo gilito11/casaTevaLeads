@@ -14,7 +14,7 @@ from urllib.parse import urlencode, quote
 
 from botasaurus.browser import browser, Driver
 
-from scrapers.botasaurus_base import BotasaurusBaseScraper
+from scrapers.botasaurus_base import BotasaurusBaseScraper, CONTAINER_CHROME_ARGS
 
 logger = logging.getLogger(__name__)
 
@@ -336,21 +336,12 @@ class BotasaurusMilanuncios(BotasaurusBaseScraper):
         should_scrape_func = self.should_scrape
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
-        # Chrome flags for container environments
-        container_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-setuid-sandbox',
-            '--single-process',
-        ]
-
         # Use full stealth mode with realistic user agent
         @browser(
             headless=headless,
             block_images=False,  # Need images for photos
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            add_arguments=container_args,
+            add_arguments=CONTAINER_CHROME_ARGS,
         )
         def scrape_zone_by_clicking(driver: Driver, data: dict):
             url = data['url']
@@ -486,18 +477,7 @@ class BotasaurusMilanuncios(BotasaurusBaseScraper):
                         'vendedor': 'Particular',
                     }
 
-                    # Apply price filter
-                    if precio and precio < 5000:
-                        logger.info(f"Listing {i+1}: Filtered (price {precio} < 5000)")
-                        scraper_self.stats['filtered_out'] += 1
-                        continue
-
-                    # Apply particular filter
-                    if not should_scrape_func(listing):
-                        logger.info(f"Listing {i+1}: Filtered (not particular)")
-                        scraper_self.stats['filtered_out'] += 1
-                        continue
-
+                    # No filtering - save all listings
                     logger.info(f"Listing {i+1}: OK - {titulo[:40] if titulo else 'No title'}... | {precio}€ | Phone: {telefono}")
                     listings.append(listing)
 

@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional
 
 from botasaurus.browser import browser, Driver
 
-from scrapers.botasaurus_base import BotasaurusBaseScraper
+from scrapers.botasaurus_base import BotasaurusBaseScraper, CONTAINER_CHROME_ARGS
 
 logger = logging.getLogger(__name__)
 
@@ -290,16 +290,7 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         # Use parent zone name for composite zones (comarca name)
         zone_display_name = parent_zone_name or zona_info.get('nombre', zona_key)
 
-        # Chrome flags for container environments
-        container_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-setuid-sandbox',
-            '--single-process',
-        ]
-
-        @browser(headless=headless, block_images=True, add_arguments=container_args)
+        @browser(headless=headless, block_images=True, add_arguments=CONTAINER_CHROME_ARGS)
         def scrape_page(driver: Driver, data: dict):
             url = data['url']
 
@@ -370,16 +361,7 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         """Fetch detail pages to extract more info."""
         headless = self.headless
 
-        # Chrome flags for container environments
-        container_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-setuid-sandbox',
-            '--single-process',
-        ]
-
-        @browser(headless=headless, block_images=True, add_arguments=container_args)
+        @browser(headless=headless, block_images=True, add_arguments=CONTAINER_CHROME_ARGS)
         def fetch_details(driver: Driver, data: dict):
             results = []
 
@@ -519,15 +501,8 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
         enriched = fetch_details({'listings': listings})
 
-        # Filter to only particulares
-        particulares = [l for l in enriched if l.get('es_particular', True)]
-        filtered = len(enriched) - len(particulares)
-
-        if filtered > 0:
-            logger.info(f"Filtered out {filtered} agency listings")
-            self.stats['filtered_out'] += filtered
-
-        return particulares
+        # No filtering - return all listings
+        return enriched
 
     def scrape_and_save(self) -> Dict[str, int]:
         """Scrape all zones and save to PostgreSQL."""
@@ -535,12 +510,7 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
         for listing in listings:
             self.stats['total_listings'] += 1
-
-            # Additional filter check
-            if not self.should_scrape(listing):
-                self.stats['filtered_out'] += 1
-                continue
-
+            # No filtering - save all listings
             if self.save_to_postgres(listing, self.PORTAL_NAME):
                 self.stats['saved'] += 1
 

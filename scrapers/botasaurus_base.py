@@ -234,32 +234,45 @@ class BotasaurusBaseScraper:
         self.close()
 
 
+# Chrome flags optimized for Azure Container Apps
+# IMPORTANT: Do NOT use --single-process or --no-zygote as they cause WebSocket disconnection
+CONTAINER_CHROME_ARGS = [
+    '--no-sandbox',                    # Required for containers (no root sandboxing)
+    '--disable-setuid-sandbox',        # Disable setuid sandbox
+    '--disable-dev-shm-usage',         # Use /tmp instead of /dev/shm
+    '--disable-gpu',                   # No GPU in containers
+    '--disable-software-rasterizer',   # Disable software GPU
+    '--disable-extensions',            # No extensions needed
+    '--disable-background-networking', # Reduce network activity
+    '--disable-sync',                  # No sync needed
+    '--disable-translate',             # No translation needed
+    '--disable-default-apps',          # No default apps
+    '--disable-hang-monitor',          # Disable hang monitor
+    '--disable-prompt-on-repost',      # Disable repost prompts
+    '--disable-client-side-phishing-detection',  # Disable phishing detection
+    '--disable-component-update',      # Disable component updates
+    '--disable-domain-reliability',    # Disable domain reliability
+    '--disable-features=TranslateUI,BlinkGenPropertyTrees,VizDisplayCompositor',
+    '--mute-audio',                    # No audio
+    '--no-first-run',                  # Skip first run
+    '--password-store=basic',          # Simple password store
+    '--use-mock-keychain',             # Mock keychain for headless
+    '--enable-features=NetworkService,NetworkServiceInProcess',
+    '--window-size=1920,1080',         # Set window size
+    '--remote-debugging-port=0',       # Random debugging port
+]
+
+
 # Reusable browser decorator with optimal settings for containers
 def create_browser_scraper(headless: bool = True):
     """Create a browser decorator with optimal anti-bot settings.
 
     Includes Chrome flags required for running in containers (Docker, Azure Container Apps).
+    IMPORTANT: Removed --single-process and --no-zygote which cause WebSocket issues.
     """
     return browser(
         headless=headless,
         block_images=True,
         user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        # Container-specific Chrome flags to prevent crashes
-        add_arguments=[
-            '--no-sandbox',                    # Required for containers (no sandboxing)
-            '--disable-dev-shm-usage',         # Prevents /dev/shm size issues
-            '--disable-gpu',                   # No GPU in containers
-            '--disable-software-rasterizer',   # Disable software GPU
-            '--single-process',                # Use less memory
-            '--no-zygote',                     # Disable zygote process
-            '--disable-setuid-sandbox',        # Disable setuid sandbox
-            '--disable-extensions',            # No extensions needed
-            '--disable-background-networking', # Reduce network activity
-            '--disable-sync',                  # No sync needed
-            '--disable-translate',             # No translation needed
-            '--mute-audio',                    # No audio
-            '--hide-scrollbars',               # Hide scrollbars
-            '--metrics-recording-only',        # Disable metrics
-            '--no-first-run',                  # Skip first run
-        ],
+        add_arguments=CONTAINER_CHROME_ARGS,
     )
