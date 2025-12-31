@@ -422,10 +422,10 @@ def scraping_all_portals(
                 if mapped not in pisos_zones:
                     pisos_zones.append(mapped)
 
-        # === Milanuncios with Camoufox (FREE - bypasses GeeTest) ===
+        # === Milanuncios with HTTP/curl_cffi (FREE - bypasses GeeTest via TLS fingerprint) ===
         if milanuncios_zones:
-            context.log.info("Running Milanuncios with Camoufox (free anti-detect browser)")
-            result = run_scraper(context, 'camoufox_milanuncios', milanuncios_zones, tenant_id)
+            context.log.info("Running Milanuncios with HTTP/curl_cffi (free TLS fingerprint impersonation)")
+            result = run_scraper(context, 'http_milanuncios', milanuncios_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 

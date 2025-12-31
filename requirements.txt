@@ -19,6 +19,7 @@ scrapy-playwright==0.0.34
 botasaurus==4.0.72
 camoufox[geoip]>=0.4.11  # Anti-detect browser with GeoIP for Milanuncios/Idealista
 requests>=2.31.0  # HTTP client
+curl_cffi>=0.7.0  # Browser TLS fingerprint impersonation for anti-bot bypass
 
 # Dagster
 dagster==1.5.12

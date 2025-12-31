@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 30 December 2025
+> **Last Updated**: 31 December 2025
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales. **100% gratuito** - sin APIs de pago.
@@ -9,8 +9,8 @@ Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales. **1
 - **Backend**: Django 5.x + DRF
 - **BD**: PostgreSQL 16 (Azure PostgreSQL en prod)
 - **Scrapers**:
-  - **HTTP puro**: pisos.com (requests+BeautifulSoup, 10x mas rapido)
-  - **Camoufox**: milanuncios, idealista (anti-detect Firefox, bypasses GeeTest/DataDome)
+  - **HTTP puro**: pisos.com, milanuncios (requests/curl_cffi, 10x mas rapido)
+  - **Camoufox**: idealista (anti-detect Firefox, bypasses DataDome)
   - **Botasaurus**: habitaclia, fotocasa (Chrome headless)
 - **Orquestacion**: Dagster
 - **ETL**: dbt (raw -> staging -> marts)
@@ -34,9 +34,9 @@ Scrapers -> raw.raw_listings (JSONB) -> dbt -> marts.dim_leads -> Django Lead mo
 ```bash
 # === LOCAL ===
 docker-compose up -d
-python run_pisos_scraper.py --zones salou --postgres          # HTTP (rapido)
-python run_camoufox_milanuncios.py salou cambrils             # Camoufox
-python run_habitaclia_scraper.py --zones salou --postgres     # Botasaurus
+python run_pisos_scraper.py --zones salou --postgres              # HTTP
+python run_http_milanuncios_scraper.py --zones salou --postgres   # HTTP + curl_cffi (bypasses GeeTest)
+python run_habitaclia_scraper.py --zones salou --postgres         # Botasaurus
 docker exec casa-teva-postgres psql -U casa_teva -d casa_teva_db -c "SELECT portal, COUNT(*) FROM marts.dim_leads GROUP BY portal;"
 
 # === AZURE ===
@@ -48,10 +48,10 @@ az containerapp revision list -n dagster-scrapers -g inmoleads-crm -o table
 
 | Portal | Tecnologia | Anti-bot | Velocidad |
 |--------|------------|----------|-----------|
-| pisos.com | HTTP puro | Ninguno | ~15s/zona |
+| pisos.com | HTTP puro (requests) | Ninguno | ~15s/zona |
+| milanuncios | HTTP + curl_cffi | GeeTest (bypassed via TLS fingerprint) | ~20s/zona |
 | habitaclia | Botasaurus (Chrome) | Minimo | ~2min/zona |
 | fotocasa | Botasaurus (Chrome) | Minimo | ~2min/zona |
-| milanuncios | Camoufox (Firefox) | GeeTest captcha | ~3min/zona |
 | idealista | Camoufox (Firefox) | DataDome | ~3min/zona |
 
 ### Portal names para BD
