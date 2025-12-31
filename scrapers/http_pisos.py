@@ -426,10 +426,16 @@ class HttpPisosScraper:
         return all_listings
 
     def scrape_and_save(self) -> Dict[str, int]:
-        """Scrape all zones and save to PostgreSQL."""
+        """Scrape all zones and save to PostgreSQL (only particulares)."""
         listings = self.scrape()
 
         for listing in listings:
+            # Filter out agencies - only save particulares
+            if not listing.get('es_particular', True):
+                self.stats['filtered_out'] += 1
+                logger.debug(f"Filtered out agency: {listing.get('vendedor')} - {listing.get('titulo', '')[:40]}")
+                continue
+
             if self.save_to_postgres(listing):
                 self.stats['saved'] += 1
 
