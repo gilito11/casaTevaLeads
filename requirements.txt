@@ -17,7 +17,7 @@ playwright==1.48.0
 scrapy==2.11.0
 scrapy-playwright==0.0.34
 botasaurus==4.0.72
-camoufox>=0.4.11  # Anti-detect browser for Milanuncios (GeeTest) and Idealista (DataDome)
+camoufox[geoip]>=0.4.11  # Anti-detect browser with GeoIP for Milanuncios/Idealista
 requests>=2.31.0  # HTTP client
 
 # Dagster
