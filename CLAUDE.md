@@ -3,43 +3,40 @@
 > **Last Updated**: 31 December 2025
 
 ## Resumen
-Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales. **100% gratuito** - sin APIs de pago.
+Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales.
 
 ## Stack
 - **Backend**: Django 5.x + DRF
 - **BD**: PostgreSQL 16 (Azure PostgreSQL en prod)
-- **Scrapers**: HTTP (pisos, milanuncios), Botasaurus (habitaclia, fotocasa), Camoufox (idealista)
+- **Scrapers**: HTTP (pisos), Botasaurus (habitaclia, fotocasa), ScrapingBee (milanuncios, idealista)
 - **Orquestacion**: Dagster
 - **ETL**: dbt (raw -> staging -> marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
 
 ## Scrapers - Estado actual
 
-| Portal | Tecnologia | Azure | Local | Notas |
+| Portal | Tecnologia | Azure | Local | Coste |
 |--------|------------|-------|-------|-------|
-| pisos.com | HTTP (requests) | ✅ | ✅ | Filtra agencias automáticamente |
-| habitaclia | Botasaurus | ✅ | ✅ | Chrome headless |
-| fotocasa | Botasaurus | ✅ | ✅ | Chrome headless |
-| milanuncios | HTTP (curl_cffi) | ❌ 403 | ✅ | **Solo funciona desde IP residencial** |
-| idealista | Camoufox | ❌ | ❌ | DataDome muy agresivo |
+| pisos.com | HTTP (requests) | ✅ | ✅ | Gratis |
+| habitaclia | Botasaurus | ✅ | ✅ | Gratis |
+| fotocasa | Botasaurus | ✅ | ✅ | Gratis |
+| milanuncios | ScrapingBee | ✅ | ✅ | 75 credits/req |
+| idealista | ScrapingBee | ✅ | ✅ | 75 credits/req |
 
-### Limitación Milanuncios
-Milanuncios bloquea IPs de datacenter (Azure):
-- curl_cffi → 403 Forbidden
-- Camoufox → GeeTest captcha
-
-**Solución**: Ejecutar localmente desde IP residencial:
-```bash
-python run_http_milanuncios_scraper.py --zones salou reus lleida_ciudad --postgres
-```
+### ScrapingBee
+- API Key: configurada en Azure Container Apps y GitHub Secrets
+- Plan: 50€/mes = 250,000 credits = ~3,333 requests
+- Stealth proxy bypass: GeeTest (Milanuncios), DataDome (Idealista)
 
 ## Comandos
 
 ```bash
 # === LOCAL ===
 python run_pisos_scraper.py --zones salou --postgres
-python run_http_milanuncios_scraper.py --zones salou reus --postgres  # Solo local!
 python run_habitaclia_scraper.py --zones salou --postgres
+python run_fotocasa_scraper.py --zones salou --postgres
+python run_scrapingbee_milanuncios_scraper.py --zones salou reus --postgres
+python run_scrapingbee_idealista_scraper.py --zones salou cambrils --postgres
 
 # === AZURE LOGS ===
 az containerapp logs show -n dagster-scrapers -g inmoleads-crm --type console --tail 100

@@ -422,10 +422,10 @@ def scraping_all_portals(
                 if mapped not in pisos_zones:
                     pisos_zones.append(mapped)
 
-        # === Milanuncios with HTTP/curl_cffi (FREE - bypasses GeeTest via TLS fingerprint) ===
+        # === Milanuncios with ScrapingBee (paid - bypasses GeeTest via stealth proxy) ===
         if milanuncios_zones:
-            context.log.info("Running Milanuncios with HTTP/curl_cffi (free TLS fingerprint impersonation)")
-            result = run_scraper(context, 'http_milanuncios', milanuncios_zones, tenant_id)
+            context.log.info("Running Milanuncios with ScrapingBee (stealth proxy)")
+            result = run_scraper(context, 'scrapingbee_milanuncios', milanuncios_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
@@ -463,8 +463,7 @@ def scraping_all_portals(
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
-        # === Idealista with Camoufox (FREE - no API key needed) ===
-        # Camoufox is an open-source anti-detect browser that bypasses DataDome
+        # === Idealista with ScrapingBee (paid - bypasses DataDome via stealth proxy) ===
         idealista_zones = []
         for slug in zone_slugs:
             if slug in ZONA_MAPPING_IDEALISTA:
@@ -473,8 +472,8 @@ def scraping_all_portals(
                     idealista_zones.append(mapped)
 
         if idealista_zones:
-            context.log.info("Running Idealista with Camoufox (free anti-detect browser)")
-            result = run_scraper(context, 'camoufox_idealista', idealista_zones, tenant_id)
+            context.log.info("Running Idealista with ScrapingBee (stealth proxy)")
+            result = run_scraper(context, 'scrapingbee_idealista', idealista_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
