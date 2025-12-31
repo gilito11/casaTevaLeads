@@ -192,27 +192,39 @@ class CamoufoxMilanuncios:
             return digits
         return None
 
-    def _human_delay(self, min_sec: float = 1.0, max_sec: float = 3.0):
-        """Random delay to simulate human behavior."""
+    def _human_delay(self, min_sec: float = 2.0, max_sec: float = 5.0):
+        """Random delay to simulate human behavior - longer delays avoid detection."""
         time.sleep(random.uniform(min_sec, max_sec))
 
     def _warmup_navigation(self, page):
-        """Warmup: visit homepage first to build trust."""
+        """Warmup: visit homepage first to build trust and look human."""
         logger.info("Warming up: visiting homepage...")
 
         page.goto(self.BASE_URL, wait_until='domcontentloaded')
-        self._human_delay(2, 4)
+        self._human_delay(4, 7)  # Longer initial wait
 
-        # Scroll a bit
-        page.mouse.wheel(0, random.randint(100, 300))
-        self._human_delay(1, 2)
+        # Scroll multiple times like a human browsing
+        for _ in range(random.randint(2, 4)):
+            page.mouse.wheel(0, random.randint(150, 400))
+            self._human_delay(1.5, 3)
 
         # Accept cookies if present
         try:
             accept_btn = page.query_selector('button[id*="accept"], button:has-text("Aceptar")')
             if accept_btn:
                 accept_btn.click()
-                self._human_delay(1, 2)
+                self._human_delay(2, 4)
+        except:
+            pass
+
+        # Maybe click on something random (categories) to look more human
+        try:
+            categories = page.query_selector_all('a[href*="/inmobiliaria/"], a[href*="/pisos"]')
+            if categories and random.random() > 0.5:
+                random.choice(categories[:5]).click()
+                self._human_delay(3, 5)
+                page.go_back()
+                self._human_delay(2, 4)
         except:
             pass
 
@@ -234,31 +246,88 @@ class CamoufoxMilanuncios:
         return base_url
 
     def _extract_listings_from_page(self, page, zona_key: str) -> List[Dict[str, Any]]:
-        """Extract listing data from search results page."""
+        """Extract listing data from search results page.
+
+        Milanuncios is a React SPA that embeds listing data in window.__INITIAL_PROPS__.
+        We extract directly from JSON for reliability instead of fragile CSS selectors.
+        """
         listings = []
 
         try:
-            # Wait for listings
+            # Method 1: Extract from embedded JSON (most reliable)
+            try:
+                json_data = page.evaluate("""
+                    () => {
+                        // Try __INITIAL_PROPS__ first
+                        if (window.__INITIAL_PROPS__) {
+                            return window.__INITIAL_PROPS__;
+                        }
+                        // Try __NEXT_DATA__ (Next.js apps)
+                        if (window.__NEXT_DATA__) {
+                            return window.__NEXT_DATA__.props;
+                        }
+                        // Try to find script tags with JSON
+                        const scripts = document.querySelectorAll('script');
+                        for (const script of scripts) {
+                            const text = script.textContent || '';
+                            if (text.includes('__INITIAL_PROPS__') || text.includes('"ads":[')) {
+                                try {
+                                    const match = text.match(/window\.__INITIAL_PROPS__\s*=\s*JSON\.parse\("(.+?)"\)/);
+                                    if (match) {
+                                        return JSON.parse(match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\\\'));
+                                    }
+                                } catch (e) {}
+                            }
+                        }
+                        return null;
+                    }
+                """)
+
+                if json_data:
+                    logger.info(f"Found JSON data with keys: {list(json_data.keys()) if isinstance(json_data, dict) else type(json_data)}")
+                    listings = self._parse_json_listings(json_data, zona_key)
+                    if listings:
+                        logger.info(f"Extracted {len(listings)} listings from JSON data")
+                        return listings
+                    else:
+                        logger.warning("JSON data found but no listings extracted")
+                else:
+                    logger.debug("No JSON data found in page")
+
+            except Exception as e:
+                logger.warning(f"JSON extraction failed: {e}")
+
+            # Method 2: Fallback to DOM selectors
             selectors = [
-                'article.ma-AdCard',
+                'article[data-testid="ad-card"]',
                 'article[class*="AdCard"]',
+                'div[class*="AdCard"]',
+                'article.ma-AdCard',
                 '.ma-AdCardV2',
                 'article.AdCard',
+                '[data-testid="listing"]',
+                'article[data-ad-id]',
             ]
 
             items = []
             for selector in selectors:
                 try:
-                    page.wait_for_selector(selector, timeout=10000)
+                    page.wait_for_selector(selector, timeout=5000)
                     items = page.query_selector_all(selector)
                     if items:
-                        logger.info(f"Found {len(items)} cards using: {selector}")
+                        logger.info(f"Found {len(items)} cards using selector: {selector}")
                         break
                 except:
                     continue
 
             if not items:
-                logger.warning("No listing cards found")
+                # Debug: log what we can find
+                try:
+                    html_sample = page.evaluate("() => document.body.innerHTML.substring(0, 2000)")
+                    logger.debug(f"Page HTML sample: {html_sample[:500]}")
+                except:
+                    pass
+                logger.warning("No listing cards found via DOM or JSON")
                 return []
 
             for item in items:
@@ -275,16 +344,152 @@ class CamoufoxMilanuncios:
 
         return listings
 
-    def _parse_listing_card(self, item, zona_key: str) -> Optional[Dict[str, Any]]:
-        """Parse a single listing card."""
-        try:
-            # Check if professional (agency)
-            pro_badge = item.query_selector('[class*="professional"], [class*="Pro"], .ma-AdTag--pro')
-            if pro_badge and self.only_particulares:
-                return None
+    def _parse_json_listings(self, json_data: Dict, zona_key: str) -> List[Dict[str, Any]]:
+        """Parse listings from Milanuncios JSON structure."""
+        listings = []
 
-            # Get link and ID
-            link = item.query_selector('a[href*="/anuncios/"]')
+        try:
+            # Navigate JSON structure to find ads array
+            ads = None
+
+            # Try different paths where ads might be
+            if isinstance(json_data, dict):
+                # Direct ads array
+                if 'ads' in json_data:
+                    ads = json_data['ads']
+                # Nested in pageProps
+                elif 'pageProps' in json_data and 'ads' in json_data['pageProps']:
+                    ads = json_data['pageProps']['ads']
+                # Nested in data
+                elif 'data' in json_data and 'ads' in json_data['data']:
+                    ads = json_data['data']['ads']
+                # Search in all keys
+                else:
+                    for key, value in json_data.items():
+                        if isinstance(value, dict) and 'ads' in value:
+                            ads = value['ads']
+                            break
+                        elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
+                            if 'id' in value[0] and 'url' in value[0]:
+                                ads = value
+                                break
+
+            if not ads:
+                # Debug: show structure to help find ads
+                if isinstance(json_data, dict):
+                    logger.warning(f"Could not find ads. Top-level keys: {list(json_data.keys())}")
+                    for key, value in json_data.items():
+                        if isinstance(value, dict):
+                            logger.debug(f"  {key}: dict with keys {list(value.keys())[:5]}")
+                        elif isinstance(value, list):
+                            logger.debug(f"  {key}: list with {len(value)} items")
+                return []
+
+            logger.info(f"Found {len(ads)} ads in JSON, filtering particulares...")
+            zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+
+            for ad in ads:
+                try:
+                    # Filter professionals if needed
+                    seller_type = ad.get('sellerType', '').lower()
+                    if self.only_particulares and seller_type == 'professional':
+                        continue
+
+                    anuncio_id = str(ad.get('id', ''))
+                    if not anuncio_id:
+                        continue
+
+                    # Extract price
+                    precio = None
+                    price_data = ad.get('price', {})
+                    if isinstance(price_data, dict):
+                        cash_price = price_data.get('cashPrice', {})
+                        if isinstance(cash_price, dict):
+                            precio = cash_price.get('value')
+                        elif 'value' in price_data:
+                            precio = price_data.get('value')
+                    elif isinstance(price_data, (int, float)):
+                        precio = price_data
+
+                    # Build URL
+                    url_path = ad.get('url', '')
+                    url_anuncio = f"{self.BASE_URL}{url_path}" if url_path.startswith('/') else url_path
+
+                    # Extract location
+                    ubicacion = ''
+                    if 'city' in ad and isinstance(ad['city'], dict):
+                        ubicacion = ad['city'].get('name', '')
+                    elif 'location' in ad:
+                        ubicacion = ad.get('location', '')
+
+                    listing = {
+                        'anuncio_id': anuncio_id,
+                        'titulo': ad.get('title', ''),
+                        'precio': precio,
+                        'descripcion': ad.get('description', '')[:500] if ad.get('description') else '',
+                        'ubicacion': ubicacion,
+                        'zona_geografica': zona_info.get('nombre', zona_key),
+                        'zona_busqueda': zona_key,
+                        'url_anuncio': url_anuncio,
+                        'es_particular': seller_type != 'professional',
+                        'tipo_inmueble': 'piso',
+                    }
+
+                    # Extract images if available
+                    if 'images' in ad and ad['images']:
+                        listing['imagenes'] = ad['images'][:5]
+
+                    listings.append(listing)
+
+                except Exception as e:
+                    logger.debug(f"Error parsing JSON ad: {e}")
+                    continue
+
+        except Exception as e:
+            logger.error(f"Error parsing JSON listings: {e}")
+
+        return listings
+
+    def _parse_listing_card(self, item, zona_key: str) -> Optional[Dict[str, Any]]:
+        """Parse a single listing card from DOM (fallback method)."""
+        try:
+            # Check if professional (agency) - various patterns
+            pro_selectors = [
+                '[class*="professional"]',
+                '[class*="Professional"]',
+                '[class*="Pro"]',
+                '.ma-AdTag--pro',
+                '[data-seller-type="professional"]',
+                '[class*="agency"]',
+            ]
+            for sel in pro_selectors:
+                try:
+                    if item.query_selector(sel) and self.only_particulares:
+                        return None
+                except:
+                    continue
+
+            # Get link and ID - multiple patterns
+            link = None
+            link_selectors = [
+                'a[href*=".htm"]',
+                'a[href*="/anuncios/"]',
+                'a[href*="/pisos"]',
+                'a[data-testid="ad-link"]',
+                'a[class*="Link"]',
+            ]
+            for sel in link_selectors:
+                try:
+                    link = item.query_selector(sel)
+                    if link:
+                        break
+                except:
+                    continue
+
+            if not link:
+                # Try getting any link
+                link = item.query_selector('a')
+
             if not link:
                 return None
 
@@ -292,34 +497,81 @@ class CamoufoxMilanuncios:
             if not href:
                 return None
 
-            # Extract ID from URL
-            id_match = re.search(r'/(\d+)\.htm', href)
-            if not id_match:
-                id_match = re.search(r'-(\d+)$', href.rstrip('/'))
+            # Extract ID from URL - multiple patterns
+            anuncio_id = None
+            id_patterns = [
+                r'-(\d{8,})\.htm',    # xxx-12345678.htm
+                r'/(\d{8,})\.htm',    # /12345678.htm
+                r'-(\d{8,})$',        # -12345678
+                r'id=(\d+)',          # ?id=12345678
+                r'(\d{8,})',          # any 8+ digit number
+            ]
+            for pattern in id_patterns:
+                match = re.search(pattern, href)
+                if match:
+                    anuncio_id = match.group(1)
+                    break
 
-            if not id_match:
+            if not anuncio_id:
+                # Try data attribute
+                anuncio_id = item.get_attribute('data-ad-id') or item.get_attribute('data-id')
+
+            if not anuncio_id:
                 return None
 
-            anuncio_id = id_match.group(1)
+            # Title - multiple patterns
+            titulo = ''
+            title_selectors = ['h2', 'h3', '[class*="title"]', '[class*="Title"]', '[data-testid="ad-title"]']
+            for sel in title_selectors:
+                try:
+                    elem = item.query_selector(sel)
+                    if elem:
+                        titulo = elem.inner_text().strip()
+                        if titulo:
+                            break
+                except:
+                    continue
 
-            # Title
-            title_elem = item.query_selector('h2, .ma-AdCard-title, [class*="title"]')
-            titulo = title_elem.inner_text().strip() if title_elem else ''
-
-            # Price
-            price_elem = item.query_selector('[class*="price"], .ma-AdCard-price')
+            # Price - multiple patterns
             precio = None
-            if price_elem:
-                price_text = price_elem.inner_text()
-                precio = self._parse_price(price_text)
+            price_selectors = ['[class*="price"]', '[class*="Price"]', '[data-testid="ad-price"]']
+            for sel in price_selectors:
+                try:
+                    elem = item.query_selector(sel)
+                    if elem:
+                        price_text = elem.inner_text()
+                        precio = self._parse_price(price_text)
+                        if precio:
+                            break
+                except:
+                    continue
 
             # Description
-            desc_elem = item.query_selector('[class*="description"], .ma-AdCard-description')
-            descripcion = desc_elem.inner_text().strip()[:500] if desc_elem else ''
+            descripcion = ''
+            desc_selectors = ['[class*="description"]', '[class*="Description"]', 'p']
+            for sel in desc_selectors:
+                try:
+                    elem = item.query_selector(sel)
+                    if elem:
+                        text = elem.inner_text().strip()
+                        if len(text) > 20:  # Avoid short labels
+                            descripcion = text[:500]
+                            break
+                except:
+                    continue
 
             # Location
-            location_elem = item.query_selector('[class*="location"], .ma-AdCard-location')
-            ubicacion = location_elem.inner_text().strip() if location_elem else ''
+            ubicacion = ''
+            loc_selectors = ['[class*="location"]', '[class*="Location"]', '[class*="city"]']
+            for sel in loc_selectors:
+                try:
+                    elem = item.query_selector(sel)
+                    if elem:
+                        ubicacion = elem.inner_text().strip()
+                        if ubicacion:
+                            break
+                except:
+                    continue
 
             zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
@@ -481,9 +733,19 @@ class CamoufoxMilanuncios:
         logger.info(f"  Max pages: {self.max_pages_per_zone}")
 
         try:
+            # Enhanced anti-detection config to avoid triggering GeeTest
+            # - geoip: matches fingerprint (timezone, locale) to IP location
+            # - locale: Spanish locale for Spanish site
+            # - block_webrtc: prevents IP leak that could expose datacenter
+            # - os: Windows is most common in Spain
+            # - humanize: slower, more realistic cursor movements
             with Camoufox(
-                humanize=True,
+                humanize=2.5,  # Slower cursor movements (max 2.5 seconds)
                 headless=headless_mode,
+                geoip=True,  # Auto-match timezone/locale to IP
+                os="windows",  # Most common OS in Spain
+                block_webrtc=True,  # Prevent WebRTC IP leak
+                locale=["es-ES", "es"],  # Spanish locale
             ) as browser:
                 page = browser.new_page()
 
