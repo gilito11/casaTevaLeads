@@ -296,17 +296,29 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
             logger.info(f"Loading: {url}")
             driver.get(url)
-            driver.sleep(4)
+            driver.sleep(5)  # Increased wait
 
-            # Scroll to load content
-            driver.run_js('window.scrollTo({top: 800, behavior: "smooth"})')
-            driver.sleep(2)
+            # Accept cookies if present
+            try:
+                driver.run_js('''
+                    const acceptBtn = document.querySelector('[id*="accept"], [class*="accept-cookies"], .cookie-accept');
+                    if (acceptBtn) acceptBtn.click();
+                ''')
+                driver.sleep(1)
+            except:
+                pass
+
+            # Scroll multiple times to load lazy content
+            for i in range(4):
+                driver.run_js(f'window.scrollTo({{top: {600 * (i+1)}, behavior: "smooth"}})')
+                driver.sleep(1.5)
 
             html = driver.page_html
+            logger.info(f"HTML length: {len(html)}")
 
-            # Check for blocking
-            if len(html) < 50000:
-                logger.warning("Possible blocking or empty results")
+            # Check for blocking - lowered threshold
+            if len(html) < 30000:
+                logger.warning(f"Possible blocking or empty results (HTML: {len(html)} bytes)")
                 return []
 
             # Extract listing URLs - Habitaclia format (may have query params)

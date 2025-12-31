@@ -208,25 +208,48 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
 
             logger.info(f"Loading: {url}")
             driver.get(url)
-            driver.sleep(6)
+            driver.sleep(8)  # Increased wait for JS rendering
+
+            # Accept cookies if present
+            try:
+                driver.run_js('''
+                    const acceptBtn = document.querySelector('[data-testid="TcfAccept"], .sui-AtomButton--primary, button[id*="accept"], button[class*="accept"]');
+                    if (acceptBtn) acceptBtn.click();
+                ''')
+                driver.sleep(1)
+            except:
+                pass
 
             # Scroll multiple times to load all lazy content
-            for i in range(4):
-                driver.run_js(f'window.scrollTo({{top: {1000 * (i+1)}, behavior: "smooth"}})')
-                driver.sleep(1.5)
+            for i in range(6):  # More scrolls
+                driver.run_js(f'window.scrollTo({{top: {800 * (i+1)}, behavior: "smooth"}})')
+                driver.sleep(2)  # Longer wait between scrolls
+
+            # Scroll back to top and wait for any final rendering
+            driver.run_js('window.scrollTo({top: 0, behavior: "smooth"})')
+            driver.sleep(2)
 
             html = driver.page_html
+            logger.info(f"HTML length: {len(html)}")
 
-            # Check for blocking
-            if len(html) < 50000:
-                logger.warning("Possible blocking or empty results")
+            # Check for blocking - lowered threshold
+            if len(html) < 30000:
+                logger.warning(f"Possible blocking or empty results (HTML: {len(html)} bytes)")
                 return []
 
-            # Extract listing URLs (format: /es/comprar/vivienda/zona/.../ID/d or .../ID1/ID2)
+            # Extract listing URLs - multiple patterns for Fotocasa
+            # Pattern 1: Standard format /es/comprar/vivienda/.../ID or .../ID/d
+            # Pattern 2: Obra nueva format /es/comprar/vivienda/obra-nueva/.../ID1/ID2
             links = re.findall(r'href="(/es/comprar/vivienda/[^?"]+)"', html)
-            # Filter to only property detail links (end with /d or /digits)
-            links = [l for l in links if re.search(r'/\d+(?:/d)?$', l)]
-            unique_links = list(dict.fromkeys(links))
+
+            # Filter to property detail links (must contain at least one 7+ digit ID)
+            filtered_links = []
+            for link in links:
+                # Match URLs with property IDs (7+ digits)
+                if re.search(r'/\d{7,}', link):
+                    filtered_links.append(link)
+
+            unique_links = list(dict.fromkeys(filtered_links))
 
             logger.info(f"Found {len(unique_links)} listing links")
 
@@ -234,12 +257,16 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
             for link in unique_links[:20]:  # Limit to avoid timeout
                 detail_url = f"{base_url}{link}"
 
-                # Extract ID from URL (last number before /d)
-                id_match = re.search(r'/(\d{7,})(?:/d)?$', link)
-                if not id_match:
+                # Extract ID from URL - handle multiple formats:
+                # - /zona/ID/d -> take ID
+                # - /zona/projectID/unitID -> take unitID (last number)
+                # - /zona/ID -> take ID
+                id_matches = re.findall(r'/(\d{7,})', link)
+                if not id_matches:
                     continue
 
-                anuncio_id = id_match.group(1)
+                # Use the last (most specific) ID
+                anuncio_id = id_matches[-1]
 
                 listings.append({
                     'anuncio_id': anuncio_id,
