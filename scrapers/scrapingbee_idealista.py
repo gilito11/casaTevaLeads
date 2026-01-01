@@ -222,13 +222,10 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             raise ValueError(f"Zone not found: {zona_key}")
 
         # Idealista URL format: /venta-viviendas/zona/
-        # With particulares filter: /venta-viviendas/zona/con-publicado-particular/
+        # Note: Idealista doesn't have a public URL filter for particulares
+        # Agency filtering is done programmatically in _scrape_detail_page()
         url_path = zona['url_path']
-
-        if self.only_particulares:
-            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/con-publicado-particular/"
-        else:
-            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
+        base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
 
         if page > 1:
             base_url += f'pagina-{page}.htm'
@@ -252,13 +249,22 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
         """Extract listing URLs and basic data from search results HTML."""
         listings = []
 
-        # Check for blocking indicators
-        if 'blocked' in html.lower() or 'captcha' in html.lower():
-            logger.warning("Blocking detected in response")
-            return []
+        # Check for actual blocking indicators (DataDome, access denied, etc.)
+        # Note: "blocked" and "captcha" appear in normal page content (CSS classes, URL configs)
+        blocking_patterns = [
+            r'access.denied|acceso.denegado',
+            r'you.have.been.blocked',
+            r'datadome.*blocked',
+            r'<title>.*blocked.*</title>',
+            r'please.complete.*captcha.*to.continue',
+        ]
+        for pattern in blocking_patterns:
+            if re.search(pattern, html, re.IGNORECASE):
+                logger.warning(f"Blocking detected: {pattern}")
+                return []
 
         # Find listing URLs in article elements
-        # Idealista format: /inmueble/ID/ or /venta-viviendas/.../ID/
+        # Idealista format: /inmueble/ID/
         url_pattern = r'href="(/inmueble/(\d+)/)"'
         matches = re.findall(url_pattern, html)
 
