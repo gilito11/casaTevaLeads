@@ -17,13 +17,15 @@ Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales.
 
 | Portal | Tecnologia | Azure | Local | Coste | Datos extraidos |
 |--------|------------|-------|-------|-------|-----------------|
-| pisos.com | HTTP (requests) | ✅ | ✅ | Gratis | titulo, precio, telefono, metros, fotos |
-| habitaclia | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, telefono*, metros, fotos |
+| pisos.com | HTTP (requests) | ✅ | ✅ | Gratis | titulo, precio, telefono, metros |
+| habitaclia | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, metros, fotos |
 | fotocasa | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, telefono, metros, fotos |
 | milanuncios | ScrapingBee | ✅ | ✅ | 75 credits/req | titulo, precio, telefono, metros, fotos |
 | idealista | ScrapingBee | ✅ | ✅ | 75 credits/req | titulo, precio, telefono, metros, fotos |
 
-*Habitaclia: telefono extraido via click en boton "Ver telefono"
+### Limitaciones conocidas
+- **Habitaclia**: Telefono oculto tras AJAX (requiere login/interaccion), no extraible
+- **Pisos.com**: Fotos en lazy-loading, extraccion parcial
 
 ### ScrapingBee
 - API Key: configurada en Azure Container Apps y GitHub Secrets
