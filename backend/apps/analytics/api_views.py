@@ -5,7 +5,7 @@ All endpoints support the following query parameters:
 - fecha_inicio: Start date (YYYY-MM-DD)
 - fecha_fin: End date (YYYY-MM-DD)
 - portal: Filter by source portal (pisos, habitaclia, fotocasa, milanuncios, idealista)
-- zona: Filter by zona_clasificada
+- zona: Filter by zona_geografica
 - estado: Filter by lead estado
 """
 from django.http import JsonResponse
@@ -51,22 +51,22 @@ def build_where_clause(request, table_alias='l'):
     fecha_fin = request.GET.get('fecha_fin')
 
     if fecha_inicio:
-        conditions.append(f"DATE({table_alias}.ultima_actualizacion) >= %s")
+        conditions.append(f"DATE({table_alias}.updated_at) >= %s")
         params.append(fecha_inicio)
     if fecha_fin:
-        conditions.append(f"DATE({table_alias}.ultima_actualizacion) <= %s")
+        conditions.append(f"DATE({table_alias}.updated_at) <= %s")
         params.append(fecha_fin)
 
     # Portal filter
     portal = request.GET.get('portal')
     if portal and portal != 'todos':
-        conditions.append(f"{table_alias}.source_portal = %s")
+        conditions.append(f"{table_alias}.portal = %s")
         params.append(portal)
 
     # Zone filter
     zona = request.GET.get('zona')
     if zona and zona != 'todas':
-        conditions.append(f"{table_alias}.zona_clasificada = %s")
+        conditions.append(f"{table_alias}.zona_geografica = %s")
         params.append(zona)
 
     # Estado filter (requires join with lead_estado)
@@ -105,9 +105,8 @@ def api_kpis(request):
             WITH lead_con_estado AS (
                 SELECT
                     l.*,
-                    COALESCE(e.estado, 'NUEVO') as estado_real
+                    COALESCE(l.estado, 'NUEVO') as estado_real
                 FROM marts.dim_leads l
-                LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
                 WHERE {where_clause} {estado_condition}
             )
             SELECT
@@ -123,10 +122,10 @@ def api_kpis(request):
                     ELSE 0 END, 1
                 ) as tasa_conversion,
                 COALESCE(SUM(precio) FILTER (WHERE estado_real NOT IN ('NO_INTERESADO', 'NO_CONTACTAR', 'YA_VENDIDO')), 0) as valor_pipeline,
-                COUNT(*) FILTER (WHERE ultima_actualizacion >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
-                COUNT(*) FILTER (WHERE ultima_actualizacion >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes,
+                COUNT(*) FILTER (WHERE updated_at >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
+                COUNT(*) FILTER (WHERE updated_at >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes,
                 COALESCE(AVG(precio), 0) as precio_medio,
-                COUNT(DISTINCT source_portal) as portales_activos
+                COUNT(DISTINCT portal) as portales_activos
             FROM lead_con_estado
         """, params)
 
@@ -148,10 +147,9 @@ def api_embudo(request):
         cursor.execute(f"""
             WITH lead_con_estado AS (
                 SELECT
-                    COALESCE(e.estado, 'NUEVO') as estado_real,
+                    COALESCE(l.estado, 'NUEVO') as estado_real,
                     l.precio
                 FROM marts.dim_leads l
-                LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
                 WHERE {where_clause}
             ),
             total AS (SELECT COUNT(*) as cnt FROM lead_con_estado),
@@ -202,26 +200,26 @@ def api_leads_por_dia(request):
 
     # Default to last 30 days if no date range specified
     if not request.GET.get('fecha_inicio'):
-        where_clause += " AND l.ultima_actualizacion >= CURRENT_DATE - INTERVAL '30 days'"
+        where_clause += " AND l.updated_at >= CURRENT_DATE - INTERVAL '30 days'"
 
     with connection.cursor() as cursor:
         estado_join = ""
         estado_condition = ""
         if estado_filter:
-            estado_join = "LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id"
+            estado_join = "LEFT JOIN leads_lead_estado e ON l.lead_id::text = e.lead_id"
             estado_condition = f"AND COALESCE(e.estado, 'NUEVO') = %s"
             params.append(estado_filter)
 
         cursor.execute(f"""
             SELECT
-                DATE(l.ultima_actualizacion) as fecha,
+                DATE(l.updated_at) as fecha,
                 COUNT(*) as leads_captados,
                 COUNT(DISTINCT l.telefono_norm) as leads_unicos,
                 COALESCE(AVG(l.precio), 0) as precio_medio
             FROM marts.dim_leads l
             {estado_join}
             WHERE {where_clause} {estado_condition}
-            GROUP BY DATE(l.ultima_actualizacion)
+            GROUP BY DATE(l.updated_at)
             ORDER BY fecha
         """, params)
 
@@ -243,12 +241,12 @@ def api_evolucion_precios(request):
 
     # Default to last 12 weeks if no date range specified
     if not request.GET.get('fecha_inicio'):
-        where_clause += " AND l.ultima_actualizacion >= CURRENT_DATE - INTERVAL '12 weeks'"
+        where_clause += " AND l.updated_at >= CURRENT_DATE - INTERVAL '12 weeks'"
 
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                DATE_TRUNC('week', l.ultima_actualizacion)::date as semana,
+                DATE_TRUNC('week', l.updated_at)::date as semana,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l.precio), 0) as precio_mediana,
                 COALESCE(MIN(l.precio), 0) as min_precio,
@@ -256,7 +254,7 @@ def api_evolucion_precios(request):
                 COUNT(*) as total_inmuebles
             FROM marts.dim_leads l
             WHERE {where_clause} AND l.precio > 0
-            GROUP BY DATE_TRUNC('week', l.ultima_actualizacion)
+            GROUP BY DATE_TRUNC('week', l.updated_at)
             ORDER BY semana
         """, params)
 
@@ -286,13 +284,13 @@ def api_comparativa_portales(request):
         cursor.execute(f"""
             WITH lead_con_estado AS (
                 SELECT
-                    l.source_portal as portal,
+                    l.portal as portal,
                     l.telefono_norm,
                     l.precio,
-                    l.superficie_m2,
+                    l.metros,
                     COALESCE(e.estado, 'NUEVO') as estado_real
                 FROM marts.dim_leads l
-                LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
+                LEFT JOIN leads_lead_estado e ON l.lead_id::text = e.lead_id
                 WHERE {where_clause} {estado_condition}
             )
             SELECT
@@ -306,7 +304,7 @@ def api_comparativa_portales(request):
                     ELSE 0 END, 1
                 ) as tasa_conversion,
                 COALESCE(AVG(precio), 0) as precio_medio,
-                COALESCE(AVG(CASE WHEN superficie_m2 > 0 THEN precio / superficie_m2 ELSE NULL END), 0) as precio_m2_medio
+                COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio
             FROM lead_con_estado
             GROUP BY portal
             ORDER BY total_leads DESC
@@ -329,20 +327,20 @@ def api_precios_por_zona(request):
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                l.zona_clasificada,
+                l.zona_geografica,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l.precio), 0) as precio_mediana,
-                COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio,
+                COALESCE(AVG(CASE WHEN l.metros > 0 THEN l.precio / l.metros ELSE NULL END), 0) as precio_m2_medio,
                 COUNT(*) as total_inmuebles,
                 COALESCE(MIN(l.precio), 0) as precio_min,
                 COALESCE(MAX(l.precio), 0) as precio_max
             FROM marts.dim_leads l
             WHERE {where_clause}
-              AND l.zona_clasificada IS NOT NULL
-              AND l.zona_clasificada != ''
-              AND l.zona_clasificada != 'Otros'
+              AND l.zona_geografica IS NOT NULL
+              AND l.zona_geografica != ''
+              AND l.zona_geografica != 'Otros'
               AND l.precio > 0
-            GROUP BY l.zona_clasificada
+            GROUP BY l.zona_geografica
             ORDER BY total_inmuebles DESC
             LIMIT 20
         """, params)
@@ -365,16 +363,16 @@ def api_tipologia(request):
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                COALESCE(l.tipo_propiedad, 'Sin especificar') as tipo_propiedad,
+                COALESCE(l.tipo_inmueble, 'Sin especificar') as tipo_inmueble,
                 COUNT(*) as total,
                 ROUND(100.0 * COUNT(*) / GREATEST(
                     (SELECT COUNT(*) FROM marts.dim_leads WHERE tenant_id = %s), 1
                 ), 1) as porcentaje,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
-                COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio
+                COALESCE(AVG(CASE WHEN l.metros > 0 THEN l.precio / l.metros ELSE NULL END), 0) as precio_m2_medio
             FROM marts.dim_leads l
             WHERE {where_clause}
-            GROUP BY l.tipo_propiedad
+            GROUP BY l.tipo_inmueble
             ORDER BY total DESC
         """, [tenant_id] + params)
 
@@ -395,22 +393,22 @@ def api_filter_options(request):
     with connection.cursor() as cursor:
         # Get distinct portals
         cursor.execute("""
-            SELECT DISTINCT source_portal
+            SELECT DISTINCT portal
             FROM marts.dim_leads
-            WHERE tenant_id = %s AND source_portal IS NOT NULL
-            ORDER BY source_portal
+            WHERE tenant_id = %s AND portal IS NOT NULL
+            ORDER BY portal
         """, [tenant_id])
         portales = [row[0] for row in cursor.fetchall()]
 
         # Get distinct zones
         cursor.execute("""
-            SELECT DISTINCT zona_clasificada
+            SELECT DISTINCT zona_geografica
             FROM marts.dim_leads
             WHERE tenant_id = %s
-              AND zona_clasificada IS NOT NULL
-              AND zona_clasificada != ''
-              AND zona_clasificada != 'Otros'
-            ORDER BY zona_clasificada
+              AND zona_geografica IS NOT NULL
+              AND zona_geografica != ''
+              AND zona_geografica != 'Otros'
+            ORDER BY zona_geografica
         """, [tenant_id])
         zonas = [row[0] for row in cursor.fetchall()]
 
@@ -442,7 +440,7 @@ def api_export_csv(request):
     estado_filter = get_estado_filter(request)
 
     with connection.cursor() as cursor:
-        estado_join = "LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id"
+        estado_join = "LEFT JOIN leads_lead_estado e ON l.lead_id::text = e.lead_id"
         estado_condition = ""
         if estado_filter:
             estado_condition = f"AND COALESCE(e.estado, 'NUEVO') = %s"
@@ -453,19 +451,19 @@ def api_export_csv(request):
                 l.lead_id,
                 l.telefono_norm,
                 l.email,
-                l.nombre_contacto,
-                l.source_portal,
-                l.zona_clasificada,
-                l.tipo_propiedad,
+                l.nombre,
+                l.portal,
+                l.zona_geografica,
+                l.tipo_inmueble,
                 l.precio,
-                l.superficie_m2,
+                l.metros,
                 l.habitaciones,
                 COALESCE(e.estado, 'NUEVO') as estado,
-                l.ultima_actualizacion
+                l.updated_at
             FROM marts.dim_leads l
             {estado_join}
             WHERE {where_clause} {estado_condition}
-            ORDER BY l.ultima_actualizacion DESC
+            ORDER BY l.updated_at DESC
             LIMIT 10000
         """, params)
 
