@@ -268,15 +268,45 @@ class HttpPisosScraper:
                     listing['descripcion'] = text[:2000]
                     break
 
-        # Extract photos
+        # Extract photos - Pisos.com uses multiple CDN patterns
         photos = []
-        for img in soup.find_all('img', src=re.compile(r'pisos\.com.*\.(jpg|jpeg|png|webp)', re.I)):
-            src = img.get('src') or img.get('data-src')
-            if src and 'logo' not in src.lower() and 'icon' not in src.lower():
+        seen = set()
+
+        # Pattern 1: Find all img tags with data-src (lazy loading)
+        for img in soup.find_all('img'):
+            src = img.get('data-src') or img.get('src') or img.get('data-lazy')
+            if not src:
+                continue
+            # Skip logos, icons, avatars
+            if any(x in src.lower() for x in ['logo', 'icon', 'avatar', 'placeholder', 'sprite']):
+                continue
+            # Look for property photos (various CDN patterns)
+            if re.search(r'(pisos|inmofoto|fotos|img\d*|cdn).*\.(jpg|jpeg|png|webp)', src, re.I):
                 if src.startswith('//'):
                     src = 'https:' + src
-                photos.append(src)
-        listing['fotos'] = list(dict.fromkeys(photos))[:10]
+                elif src.startswith('/'):
+                    src = f'https://www.pisos.com{src}'
+                if src not in seen:
+                    photos.append(src)
+                    seen.add(src)
+
+        # Pattern 2: Extract from JSON-LD or data attributes
+        json_photos = re.findall(r'"image"\s*:\s*"([^"]+\.(?:jpg|jpeg|png|webp))"', html, re.I)
+        for photo in json_photos:
+            if photo not in seen and 'logo' not in photo.lower():
+                photos.append(photo)
+                seen.add(photo)
+
+        # Pattern 3: Look for photo URLs in data attributes
+        data_photos = re.findall(r'data-(?:src|image|photo)="([^"]+\.(?:jpg|jpeg|png|webp))"', html, re.I)
+        for photo in data_photos:
+            if photo.startswith('//'):
+                photo = 'https:' + photo
+            if photo not in seen and 'logo' not in photo.lower():
+                photos.append(photo)
+                seen.add(photo)
+
+        listing['fotos'] = photos[:10]
 
         # Check if particular or agency
         has_agency_link = bool(re.search(r'href="[^"]*\/inmobiliaria-', html, re.IGNORECASE))

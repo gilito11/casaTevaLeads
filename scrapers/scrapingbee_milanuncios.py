@@ -382,27 +382,53 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         if not html:
             return listing
 
-        # Extract title
-        title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
-        if title_match:
-            listing['titulo'] = title_match.group(1).strip()
+        # Extract title - multiple patterns for Milanuncios
+        title_patterns = [
+            r'<h1[^>]*class="[^"]*[Tt]itle[^"]*"[^>]*>([^<]+)</h1>',
+            r'<h1[^>]*>([^<]{10,})</h1>',
+            r'"headline"\s*:\s*"([^"]+)"',  # JSON-LD
+            r'"name"\s*:\s*"([^"]+)"',  # JSON-LD
+            r'class="[^"]*AdDetail[^"]*[Tt]itle[^"]*"[^>]*>([^<]+)',
+            r'<title>([^<|]+)',  # Page title fallback
+        ]
+        for pattern in title_patterns:
+            title_match = re.search(pattern, html)
+            if title_match:
+                titulo = title_match.group(1).strip()
+                if titulo and len(titulo) > 5 and 'milanuncios' not in titulo.lower():
+                    listing['titulo'] = titulo
+                    break
 
-        # Extract description
-        desc_match = re.search(
+        # Extract description - multiple patterns
+        desc_patterns = [
             r'class="[^"]*AdDetail-description[^"]*"[^>]*>(.*?)</div>',
-            html, re.DOTALL
-        )
-        if desc_match:
-            desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
-            listing['descripcion'] = desc_text.strip()[:2000]
+            r'class="[^"]*[Dd]escription[^"]*"[^>]*>(.*?)</(?:div|section)',
+            r'"description"\s*:\s*"([^"]{50,})"',  # JSON-LD
+        ]
+        for pattern in desc_patterns:
+            desc_match = re.search(pattern, html, re.DOTALL)
+            if desc_match:
+                desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
+                desc_text = desc_text.strip()
+                if len(desc_text) > 30:
+                    listing['descripcion'] = desc_text[:2000]
+                    break
 
-        # Extract price
-        price_match = re.search(
-            r'class="[^"]*[Pp]rice[^"]*"[^>]*>([^<€]+)',
-            html
-        )
-        if price_match:
-            listing['precio'] = self._parse_price(price_match.group(1))
+        # Extract price - multiple patterns for Milanuncios
+        price_patterns = [
+            r'"price"\s*:\s*["\']?(\d+(?:\.\d+)?)',  # JSON
+            r'"price"\s*:\s*\{\s*"value"\s*:\s*(\d+)',  # JSON nested
+            r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|€)',  # Display format
+            r'class="[^"]*[Pp]rice[^"]*"[^>]*>\s*(\d{1,3}(?:[\.\s]\d{3})*)',
+            r'data-price="(\d+)"',
+        ]
+        for pattern in price_patterns:
+            price_match = re.search(pattern, html)
+            if price_match:
+                precio = self._parse_price(price_match.group(1))
+                if precio and precio > 1000:  # Sanity check - real estate > 1000€
+                    listing['precio'] = precio
+                    break
 
         # Extract location
         location_match = re.search(

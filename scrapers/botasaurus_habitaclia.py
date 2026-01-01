@@ -160,24 +160,27 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         """
         Extract phone number from Habitaclia detail page.
 
-        IMPORTANT: Only extract phones from legitimate contact sections.
-        Do NOT scan entire HTML for 9-digit numbers as this can pick up
-        listing IDs, tracking codes, or other non-phone numbers.
-
-        Returns None if no phone is found in a contact-related context.
+        Habitaclia typically hides phones behind a "Ver teléfono" button.
+        After clicking, the phone appears in various formats.
         """
         # Pattern 1: Phone in a visible tel: link (most reliable)
-        tel_link = re.search(r'href="tel:(\+?34)?([679]\d{8})"', html)
+        tel_link = re.search(r'href="tel:(?:\+?34)?([679]\d{8})"', html)
         if tel_link:
-            return tel_link.group(2)
+            return tel_link.group(1)
 
-        # Pattern 2: Phone displayed near contact button/section
-        # Look for phone in a contact-related container
+        # Pattern 2: Phone with Spanish prefix in any format
+        tel_with_prefix = re.search(r'(?:\+34|0034|34)?[\s\-]?([679]\d{2})[\s\-\.]?(\d{2})[\s\-\.]?(\d{2})[\s\-\.]?(\d{2})', html)
+        if tel_with_prefix:
+            phone = ''.join(tel_with_prefix.groups())
+            if len(phone) == 9 and phone[0] in '679':
+                return phone
+
+        # Pattern 3: Phone displayed in contact section after button click
         contact_section = re.search(
-            r'(?:class="[^"]*(?:contact|phone|telefono|llamar)[^"]*"[^>]*>.*?'
+            r'(?:class="[^"]*(?:contact|phone|telefono|llamar|advertiser)[^"]*"[^>]*>.*?'
             r'|data-phone[^>]*>.*?'
             r'|id="[^"]*phone[^"]*"[^>]*>.*?)'
-            r'([679]\d[\d\s\.\-]{7,12})',
+            r'([679][\d\s\.\-]{8,14})',
             html, re.IGNORECASE | re.DOTALL
         )
         if contact_section:
@@ -185,9 +188,9 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
             if len(phone) == 9:
                 return phone
 
-        # Pattern 3: Phone after "Teléfono:" or "Tel:" label
+        # Pattern 4: Phone after "Teléfono:" or similar labels
         phone_label = re.search(
-            r'(?:tel[ée]fono|tel\.?|llamar|phone)\s*:?\s*([679]\d[\d\s\.\-]{7,12})',
+            r'(?:tel[ée]fono|tel\.?|llamar|phone|m[oó]vil)\s*:?\s*([679][\d\s\.\-]{8,14})',
             html, re.IGNORECASE
         )
         if phone_label:
@@ -195,13 +198,26 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
             if len(phone) == 9:
                 return phone
 
-        # Pattern 4: Phone in JSON-LD structured data
-        json_phone = re.search(r'"telephone"\s*:\s*"(\+?34)?([679]\d{8})"', html)
+        # Pattern 5: Phone in JSON-LD structured data
+        json_phone = re.search(r'"telephone"\s*:\s*"(?:\+?34)?([679]\d{8})"', html)
         if json_phone:
-            return json_phone.group(2)
+            return json_phone.group(1)
 
-        # NO phone found in legitimate contact contexts
-        # Do NOT fall back to scanning entire HTML
+        # Pattern 6: Phone in data attributes (after button reveal)
+        data_phone = re.search(r'data-(?:phone|tel|telefono)="(?:\+?34)?([679]\d{8})"', html)
+        if data_phone:
+            return data_phone.group(1)
+
+        # Pattern 7: Visible phone number near advertiser info
+        advertiser_phone = re.search(
+            r'(?:anunciante|vendedor|propietario|particular)[^<]{0,100}([679]\d{2}[\s\-\.]?\d{2}[\s\-\.]?\d{2}[\s\-\.]?\d{2})',
+            html, re.IGNORECASE
+        )
+        if advertiser_phone:
+            phone = re.sub(r'[\s\.\-]', '', advertiser_phone.group(1))
+            if len(phone) == 9:
+                return phone
+
         return None
 
     def __init__(
@@ -384,6 +400,16 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                 try:
                     driver.get(url)
                     driver.sleep(3)
+
+                    # Try to click "Ver teléfono" button to reveal phone
+                    try:
+                        driver.run_js('''
+                            const phoneBtn = document.querySelector('[class*="phone"], [class*="telefono"], [data-qa="phone"], button[class*="call"], a[href^="tel:"]');
+                            if (phoneBtn && phoneBtn.click) phoneBtn.click();
+                        ''')
+                        driver.sleep(1)
+                    except:
+                        pass
 
                     html = driver.page_html
 
