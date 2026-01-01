@@ -3,7 +3,7 @@
 > **Last Updated**: 1 January 2026
 
 ## Resumen
-Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales.
+Sistema de captacion de leads inmobiliarios mediante scraping de 6 portales.
 
 ## Stack
 - **Backend**: Django 5.x + DRF
@@ -64,7 +64,44 @@ az containerapp logs show -n dagster-scrapers -g inmoleads-crm --type console --
 - **Azure**: inmoleadsadmin / ataulfo1! / inmoleadsdb (sslmode=require)
 
 ## Portal names para BD
-`pisos`, `habitaclia`, `fotocasa`, `milanuncios`, `idealista`
+`pisos`, `habitaclia`, `fotocasa`, `milanuncios`, `idealista`, `wallapop`
+
+## Estados de Lead (Django ESTADO_CHOICES)
+`NUEVO`, `EN_PROCESO`, `CONTACTADO_SIN_RESPUESTA`, `INTERESADO`, `NO_INTERESADO`, `EN_ESPERA`, `NO_CONTACTAR`, `CLIENTE`, `YA_VENDIDO`
+
+## dbt Pipeline
+```
+raw_listings (JSONB) -> staging models (6 portales) -> dim_leads (marts) -> analytics views
+```
+
+### Modelos dbt
+- **staging/**: `stg_pisos`, `stg_habitaclia`, `stg_fotocasa`, `stg_milanuncios`, `stg_idealista`, `stg_wallapop`
+- **marts/**: `dim_leads` (incremental, unique_key=[tenant_id, telefono_norm])
+- **analytics/**: Views para dashboards (analytics_*)
+
+### Ejecutar dbt
+```bash
+cd dbt_project
+dbt run --select staging.*
+dbt run --select dim_leads
+dbt run --select analytics.*
+dbt test
+```
+
+## Analytics API Endpoints
+```
+GET /analytics/api/kpis/              # KPIs globales
+GET /analytics/api/embudo/            # Embudo de conversion
+GET /analytics/api/leads-por-dia/     # Tendencia diaria
+GET /analytics/api/evolucion-precios/ # Evolucion de precios
+GET /analytics/api/comparativa-portales/ # Comparativa entre portales
+GET /analytics/api/precios-por-zona/  # Precios por zona
+GET /analytics/api/tipologia/         # Distribucion por tipo
+GET /analytics/api/filter-options/    # Opciones para filtros
+GET /analytics/api/export/            # Exportar CSV
+
+# Query params: fecha_inicio, fecha_fin, portal, zona, estado
+```
 
 ## CI/CD
 Push a master -> GitHub Actions -> ACR -> Azure Container Apps

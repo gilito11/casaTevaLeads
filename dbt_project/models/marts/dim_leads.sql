@@ -25,36 +25,13 @@
 WITH all_staging_sources AS (
     -- Fotocasa listings
     SELECT
-        raw_listing_id,
-        tenant_id,
-        portal,
-        data_lake_path,
-        scraping_timestamp,
-        created_at,
-        url,
-        titulo,
-        descripcion,
-        ubicacion,
-        zona_clasificada,
-        telefono_raw,
-        telefono_norm,
-        email,
-        nombre_contacto,
-        anunciante,
-        tipo_propiedad,
-        superficie_m2,
-        habitaciones,
-        banos,
-        precio,
-        precio_por_m2,
-        es_particular,
-        permite_inmobiliarias,
-        fecha_publicacion,
-        raw_data
+        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        url, titulo, descripcion, ubicacion, zona_clasificada,
+        telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
+        tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
+        es_particular, permite_inmobiliarias, fecha_publicacion
     FROM {{ ref('stg_fotocasa') }}
-
     {% if is_incremental() %}
-    -- Only process new records in incremental runs
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
     {% endif %}
 
@@ -62,34 +39,12 @@ WITH all_staging_sources AS (
 
     -- Milanuncios listings
     SELECT
-        raw_listing_id,
-        tenant_id,
-        portal,
-        data_lake_path,
-        scraping_timestamp,
-        created_at,
-        url,
-        titulo,
-        descripcion,
-        ubicacion,
-        zona_clasificada,
-        telefono_raw,
-        telefono_norm,
-        email,
-        nombre_contacto,
-        anunciante,
-        tipo_propiedad,
-        superficie_m2,
-        habitaciones,
-        banos,
-        precio,
-        precio_por_m2,
-        es_particular,
-        permite_inmobiliarias,
-        fecha_publicacion,
-        raw_data
+        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        url, titulo, descripcion, ubicacion, zona_clasificada,
+        telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
+        tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
+        es_particular, permite_inmobiliarias, fecha_publicacion
     FROM {{ ref('stg_milanuncios') }}
-
     {% if is_incremental() %}
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
     {% endif %}
@@ -98,34 +53,12 @@ WITH all_staging_sources AS (
 
     -- Wallapop listings
     SELECT
-        raw_listing_id,
-        tenant_id,
-        portal,
-        data_lake_path,
-        scraping_timestamp,
-        created_at,
-        url,
-        titulo,
-        descripcion,
-        ubicacion,
-        zona_clasificada,
-        telefono_raw,
-        telefono_norm,
-        email,
-        nombre_contacto,
-        anunciante,
-        tipo_propiedad,
-        superficie_m2,
-        habitaciones,
-        banos,
-        precio,
-        precio_por_m2,
-        es_particular,
-        permite_inmobiliarias,
-        fecha_publicacion,
-        raw_data
+        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        url, titulo, descripcion, ubicacion, zona_clasificada,
+        telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
+        tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
+        es_particular, permite_inmobiliarias, fecha_publicacion
     FROM {{ ref('stg_wallapop') }}
-
     {% if is_incremental() %}
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
     {% endif %}
@@ -134,34 +67,12 @@ WITH all_staging_sources AS (
 
     -- Pisos.com listings
     SELECT
-        raw_listing_id,
-        tenant_id,
-        portal,
-        data_lake_path,
-        scraping_timestamp,
-        created_at,
-        url,
-        titulo,
-        descripcion,
-        ubicacion,
-        zona_clasificada,
-        telefono_raw,
-        telefono_norm,
-        email,
-        nombre_contacto,
-        anunciante,
-        tipo_propiedad,
-        superficie_m2,
-        habitaciones,
-        banos,
-        precio,
-        precio_por_m2,
-        es_particular,
-        permite_inmobiliarias,
-        fecha_publicacion,
-        raw_data
+        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        url, titulo, descripcion, ubicacion, zona_clasificada,
+        telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
+        tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
+        es_particular, permite_inmobiliarias, fecha_publicacion
     FROM {{ ref('stg_pisos') }}
-
     {% if is_incremental() %}
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
     {% endif %}
@@ -170,34 +81,12 @@ WITH all_staging_sources AS (
 
     -- Habitaclia listings
     SELECT
-        raw_listing_id,
-        tenant_id,
-        portal,
-        data_lake_path,
-        scraping_timestamp,
-        created_at,
-        url,
-        titulo,
-        descripcion,
-        ubicacion,
-        zona_clasificada,
-        telefono_raw,
-        telefono_norm,
-        email,
-        nombre_contacto,
-        anunciante,
-        tipo_propiedad,
-        superficie_m2,
-        habitaciones,
-        banos,
-        precio,
-        precio_por_m2,
-        es_particular,
-        permite_inmobiliarias,
-        fecha_publicacion,
-        raw_data
+        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        url, titulo, descripcion, ubicacion, zona_clasificada,
+        telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
+        tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
+        es_particular, permite_inmobiliarias, fecha_publicacion
     FROM {{ ref('stg_habitaclia') }}
-
     {% if is_incremental() %}
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
     {% endif %}
@@ -206,34 +95,12 @@ WITH all_staging_sources AS (
 
     -- Idealista listings (ScrapingBee)
     SELECT
-        raw_listing_id,
-        tenant_id,
-        portal,
-        data_lake_path,
-        scraping_timestamp,
-        created_at,
-        url,
-        titulo,
-        descripcion,
-        ubicacion,
-        zona_clasificada,
-        telefono_raw,
-        telefono_norm,
-        email,
-        nombre_contacto,
-        anunciante,
-        tipo_propiedad,
-        superficie_m2,
-        habitaciones,
-        banos,
-        precio,
-        precio_por_m2,
-        es_particular,
-        permite_inmobiliarias,
-        fecha_publicacion,
-        raw_data
+        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        url, titulo, descripcion, ubicacion, zona_clasificada,
+        telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
+        tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
+        es_particular, permite_inmobiliarias, fecha_publicacion
     FROM {{ ref('stg_idealista') }}
-
     {% if is_incremental() %}
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
     {% endif %}
@@ -313,10 +180,7 @@ enriched AS (
         fecha_publicacion,
         scraping_timestamp AS fecha_primera_captura,
         scraping_timestamp AS ultima_actualizacion,
-        CURRENT_TIMESTAMP AS created_at_marts,
-
-        -- Raw data reference
-        raw_data
+        CURRENT_TIMESTAMP AS created_at_marts
 
     FROM deduplicated
     WHERE rn = 1  -- Keep only the most recent record per tenant + phone
@@ -372,10 +236,7 @@ final AS (
         fecha_publicacion,
         fecha_primera_captura,
         ultima_actualizacion,
-        created_at_marts,
-
-        -- Raw data
-        raw_data
+        created_at_marts
 
     FROM enriched
 )

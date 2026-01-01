@@ -6,9 +6,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}Casa Teva CRM{% endblock %}</title>
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -25,35 +26,18 @@
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script>
-        // CSRF token for HTMX requests
-        document.addEventListener('htmx:configRequest', function(evt) {
-            evt.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
-        });
-    </script>
 
     <!-- Alpine.js -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <!-- Chart.js para graficos -->
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         [x-cloak] { display: none !important; }
-
-        /* HTMX loading indicator */
-        .htmx-request .htmx-indicator {
-            display: inline-block;
-        }
-        .htmx-indicator {
-            display: none;
-        }
-
-        /* Smooth transitions */
-        .htmx-swapping {
-            opacity: 0;
-            transition: opacity 0.2s ease-out;
-        }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-indicator { display: none; }
+        .htmx-swapping { opacity: 0; transition: opacity 0.2s ease-out; }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -112,24 +96,25 @@
     <!-- Toast Notifications Container -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
-    <!-- HTMX Config -->
+    <!-- HTMX Config & Utilities -->
     <script>
+        // CSRF token for HTMX requests
+        document.addEventListener('htmx:configRequest', function(evt) {
+            evt.detail.headers['X-CSRFToken'] = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token }}';
+        });
+
         document.body.addEventListener('htmx:afterSwap', function(evt) {
-            // Scroll to top of swapped content if needed
             if (evt.detail.target.id === 'main-content') {
                 evt.detail.target.scrollTop = 0;
             }
-
         });
 
-        // Reinicializar Alpine.js después de que HTMX termine
         document.body.addEventListener('htmx:afterSettle', function(evt) {
             if (window.Alpine && evt.detail.target) {
                 Alpine.initTree(evt.detail.target);
             }
         });
 
-        // Show toast notification
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
             const colors = {
@@ -138,179 +123,80 @@
                 warning: 'bg-yellow-500',
                 info: 'bg-blue-500'
             };
-
             const toast = document.createElement('div');
             toast.className = `${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
             toast.textContent = message;
-
             container.appendChild(toast);
-
-            // Animate in
             setTimeout(() => toast.classList.remove('translate-x-full'), 10);
-
-            // Remove after 3 seconds
             setTimeout(() => {
                 toast.classList.add('translate-x-full');
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
 
-        // Listen for HTMX events to show toasts
         document.body.addEventListener('showToast', function(evt) {
             showToast(evt.detail.message, evt.detail.type);
         });
 
-        // Bulk Selection Alpine.js component for leads table
         function bulkSelection() {
             return {
                 selected: [],
                 allLeadIds: [],
-
-                init() {
-                    // Get all lead IDs from the table
-                    this.updateLeadIds();
-                },
-
+                init() { this.updateLeadIds(); },
                 updateLeadIds() {
                     const rows = document.querySelectorAll('tr[data-lead-id]');
                     this.allLeadIds = Array.from(rows).map(row => row.dataset.leadId);
                 },
-
-                get selectedCount() {
-                    return this.selected.length;
-                },
-
-                get allSelected() {
-                    return this.allLeadIds.length > 0 && this.selected.length === this.allLeadIds.length;
-                },
-
-                get someSelected() {
-                    return this.selected.length > 0 && this.selected.length < this.allLeadIds.length;
-                },
-
+                get selectedCount() { return this.selected.length; },
+                get allSelected() { return this.allLeadIds.length > 0 && this.selected.length === this.allLeadIds.length; },
                 toggleSelection(leadId) {
                     const id = String(leadId);
                     const index = this.selected.indexOf(id);
-                    if (index === -1) {
-                        this.selected.push(id);
-                    } else {
-                        this.selected.splice(index, 1);
-                    }
+                    if (index === -1) this.selected.push(id);
+                    else this.selected.splice(index, 1);
                 },
-
-                toggleAll(checked) {
-                    if (checked) {
-                        this.selected = [...this.allLeadIds];
-                    } else {
-                        this.selected = [];
-                    }
-                },
-
-                clearSelection() {
-                    this.selected = [];
-                },
-
-                isSelected(leadId) {
-                    return this.selected.includes(String(leadId));
-                },
-
+                toggleAll(checked) { this.selected = checked ? [...this.allLeadIds] : []; },
+                clearSelection() { this.selected = []; },
+                isSelected(leadId) { return this.selected.includes(String(leadId)); },
                 async bulkChangeStatus(estado) {
                     if (this.selected.length === 0) return;
-
-                    if (!confirm(`Cambiar estado a "${estado}" para ${this.selected.length} lead(s)?`)) {
-                        return;
-                    }
-
-                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-                                      '{{ csrf_token }}';
-
+                    if (!confirm(`Cambiar estado a "${estado}" para ${this.selected.length} lead(s)?`)) return;
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token }}';
                     try {
                         const response = await fetch('/leads/bulk-change-status/', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrfToken,
-                            },
-                            body: JSON.stringify({
-                                lead_ids: this.selected,
-                                estado: estado
-                            })
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                            body: JSON.stringify({ lead_ids: this.selected, estado: estado })
                         });
-
                         if (response.ok) {
                             showToast(`Estado actualizado para ${this.selected.length} lead(s)`, 'success');
-                            // Reload the table
-                            htmx.trigger('#leads-table-container', 'htmx:load');
                             this.clearSelection();
                             location.reload();
-                        } else {
-                            showToast('Error al cambiar estado', 'error');
-                        }
-                    } catch (error) {
-                        showToast('Error de conexión', 'error');
-                    }
+                        } else showToast('Error al cambiar estado', 'error');
+                    } catch (error) { showToast('Error de conexion', 'error'); }
                 },
-
                 async bulkDelete(addToBlacklist = false) {
                     if (this.selected.length === 0) return;
-
-                    const message = addToBlacklist
-                        ? `Eliminar ${this.selected.length} lead(s) y añadir a blacklist para no volver a scrapearlos?`
-                        : `Eliminar ${this.selected.length} lead(s)?`;
-
-                    if (!confirm(message)) {
-                        return;
-                    }
-
-                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-                                      '{{ csrf_token }}';
-
-                    // Collect anuncio info for blacklist
-                    const leadsInfo = [];
-                    this.selected.forEach(leadId => {
+                    const message = addToBlacklist ? `Eliminar ${this.selected.length} lead(s) y anadir a blacklist?` : `Eliminar ${this.selected.length} lead(s)?`;
+                    if (!confirm(message)) return;
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token }}';
+                    const leadsInfo = this.selected.map(leadId => {
                         const row = document.querySelector(`tr[data-lead-id="${leadId}"]`);
-                        if (row) {
-                            leadsInfo.push({
-                                lead_id: leadId,
-                                anuncio_id: row.dataset.anuncioId || '',
-                                portal: row.dataset.portal || ''
-                            });
-                        }
+                        return { lead_id: leadId, anuncio_id: row?.dataset.anuncioId || '', portal: row?.dataset.portal || '' };
                     });
-
                     try {
                         const response = await fetch('/leads/bulk-delete/', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrfToken,
-                            },
-                            body: JSON.stringify({
-                                leads_info: leadsInfo,
-                                add_to_blacklist: addToBlacklist
-                            })
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                            body: JSON.stringify({ leads_info: leadsInfo, add_to_blacklist: addToBlacklist })
                         });
-
                         if (response.ok) {
                             const result = await response.json();
-                            const msg = addToBlacklist
-                                ? `${result.deleted} lead(s) eliminado(s) y añadido(s) a blacklist`
-                                : `${result.deleted} lead(s) eliminado(s)`;
-                            showToast(msg, 'success');
-
-                            // Remove deleted rows from DOM
-                            this.selected.forEach(leadId => {
-                                const row = document.getElementById(`lead-row-${leadId}`);
-                                if (row) row.remove();
-                            });
-
+                            showToast(`${result.deleted} lead(s) eliminado(s)`, 'success');
+                            this.selected.forEach(leadId => document.getElementById(`lead-row-${leadId}`)?.remove());
                             this.clearSelection();
-                        } else {
-                            showToast('Error al eliminar', 'error');
-                        }
-                    } catch (error) {
-                        showToast('Error de conexión', 'error');
-                    }
+                        } else showToast('Error al eliminar', 'error');
+                    } catch (error) { showToast('Error de conexion', 'error'); }
                 }
             };
         }

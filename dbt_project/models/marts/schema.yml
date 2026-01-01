@@ -29,18 +29,18 @@ models:
           - not_null
 
       - name: source_portal
-        description: "Origin portal (fotocasa, milanuncios, wallapop)"
+        description: "Origin portal (pisos, habitaclia, fotocasa, milanuncios, idealista, wallapop)"
         tests:
           - not_null
           - accepted_values:
-              values: ['fotocasa', 'milanuncios', 'wallapop']
+              values: ['pisos', 'habitaclia', 'fotocasa', 'milanuncios', 'idealista', 'wallapop']
 
       - name: estado
         description: "CRM status of the lead"
         tests:
           - not_null
           - accepted_values:
-              values: ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'NEGOCIACION', 'CERRADO_GANADO', 'CERRADO_PERDIDO', 'DESCARTADO']
+              values: ['NUEVO', 'EN_PROCESO', 'CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'NO_INTERESADO', 'EN_ESPERA', 'NO_CONTACTAR', 'CLIENTE', 'YA_VENDIDO']
 
       - name: lead_score
         description: "Quality score from 0-100"

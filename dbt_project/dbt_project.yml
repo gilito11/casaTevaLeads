@@ -38,9 +38,9 @@ models:
       +docs:
         node_color: "#2196F3"
 
-    # Analytics models: tables for reporting
+    # Analytics models: views for real-time reporting
     analytics:
-      +materialized: table
+      +materialized: view
       +schema: analytics
       +tags: ["analytics"]
       +docs:
