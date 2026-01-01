@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 31 December 2025
+> **Last Updated**: 1 January 2026
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales.
@@ -15,18 +15,21 @@ Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales.
 
 ## Scrapers - Estado actual
 
-| Portal | Tecnologia | Azure | Local | Coste |
-|--------|------------|-------|-------|-------|
-| pisos.com | HTTP (requests) | ✅ | ✅ | Gratis |
-| habitaclia | Botasaurus | ✅ | ✅ | Gratis |
-| fotocasa | Botasaurus | ✅ | ✅ | Gratis |
-| milanuncios | ScrapingBee | ✅ | ✅ | 75 credits/req |
-| idealista | ScrapingBee | ✅ | ✅ | 75 credits/req |
+| Portal | Tecnologia | Azure | Local | Coste | Datos extraidos |
+|--------|------------|-------|-------|-------|-----------------|
+| pisos.com | HTTP (requests) | ✅ | ✅ | Gratis | titulo, precio, telefono, metros, fotos |
+| habitaclia | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, telefono*, metros, fotos |
+| fotocasa | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, telefono, metros, fotos |
+| milanuncios | ScrapingBee | ✅ | ✅ | 75 credits/req | titulo, precio, telefono, metros, fotos |
+| idealista | ScrapingBee | ✅ | ✅ | 75 credits/req | titulo, precio, telefono, metros, fotos |
+
+*Habitaclia: telefono extraido via click en boton "Ver telefono"
 
 ### ScrapingBee
 - API Key: configurada en Azure Container Apps y GitHub Secrets
 - Plan: 50€/mes = 250,000 credits = ~3,333 requests
 - Stealth proxy bypass: GeeTest (Milanuncios), DataDome (Idealista)
+- Coste estimado por scrape: ~€0.20 (Milanuncios) + ~€0.20 (Idealista)
 
 ## Comandos
 
