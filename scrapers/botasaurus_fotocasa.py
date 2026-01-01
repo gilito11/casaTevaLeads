@@ -479,11 +479,16 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         return results
 
     def scrape_and_save(self) -> Dict[str, int]:
-        """Scrape all zones and save to PostgreSQL."""
+        """Scrape all zones and save to PostgreSQL (only particulares)."""
         listings = self.scrape()
 
         for listing in listings:
-            # No filtering - save all listings
+            # Filter out agencies - only save particulares
+            if not listing.get('es_particular', True):
+                self.stats['filtered_out'] = self.stats.get('filtered_out', 0) + 1
+                logger.debug(f"Filtered out agency: {listing.get('nombre', 'Unknown')}")
+                continue
+
             if self.save_to_postgres(listing, self.PORTAL_NAME):
                 self.stats['saved'] += 1
 
