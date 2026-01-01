@@ -384,17 +384,20 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
 
         # Extract title - multiple patterns for Milanuncios
         title_patterns = [
-            r'<h1[^>]*class="[^"]*[Tt]itle[^"]*"[^>]*>([^<]+)</h1>',
-            r'<h1[^>]*>([^<]{10,})</h1>',
-            r'"headline"\s*:\s*"([^"]+)"',  # JSON-LD
-            r'"name"\s*:\s*"([^"]+)"',  # JSON-LD
-            r'class="[^"]*AdDetail[^"]*[Tt]itle[^"]*"[^>]*>([^<]+)',
-            r'<title>([^<|]+)',  # Page title fallback
+            # og:title meta tag is the cleanest source
+            r'property="og:title"\s+content="([^"]+)"',
+            r'content="([^"]+)"\s+property="og:title"',
+            # H1 tag (may have nested content)
+            r'<h1[^>]*>(.*?)</h1>',
+            # Clean title tag (remove "Milanuncios - " prefix)
+            r'<title>(?:Milanuncios\s*[-:]\s*)?([^<]+)</title>',
         ]
         for pattern in title_patterns:
-            title_match = re.search(pattern, html)
+            title_match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
             if title_match:
-                titulo = title_match.group(1).strip()
+                titulo = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+                # Clean up extra characters at end
+                titulo = re.sub(r'\d$', '', titulo).strip()
                 if titulo and len(titulo) > 5 and 'milanuncios' not in titulo.lower():
                     listing['titulo'] = titulo
                     break
@@ -415,11 +418,16 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
                     break
 
         # Extract price - multiple patterns for Milanuncios
+        # Milanuncios uses format: 800.000&nbsp;€ or 800.000 €
         price_patterns = [
-            r'"price"\s*:\s*["\']?(\d+(?:\.\d+)?)',  # JSON
-            r'"price"\s*:\s*\{\s*"value"\s*:\s*(\d+)',  # JSON nested
-            r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|€)',  # Display format
-            r'class="[^"]*[Pp]rice[^"]*"[^>]*>\s*(\d{1,3}(?:[\.\s]\d{3})*)',
+            # ma-AdPrice section with &nbsp; before euro
+            r'class="[^"]*ma-AdPrice[^"]*"[^>]*>\s*(\d{1,3}(?:\.\d{3})*)(?:&nbsp;|\s)*(?:€|&euro;)',
+            # Any price followed by &nbsp;€
+            r'(\d{1,3}(?:\.\d{3})*)(?:&nbsp;|\xa0|\s)*(?:€|&euro;|EUR)',
+            # JSON format
+            r'"price"\s*:\s*["\']?(\d+(?:\.\d+)?)',
+            r'"price"\s*:\s*\{\s*"value"\s*:\s*(\d+)',
+            # data-price attribute
             r'data-price="(\d+)"',
         ]
         for pattern in price_patterns:
