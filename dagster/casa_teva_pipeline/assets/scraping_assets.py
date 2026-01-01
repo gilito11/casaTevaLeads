@@ -429,11 +429,11 @@ def scraping_all_portals(
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
-        # Ejecutar Pisos.com
-        if pisos_zones:
-            result = run_scraper(context, 'pisos', pisos_zones, tenant_id)
-            all_results.append(result)
-            total_leads += result.get('leads_found', 0)
+        # Pisos.com DISABLED - casi todos son inmobiliarias/bancos, no hay particulares reales
+        # if pisos_zones:
+        #     result = run_scraper(context, 'pisos', pisos_zones, tenant_id)
+        #     all_results.append(result)
+        #     total_leads += result.get('leads_found', 0)
 
         # Mapear zonas para Habitaclia (Botasaurus)
         habitaclia_zones = []

@@ -376,89 +376,102 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
 
         html = self.fetch_page(
             detail_url,
-            wait_for='.AdDetail',  # Wait for detail content
+            wait_for='[data-testid="AD_DETAIL"]',  # More specific selector
         )
 
         if not html:
             return listing
 
-        # Extract title - multiple patterns for Milanuncios
-        title_patterns = [
-            # og:title meta tag is the cleanest source
-            r'property="og:title"\s+content="([^"]+)"',
-            r'content="([^"]+)"\s+property="og:title"',
-            # H1 tag (may have nested content)
-            r'<h1[^>]*>(.*?)</h1>',
-            # Clean title tag (remove "Milanuncios - " prefix)
-            r'<title>(?:Milanuncios\s*[-:]\s*)?([^<]+)</title>',
-        ]
-        for pattern in title_patterns:
-            title_match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
-            if title_match:
-                titulo = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
-                # Clean up extra characters at end
-                titulo = re.sub(r'\d$', '', titulo).strip()
-                if titulo and len(titulo) > 5 and 'milanuncios' not in titulo.lower():
-                    listing['titulo'] = titulo
-                    break
+        # Extract title from og:title (most reliable)
+        title_match = re.search(
+            r'(?:property="og:title"|name="og:title")\s+content="([^"]+)"',
+            html, re.IGNORECASE
+        )
+        if not title_match:
+            title_match = re.search(r'content="([^"]+)"[^>]*property="og:title"', html)
+        if title_match:
+            titulo = title_match.group(1).strip()
+            # Remove "Milanuncios" suffix if present
+            titulo = re.sub(r'\s*[-|]\s*[Mm]ilanuncios.*$', '', titulo)
+            if titulo and len(titulo) > 5:
+                listing['titulo'] = titulo
 
-        # Extract description - multiple patterns
+        # Extract description - Milanuncios specific patterns
         desc_patterns = [
-            r'class="[^"]*AdDetail-description[^"]*"[^>]*>(.*?)</div>',
-            r'class="[^"]*[Dd]escription[^"]*"[^>]*>(.*?)</(?:div|section)',
-            r'"description"\s*:\s*"([^"]{50,})"',  # JSON-LD
+            # Main description container
+            r'<div[^>]*class="[^"]*ma-AdDescription[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*data-testid="AD_DESCRIPTION"[^>]*>(.*?)</div>',
+            # Fallback to og:description
+            r'(?:property="og:description"|name="description")\s+content="([^"]+)"',
+            r'content="([^"]+)"[^>]*(?:property="og:description"|name="description")',
+            # JSON-LD description
+            r'"description"\s*:\s*"([^"]{50,})"',
         ]
         for pattern in desc_patterns:
-            desc_match = re.search(pattern, html, re.DOTALL)
+            desc_match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
             if desc_match:
-                desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
-                desc_text = desc_text.strip()
-                if len(desc_text) > 30:
+                desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
+                desc_text = re.sub(r'\s+', ' ', desc_text).strip()
+                # Skip if it's just a reference number
+                if len(desc_text) > 50 and not desc_text.startswith('Descripción'):
                     listing['descripcion'] = desc_text[:2000]
                     break
 
-        # Extract price - multiple patterns for Milanuncios
-        # Milanuncios uses format: 800.000&nbsp;€ or 800.000 €
+        # Extract price from JSON-LD or structured data (most reliable)
         price_patterns = [
-            # ma-AdPrice section with &nbsp; before euro
-            r'class="[^"]*ma-AdPrice[^"]*"[^>]*>\s*(\d{1,3}(?:\.\d{3})*)(?:&nbsp;|\s)*(?:€|&euro;)',
-            # Any price followed by &nbsp;€
-            r'(\d{1,3}(?:\.\d{3})*)(?:&nbsp;|\xa0|\s)*(?:€|&euro;|EUR)',
-            # JSON format
-            r'"price"\s*:\s*["\']?(\d+(?:\.\d+)?)',
-            r'"price"\s*:\s*\{\s*"value"\s*:\s*(\d+)',
-            # data-price attribute
+            r'"price"\s*:\s*"?(\d+)"?',
+            r'"price"\s*:\s*\{\s*[^}]*"value"\s*:\s*"?(\d+)"?',
             r'data-price="(\d+)"',
+            r'class="[^"]*[Pp]rice[^"]*"[^>]*>\s*(\d{1,3}(?:[.,]\d{3})*)',
         ]
         for pattern in price_patterns:
             price_match = re.search(pattern, html)
             if price_match:
                 precio = self._parse_price(price_match.group(1))
-                if precio and precio > 1000:  # Sanity check - real estate > 1000€
+                if precio and precio > 5000:
                     listing['precio'] = precio
                     break
 
-        # Extract location
-        location_match = re.search(
-            r'class="[^"]*[Ll]ocation[^"]*"[^>]*>([^<]+)',
-            html
-        )
-        if location_match:
-            listing['ubicacion'] = location_match.group(1).strip()
+        # Extract location from structured data or visible elements
+        location_patterns = [
+            r'"addressLocality"\s*:\s*"([^"]+)"',
+            r'class="[^"]*[Ll]ocation[^"]*"[^>]*>\s*([^<]+)',
+        ]
+        for pattern in location_patterns:
+            location_match = re.search(pattern, html)
+            if location_match:
+                listing['ubicacion'] = location_match.group(1).strip()
+                break
 
-        # Extract phone
-        phones = self.extract_phones_from_html(html)
-        if phones:
-            listing['telefono'] = phones[0]
-            listing['telefono_norm'] = self.normalize_phone(phones[0])
+        # Extract phone - be more careful, look for tel: links first (most reliable)
+        tel_links = re.findall(r'href="tel:(\+?34)?(\d{9})"', html)
+        if tel_links:
+            phone = tel_links[0][1]  # Get the 9-digit part
+            listing['telefono'] = phone
+            listing['telefono_norm'] = phone
+        else:
+            # Fallback: look for phone in specific containers
+            phone_container_match = re.search(
+                r'(?:data-testid="PHONE"|class="[^"]*[Pp]hone[^"]*")[^>]*>.*?(\d{9})',
+                html, re.DOTALL
+            )
+            if phone_container_match:
+                listing['telefono'] = phone_container_match.group(1)
+                listing['telefono_norm'] = phone_container_match.group(1)
+            else:
+                # Last resort: general phone extraction but filter carefully
+                phones = self.extract_phones_from_html(html)
+                # Filter out common fake/service numbers
+                filtered_phones = [
+                    p for p in phones
+                    if not p.startswith('900') and not p.startswith('800')
+                    and p not in ('666666666', '999999999', '111111111')
+                ]
+                if filtered_phones:
+                    listing['telefono'] = filtered_phones[0]
+                    listing['telefono_norm'] = self.normalize_phone(filtered_phones[0])
 
-        # Also try tel: links
-        tel_match = re.search(r'tel:(\d{9,})', html)
-        if tel_match and 'telefono' not in listing:
-            listing['telefono'] = tel_match.group(1)
-            listing['telefono_norm'] = self.normalize_phone(tel_match.group(1))
-
-        # Extract features (metros, habitaciones)
+        # Extract features
         metros_match = re.search(r'(\d+)\s*m[²2]', html)
         if metros_match:
             listing['metros'] = int(metros_match.group(1))
@@ -471,29 +484,49 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         if banos_match:
             listing['banos'] = int(banos_match.group(1))
 
-        # Extract photos (Milanuncios CDN)
-        photos = re.findall(
-            r'(https://[^"\']+milanuncios[^"\']+\.(?:jpg|jpeg|png|webp))',
-            html, re.IGNORECASE
-        )
+        # Extract photos - ONLY from img.milanuncios.com CDN (real property photos)
+        # Look for high-quality image URLs in various formats
+        photo_patterns = [
+            # Standard gallery photos (most common)
+            r'(https://img\.milanuncios\.com/api/v\d+/[^"\']+\.(?:jpg|jpeg|png|webp))',
+            # Alternative CDN format
+            r'(https://[a-z\d-]+\.milanuncios\.com/[^"\']+/fg/[^"\']+\.(?:jpg|jpeg|png|webp))',
+            # Fallback: any img.milanuncios.com with size params (real photos have sizes)
+            r'(https://img\.milanuncios\.com/[^"\']*\d{3,}x\d{3,}[^"\']*\.(?:jpg|jpeg|png|webp))',
+        ]
+
+        all_photos = []
+        for pattern in photo_patterns:
+            all_photos.extend(re.findall(pattern, html, re.IGNORECASE))
+
         unique_photos = []
         seen = set()
-        for photo in photos:
+        # URLs/patterns to explicitly exclude (icons, avatars, logos)
+        exclude_patterns = ['icon', 'avatar', 'logo', 'badge', 'placeholder', '/ma/', 'thumbnail', 'sprite']
+
+        for photo in all_photos:
             photo_clean = re.sub(r'\?.*$', '', photo)
-            if photo_clean not in seen and 'thumbnail' not in photo.lower():
+            photo_lower = photo.lower()
+
+            # Skip excluded patterns
+            if any(excl in photo_lower for excl in exclude_patterns):
+                continue
+
+            if photo_clean not in seen:
                 unique_photos.append(photo)
                 seen.add(photo_clean)
+
         listing['fotos'] = unique_photos[:10]
 
         # Extract seller name
         seller_match = re.search(
-            r'class="[^"]*AdDetail-sellerName[^"]*"[^>]*>([^<]+)',
+            r'class="[^"]*[Ss]eller[Nn]ame[^"]*"[^>]*>([^<]+)',
             html
         )
         if seller_match:
             listing['vendedor'] = seller_match.group(1).strip()
         else:
-            listing['vendedor'] = 'Particular'  # URL filter ensures this
+            listing['vendedor'] = 'Particular'
 
         listing['es_particular'] = True
 

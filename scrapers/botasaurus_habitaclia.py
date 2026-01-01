@@ -160,64 +160,28 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         """
         Extract phone number from Habitaclia detail page.
 
-        Habitaclia typically hides phones behind a "Ver teléfono" button.
-        After clicking, the phone appears in various formats.
+        IMPORTANT: Habitaclia hides real phones behind login/AJAX.
+        We ONLY extract from tel: links (after Ver teléfono click).
+        Better to return None than a fake/generic number!
         """
-        # Pattern 1: Phone in a visible tel: link (most reliable)
+        # Known fake/generic numbers to ALWAYS reject
+        BLACKLIST = {'611723867', '900000000', '902000000', '600000000'}
+
+        # ONLY extract from tel: links - the ONLY reliable source
         tel_link = re.search(r'href="tel:(?:\+?34)?([679]\d{8})"', html)
         if tel_link:
-            return tel_link.group(1)
-
-        # Pattern 2: Phone with Spanish prefix in any format
-        tel_with_prefix = re.search(r'(?:\+34|0034|34)?[\s\-]?([679]\d{2})[\s\-\.]?(\d{2})[\s\-\.]?(\d{2})[\s\-\.]?(\d{2})', html)
-        if tel_with_prefix:
-            phone = ''.join(tel_with_prefix.groups())
-            if len(phone) == 9 and phone[0] in '679':
+            phone = tel_link.group(1)
+            if phone not in BLACKLIST:
                 return phone
 
-        # Pattern 3: Phone displayed in contact section after button click
-        contact_section = re.search(
-            r'(?:class="[^"]*(?:contact|phone|telefono|llamar|advertiser)[^"]*"[^>]*>.*?'
-            r'|data-phone[^>]*>.*?'
-            r'|id="[^"]*phone[^"]*"[^>]*>.*?)'
-            r'([679][\d\s\.\-]{8,14})',
-            html, re.IGNORECASE | re.DOTALL
-        )
-        if contact_section:
-            phone = re.sub(r'[\s\.\-]', '', contact_section.group(1))
-            if len(phone) == 9:
-                return phone
-
-        # Pattern 4: Phone after "Teléfono:" or similar labels
-        phone_label = re.search(
-            r'(?:tel[ée]fono|tel\.?|llamar|phone|m[oó]vil)\s*:?\s*([679][\d\s\.\-]{8,14})',
-            html, re.IGNORECASE
-        )
-        if phone_label:
-            phone = re.sub(r'[\s\.\-]', '', phone_label.group(1))
-            if len(phone) == 9:
-                return phone
-
-        # Pattern 5: Phone in JSON-LD structured data
-        json_phone = re.search(r'"telephone"\s*:\s*"(?:\+?34)?([679]\d{8})"', html)
-        if json_phone:
-            return json_phone.group(1)
-
-        # Pattern 6: Phone in data attributes (after button reveal)
-        data_phone = re.search(r'data-(?:phone|tel|telefono)="(?:\+?34)?([679]\d{8})"', html)
+        # Also check data-phone attribute (revealed after button click)
+        data_phone = re.search(r'data-phone="(?:\+?34)?([679]\d{8})"', html)
         if data_phone:
-            return data_phone.group(1)
-
-        # Pattern 7: Visible phone number near advertiser info
-        advertiser_phone = re.search(
-            r'(?:anunciante|vendedor|propietario|particular)[^<]{0,100}([679]\d{2}[\s\-\.]?\d{2}[\s\-\.]?\d{2}[\s\-\.]?\d{2})',
-            html, re.IGNORECASE
-        )
-        if advertiser_phone:
-            phone = re.sub(r'[\s\.\-]', '', advertiser_phone.group(1))
-            if len(phone) == 9:
+            phone = data_phone.group(1)
+            if phone not in BLACKLIST:
                 return phone
 
+        # DO NOT use other patterns - they extract wrong numbers
         return None
 
     def __init__(
