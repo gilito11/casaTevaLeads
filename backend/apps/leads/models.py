@@ -5,8 +5,8 @@ from core.models import Tenant
 
 class Lead(models.Model):
     """
-    Modelo para gestionar leads inmobiliarios - Vista desde marts.dim_leads
-    Las columnas coinciden con la VIEW existente en PostgreSQL.
+    Modelo para gestionar leads inmobiliarios - Vista desde public_marts.dim_leads
+    Los campos Django se mapean a las columnas reales de dbt via db_column.
     """
 
     ESTADO_CHOICES = [
@@ -21,34 +21,36 @@ class Lead(models.Model):
         ('YA_VENDIDO', 'Ya vendido'),
     ]
 
-    # Columnas que existen en la VIEW marts.dim_leads
+    # Columnas que existen en public_marts.dim_leads (dbt)
     lead_id = models.CharField(max_length=100, primary_key=True)
     tenant_id = models.IntegerField()
     telefono_norm = models.CharField(max_length=20)
     email = models.EmailField(blank=True, null=True)
-    nombre = models.CharField(max_length=255, blank=True, null=True)
-    direccion = models.TextField(null=True, blank=True)
-    zona_geografica = models.CharField(max_length=100, null=True, blank=True)
-    codigo_postal = models.CharField(max_length=10, blank=True, null=True)
-    tipo_inmueble = models.CharField(max_length=50, blank=True, null=True)
+    nombre = models.CharField(max_length=255, blank=True, null=True, db_column='nombre_contacto')
+    direccion = models.TextField(null=True, blank=True, db_column='ubicacion')
+    zona_geografica = models.CharField(max_length=100, null=True, blank=True, db_column='zona_clasificada')
+    tipo_inmueble = models.CharField(max_length=50, blank=True, null=True, db_column='tipo_propiedad')
     precio = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     habitaciones = models.IntegerField(null=True, blank=True)
-    metros = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    banos = models.IntegerField(null=True, blank=True)
+    metros = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, db_column='superficie_m2')
+    titulo = models.TextField(blank=True, null=True)
     descripcion = models.TextField(blank=True, null=True)
-    fotos = models.JSONField(default=list, null=True, blank=True)
-    portal = models.CharField(max_length=50, null=True, blank=True)
-    url_anuncio = models.TextField(null=True, blank=True)
-    data_lake_reference = models.TextField(blank=True, null=True)
+    portal = models.CharField(max_length=50, null=True, blank=True, db_column='source_portal')
+    url_anuncio = models.TextField(null=True, blank=True, db_column='listing_url')
+    data_lake_reference = models.TextField(blank=True, null=True, db_column='data_lake_path')
     estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='NUEVO')
-    numero_intentos = models.IntegerField(default=0)
-    fecha_scraping = models.DateTimeField(null=True, blank=True)
+    numero_intentos = models.IntegerField(default=0, db_column='num_contactos')
+    fecha_scraping = models.DateTimeField(null=True, blank=True, db_column='fecha_primera_captura')
     fecha_primer_contacto = models.DateTimeField(null=True, blank=True)
     fecha_ultimo_contacto = models.DateTimeField(null=True, blank=True)
-    fecha_cambio_estado = models.DateTimeField(null=True, blank=True)
-    asignado_a_id = models.IntegerField(null=True, blank=True)
-    created_at = models.DateTimeField(null=True, blank=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
-    anuncio_id = models.CharField(max_length=255, blank=True, null=True)
+    asignado_a_id = models.IntegerField(null=True, blank=True, db_column='asignado_a')
+    updated_at = models.DateTimeField(null=True, blank=True, db_column='ultima_actualizacion')
+    anuncio_id = models.CharField(max_length=255, blank=True, null=True, db_column='source_listing_id')
+    # Additional dbt columns
+    es_particular = models.BooleanField(null=True, blank=True)
+    lead_score = models.IntegerField(null=True, blank=True)
+    fecha_publicacion = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'public_marts"."dim_leads'
@@ -59,27 +61,6 @@ class Lead(models.Model):
 
     def __str__(self):
         return f"{self.telefono_norm} - {self.direccion} ({self.estado})"
-
-    # Campos adicionales como properties (para datos que vendrán cuando se actualice dbt)
-    @property
-    def titulo(self):
-        """El título será extraído de descripción o URL por ahora"""
-        return self.descripcion[:100] if self.descripcion else ''
-
-    @property
-    def banos(self):
-        """Baños no está en la VIEW actual"""
-        return None
-
-    @property
-    def certificado_energetico(self):
-        """Certificado energético no está en la VIEW actual"""
-        return ''
-
-    @property
-    def fecha_publicacion(self):
-        """Fecha publicación no está en la VIEW actual"""
-        return None
 
 
 class LeadEstado(models.Model):
