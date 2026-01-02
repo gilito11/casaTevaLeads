@@ -1,31 +1,31 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 1 January 2026
+> **Last Updated**: 2 January 2026
 
 ## Resumen
-Sistema de captacion de leads inmobiliarios mediante scraping de 6 portales.
+Sistema de captacion de leads inmobiliarios mediante scraping de 5 portales.
 
 ## Stack
 - **Backend**: Django 5.x + DRF
 - **BD**: PostgreSQL 16 (Azure PostgreSQL en prod)
-- **Scrapers**: HTTP (pisos), Botasaurus (habitaclia, fotocasa), ScrapingBee (milanuncios, idealista)
+- **Scrapers**: Botasaurus (habitaclia, fotocasa), ScrapingBee (milanuncios, idealista)
 - **Orquestacion**: Dagster
-- **ETL**: dbt (raw -> staging -> marts)
+- **ETL**: dbt (raw -> public_staging -> public_marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
 
 ## Scrapers - Estado actual
 
 | Portal | Tecnologia | Azure | Local | Coste | Datos extraidos |
 |--------|------------|-------|-------|-------|-----------------|
-| pisos.com | HTTP (requests) | ✅ | ✅ | Gratis | titulo, precio, telefono, metros |
-| habitaclia | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, metros, fotos |
+| habitaclia | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, metros, fotos (sin telefono) |
 | fotocasa | Botasaurus | ✅ | ✅ | Gratis | titulo, precio, telefono, metros, fotos |
 | milanuncios | ScrapingBee | ✅ | ✅ | 75 credits/req | titulo, precio, telefono, metros, fotos |
 | idealista | ScrapingBee | ✅ | ✅ | 75 credits/req | titulo, precio, telefono, metros, fotos |
 
 ### Limitaciones conocidas
-- **Habitaclia**: Telefono oculto tras AJAX (requiere login/interaccion), no extraible
-- **Pisos.com**: Fotos en lazy-loading, extraccion parcial
+- **Habitaclia**: Telefono oculto tras AJAX (requiere login), no extraible
+- **Fotocasa/Idealista**: Mayoria de anuncios son agencias (filtrados automaticamente)
+- **Pisos.com**: Deshabilitado temporalmente
 
 ### ScrapingBee
 - API Key: configurada en Azure Container Apps y GitHub Secrets
@@ -71,13 +71,16 @@ az containerapp logs show -n dagster-scrapers -g inmoleads-crm --type console --
 
 ## dbt Pipeline
 ```
-raw_listings (JSONB) -> staging models (6 portales) -> dim_leads (marts) -> analytics views
+raw.raw_listings (JSONB) -> public_staging.stg_* -> public_marts.dim_leads
 ```
 
 ### Modelos dbt
-- **staging/**: `stg_pisos`, `stg_habitaclia`, `stg_fotocasa`, `stg_milanuncios`, `stg_idealista`, `stg_wallapop`
-- **marts/**: `dim_leads` (incremental, unique_key=[tenant_id, telefono_norm])
-- **analytics/**: Views para dashboards (analytics_*)
+- **public_staging/**: `stg_habitaclia`, `stg_fotocasa`, `stg_milanuncios`, `stg_idealista` (views)
+- **public_marts/**: `dim_leads` (incremental, unique_key=[tenant_id, telefono_norm])
+
+### Django Lead model
+El modelo Lead apunta a `public_marts.dim_leads` (vista de solo lectura de dbt).
+Los estados CRM se guardan en `leads_lead_estado` (tabla gestionada por Django).
 
 ### Ejecutar dbt
 ```bash

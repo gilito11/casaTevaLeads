@@ -51,7 +51,7 @@ class Lead(models.Model):
     anuncio_id = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
-        db_table = 'marts"."dim_leads'
+        db_table = 'public_marts"."dim_leads'
         managed = False
         verbose_name = 'Lead'
         verbose_name_plural = 'Leads'

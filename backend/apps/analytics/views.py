@@ -39,7 +39,7 @@ def analytics_dashboard_view(request):
     """Dashboard de analytics con KPIs, gráficos y métricas.
 
     NOTA: Las vistas de analytics no existen aún, así que usamos queries directas
-    que combinan marts.dim_leads con leads_lead_estado para obtener estados reales.
+    que combinan public_marts.dim_leads con leads_lead_estado para obtener estados reales.
     """
     tenant_id = request.session.get('tenant_id', 1)
 
@@ -61,7 +61,7 @@ def analytics_dashboard_view(request):
                     SELECT
                         l.*,
                         COALESCE(e.estado, 'NUEVO') as estado_real
-                    FROM marts.dim_leads l
+                    FROM public_marts.dim_leads l
                     LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
                     WHERE l.tenant_id = %s
                 )
@@ -101,7 +101,7 @@ def analytics_dashboard_view(request):
                     SELECT
                         COALESCE(e.estado, 'NUEVO') as estado_real,
                         l.precio
-                    FROM marts.dim_leads l
+                    FROM public_marts.dim_leads l
                     LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
                     WHERE l.tenant_id = %s
                 ),
@@ -147,7 +147,7 @@ def analytics_dashboard_view(request):
                     COUNT(*) as leads_captados,
                     COUNT(DISTINCT telefono_norm) as leads_unicos,
                     COALESCE(AVG(precio), 0) as precio_medio
-                FROM marts.dim_leads
+                FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND fecha_scraping >= CURRENT_DATE - INTERVAL '30 days'
                 GROUP BY DATE(fecha_scraping)
@@ -170,7 +170,7 @@ def analytics_dashboard_view(request):
                     COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
                     COALESCE(MIN(precio), 0) as min_precio,
                     COALESCE(MAX(precio), 0) as max_precio
-                FROM marts.dim_leads
+                FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND precio > 0
                   AND fecha_scraping >= CURRENT_DATE - INTERVAL '12 weeks'
@@ -199,7 +199,7 @@ def analytics_dashboard_view(request):
                         l.precio,
                         l.metros,
                         COALESCE(e.estado, 'NUEVO') as estado_real
-                    FROM marts.dim_leads l
+                    FROM public_marts.dim_leads l
                     LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
                     WHERE l.tenant_id = %s
                 )
@@ -242,7 +242,7 @@ def analytics_dashboard_view(request):
                     COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
                     COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio,
                     COUNT(*) as total_inmuebles
-                FROM marts.dim_leads
+                FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND zona_geografica IS NOT NULL
                   AND zona_geografica != ''
@@ -266,10 +266,10 @@ def analytics_dashboard_view(request):
                 SELECT
                     COALESCE(tipo_inmueble, 'Sin especificar') as tipo_propiedad,
                     COUNT(*) as total,
-                    ROUND(100.0 * COUNT(*) / GREATEST((SELECT COUNT(*) FROM marts.dim_leads WHERE tenant_id = %s), 1), 1) as porcentaje,
+                    ROUND(100.0 * COUNT(*) / GREATEST((SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1), 1) as porcentaje,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio
-                FROM marts.dim_leads
+                FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                 GROUP BY tipo_inmueble
                 ORDER BY total DESC
@@ -311,7 +311,7 @@ def map_view(request):
                     COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio,
                     COALESCE(MIN(precio) FILTER (WHERE precio > 0), 0) as precio_min,
                     COALESCE(MAX(precio) FILTER (WHERE precio > 0), 0) as precio_max
-                FROM marts.dim_leads
+                FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND zona_geografica IS NOT NULL
                   AND zona_geografica != ''
@@ -392,7 +392,7 @@ def map_data_api(request):
                     portal,
                     COUNT(*) as total_leads,
                     COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio
-                FROM marts.dim_leads
+                FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND zona_geografica IS NOT NULL
                   AND zona_geografica != ''

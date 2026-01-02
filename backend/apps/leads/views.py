@@ -251,10 +251,10 @@ def delete_lead_view(request, lead_id):
     with connection.cursor() as cursor:
         cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
 
-    # Eliminar el lead de la tabla marts.dim_leads
+    # Eliminar el lead de la tabla public_marts.dim_leads
     with connection.cursor() as cursor:
         cursor.execute("""
-            DELETE FROM marts.dim_leads
+            DELETE FROM public_marts.dim_leads
             WHERE lead_id = %s
         """, [lead_id])
 
@@ -378,10 +378,10 @@ def bulk_delete_view(request):
                 with connection.cursor() as cursor:
                     cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
 
-                # Eliminar de marts.dim_leads
+                # Eliminar de public_marts.dim_leads
                 with connection.cursor() as cursor:
                     cursor.execute("""
-                        DELETE FROM marts.dim_leads
+                        DELETE FROM public_marts.dim_leads
                         WHERE lead_id = %s
                     """, [lead_id])
 

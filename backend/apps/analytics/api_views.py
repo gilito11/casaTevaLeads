@@ -106,7 +106,7 @@ def api_kpis(request):
                 SELECT
                     l.*,
                     COALESCE(l.estado, 'NUEVO') as estado_real
-                FROM marts.dim_leads l
+                FROM public_marts.dim_leads l
                 WHERE {where_clause} {estado_condition}
             )
             SELECT
@@ -149,7 +149,7 @@ def api_embudo(request):
                 SELECT
                     COALESCE(l.estado, 'NUEVO') as estado_real,
                     l.precio
-                FROM marts.dim_leads l
+                FROM public_marts.dim_leads l
                 WHERE {where_clause}
             ),
             total AS (SELECT COUNT(*) as cnt FROM lead_con_estado),
@@ -216,7 +216,7 @@ def api_leads_por_dia(request):
                 COUNT(*) as leads_captados,
                 COUNT(DISTINCT l.telefono_norm) as leads_unicos,
                 COALESCE(AVG(l.precio), 0) as precio_medio
-            FROM marts.dim_leads l
+            FROM public_marts.dim_leads l
             {estado_join}
             WHERE {where_clause} {estado_condition}
             GROUP BY DATE(l.updated_at)
@@ -252,7 +252,7 @@ def api_evolucion_precios(request):
                 COALESCE(MIN(l.precio), 0) as min_precio,
                 COALESCE(MAX(l.precio), 0) as max_precio,
                 COUNT(*) as total_inmuebles
-            FROM marts.dim_leads l
+            FROM public_marts.dim_leads l
             WHERE {where_clause} AND l.precio > 0
             GROUP BY DATE_TRUNC('week', l.updated_at)
             ORDER BY semana
@@ -289,7 +289,7 @@ def api_comparativa_portales(request):
                     l.precio,
                     l.metros,
                     COALESCE(e.estado, 'NUEVO') as estado_real
-                FROM marts.dim_leads l
+                FROM public_marts.dim_leads l
                 LEFT JOIN leads_lead_estado e ON l.lead_id::text = e.lead_id
                 WHERE {where_clause} {estado_condition}
             )
@@ -334,7 +334,7 @@ def api_precios_por_zona(request):
                 COUNT(*) as total_inmuebles,
                 COALESCE(MIN(l.precio), 0) as precio_min,
                 COALESCE(MAX(l.precio), 0) as precio_max
-            FROM marts.dim_leads l
+            FROM public_marts.dim_leads l
             WHERE {where_clause}
               AND l.zona_geografica IS NOT NULL
               AND l.zona_geografica != ''
@@ -366,11 +366,11 @@ def api_tipologia(request):
                 COALESCE(l.tipo_inmueble, 'Sin especificar') as tipo_inmueble,
                 COUNT(*) as total,
                 ROUND(100.0 * COUNT(*) / GREATEST(
-                    (SELECT COUNT(*) FROM marts.dim_leads WHERE tenant_id = %s), 1
+                    (SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1
                 ), 1) as porcentaje,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
                 COALESCE(AVG(CASE WHEN l.metros > 0 THEN l.precio / l.metros ELSE NULL END), 0) as precio_m2_medio
-            FROM marts.dim_leads l
+            FROM public_marts.dim_leads l
             WHERE {where_clause}
             GROUP BY l.tipo_inmueble
             ORDER BY total DESC
@@ -394,7 +394,7 @@ def api_filter_options(request):
         # Get distinct portals
         cursor.execute("""
             SELECT DISTINCT portal
-            FROM marts.dim_leads
+            FROM public_marts.dim_leads
             WHERE tenant_id = %s AND portal IS NOT NULL
             ORDER BY portal
         """, [tenant_id])
@@ -403,7 +403,7 @@ def api_filter_options(request):
         # Get distinct zones
         cursor.execute("""
             SELECT DISTINCT zona_geografica
-            FROM marts.dim_leads
+            FROM public_marts.dim_leads
             WHERE tenant_id = %s
               AND zona_geografica IS NOT NULL
               AND zona_geografica != ''
@@ -460,7 +460,7 @@ def api_export_csv(request):
                 l.habitaciones,
                 COALESCE(e.estado, 'NUEVO') as estado,
                 l.updated_at
-            FROM marts.dim_leads l
+            FROM public_marts.dim_leads l
             {estado_join}
             WHERE {where_clause} {estado_condition}
             ORDER BY l.updated_at DESC
