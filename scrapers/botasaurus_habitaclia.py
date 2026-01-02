@@ -387,13 +387,10 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         price_str = price_match.group(1).replace('.', '')
                         listing['precio'] = float(price_str)
 
-                    # Extract phones - ONLY from contact section, NOT from entire HTML
-                    # Habitaclia typically hides phone behind "Ver teléfono" button
-                    # We should NOT invent phones from random numbers in the page
-                    phone = self._extract_habitaclia_phone(html)
-                    if phone:
-                        listing['telefono'] = phone
-                        listing['telefono_norm'] = self.normalize_phone(phone)
+                    # Habitaclia hides phones behind login/AJAX - don't try to extract
+                    # Leads will be saved without phone numbers
+                    listing['telefono'] = None
+                    listing['telefono_norm'] = None
 
                     # Extract features
                     metros_match = re.search(r'(\d+)\s*m[²2]', html)
@@ -432,19 +429,20 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         text_blocks = re.findall(r'>([^<]{100,})<', html)
                         for block in text_blocks:
                             clean_text = block.strip()
-                            # Skip JavaScript code, cookie banners, and other non-content
+                            # Skip JavaScript code, CSS, cookie banners, and other non-content
+                            skip_patterns = [
+                                'cookie', 'javascript', 'privacy', 'google', 'analytics',
+                                'gdpr', 'window.', 'function', '__tcfapi', 'addEventListener',
+                                'position:', 'display:', 'background:', 'font-', 'margin:',
+                                'padding:', 'border:', 'z-index', '.fb_', 'visibility:',
+                                'overflow:', 'height:', 'width:', '@media', 'transform:',
+                                'transition:', 'animation:', 'opacity:', 'cursor:',
+                                'rgba(', '#didomi', 'document.', 'var(--', 'calc(',
+                            ]
                             if (clean_text and
-                                'cookie' not in clean_text.lower() and
-                                'javascript' not in clean_text.lower() and
-                                'privacy' not in clean_text.lower() and
-                                'google' not in clean_text.lower() and
-                                'analytics' not in clean_text.lower() and
-                                'gdpr' not in clean_text.lower() and
-                                'window.' not in clean_text.lower() and
-                                'function' not in clean_text.lower() and
-                                '__tcfapi' not in clean_text and
-                                'addEventListener' not in clean_text and
-                                not clean_text.startswith('{')):
+                                not any(skip in clean_text.lower() for skip in skip_patterns) and
+                                not clean_text.startswith('{') and
+                                not clean_text.startswith('.')):
                                 listing['descripcion'] = clean_text[:2000]
                                 break
                     if desc_match and 'descripcion' not in listing:

@@ -202,7 +202,7 @@ class BotasaurusBaseScraper:
                 self.tenant_id,
                 portal,
                 data_lake_path,
-                json.dumps(raw_data),
+                json.dumps(raw_data, ensure_ascii=False),
                 now,
             ))
 

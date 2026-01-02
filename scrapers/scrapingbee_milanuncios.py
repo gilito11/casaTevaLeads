@@ -484,37 +484,24 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         if banos_match:
             listing['banos'] = int(banos_match.group(1))
 
-        # Extract photos - ONLY from img.milanuncios.com CDN (real property photos)
-        # Look for high-quality image URLs in various formats
+        # Extract photos from images-re.milanuncios.com CDN
+        # Milanuncios uses UUID-based URLs: https://images-re.milanuncios.com/images/ads/{UUID}
         photo_patterns = [
-            # Standard gallery photos (most common)
-            r'(https://img\.milanuncios\.com/api/v\d+/[^"\']+\.(?:jpg|jpeg|png|webp))',
-            # Alternative CDN format
-            r'(https://[a-z\d-]+\.milanuncios\.com/[^"\']+/fg/[^"\']+\.(?:jpg|jpeg|png|webp))',
-            # Fallback: any img.milanuncios.com with size params (real photos have sizes)
-            r'(https://img\.milanuncios\.com/[^"\']*\d{3,}x\d{3,}[^"\']*\.(?:jpg|jpeg|png|webp))',
+            # Main pattern: UUID-based image URLs (with or without size rules)
+            r'https://images-re\.milanuncios\.com/images/ads/([a-f0-9-]{36})(?:\?rule=[^"\'<>\s]*)?',
         ]
 
-        all_photos = []
+        all_photo_ids = set()
         for pattern in photo_patterns:
-            all_photos.extend(re.findall(pattern, html, re.IGNORECASE))
+            matches = re.findall(pattern, html, re.IGNORECASE)
+            all_photo_ids.update(matches)
 
+        # Build full URLs with high-quality size rule
         unique_photos = []
-        seen = set()
-        # URLs/patterns to explicitly exclude (icons, avatars, logos)
-        exclude_patterns = ['icon', 'avatar', 'logo', 'badge', 'placeholder', '/ma/', 'thumbnail', 'sprite']
-
-        for photo in all_photos:
-            photo_clean = re.sub(r'\?.*$', '', photo)
-            photo_lower = photo.lower()
-
-            # Skip excluded patterns
-            if any(excl in photo_lower for excl in exclude_patterns):
-                continue
-
-            if photo_clean not in seen:
-                unique_photos.append(photo)
-                seen.add(photo_clean)
+        for photo_id in all_photo_ids:
+            # Use detail_640x480 for good quality
+            photo_url = f"https://images-re.milanuncios.com/images/ads/{photo_id}?rule=detail_640x480"
+            unique_photos.append(photo_url)
 
         listing['fotos'] = unique_photos[:10]
 

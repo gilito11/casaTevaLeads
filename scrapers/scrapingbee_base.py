@@ -24,6 +24,39 @@ import psycopg2
 logger = logging.getLogger(__name__)
 
 
+def fix_encoding(text: str) -> str:
+    """
+    Fix common encoding issues in scraped text.
+    Handles cases where UTF-8 text was incorrectly decoded as Latin-1.
+    """
+    if not text:
+        return text
+
+    # Common Latin-1 -> UTF-8 misencoding patterns
+    replacements = {
+        'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
+        'Ã±': 'ñ', 'Ã': 'Á', 'Ã‰': 'É', 'Ã': 'Í', 'Ã"': 'Ó',
+        'Ãš': 'Ú', 'Ã'': 'Ñ', 'Ã¼': 'ü', 'Ãœ': 'Ü',
+        'Â¡': '¡', 'Â¿': '¿', 'â‚¬': '€',
+        '\x00': '',  # Null bytes
+    }
+    for bad, good in replacements.items():
+        text = text.replace(bad, good)
+
+    # Try to fix UTF-8 double encoding
+    try:
+        # If it looks like it was Latin-1 encoded UTF-8
+        if any(ord(c) > 127 for c in text):
+            # Try to decode as Latin-1 and re-encode as UTF-8
+            fixed = text.encode('latin-1', errors='ignore').decode('utf-8', errors='ignore')
+            if fixed and len(fixed) >= len(text) * 0.8:  # Sanity check
+                return fixed
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
+
+    return text
+
+
 def get_scrapingbee_api_key() -> str:
     """Get ScrapingBee API key from environment."""
     api_key = os.environ.get('SCRAPINGBEE_API_KEY', '')
@@ -190,8 +223,11 @@ class ScrapingBeeClient:
             self.stats['credits_used'] += credits
 
             if response.status_code == 200:
-                logger.info(f"Success: {len(response.text)} chars")
-                return response.text
+                # Ensure proper UTF-8 decoding
+                response.encoding = 'utf-8'
+                html = response.text
+                logger.info(f"Success: {len(html)} chars")
+                return html
             else:
                 logger.error(
                     f"ScrapingBee error: {response.status_code} - "
@@ -265,28 +301,29 @@ class ScrapingBeeClient:
                 return False
 
             # Prepare raw_data as JSONB (same structure as Botasaurus scrapers)
+            # Apply encoding fix to text fields
             raw_data = {
                 'anuncio_id': anuncio_id,
-                'titulo': listing_data.get('titulo', ''),
+                'titulo': fix_encoding(listing_data.get('titulo', '')),
                 'telefono': listing_data.get('telefono', ''),
                 'telefono_norm': listing_data.get('telefono_norm', ''),
                 'email': listing_data.get('email'),
-                'nombre': listing_data.get('vendedor') or listing_data.get('nombre', ''),
-                'direccion': listing_data.get('direccion') or listing_data.get('ubicacion', ''),
-                'zona': listing_data.get('zona_geografica') or listing_data.get('zona_busqueda', ''),
-                'zona_busqueda': listing_data.get('zona_busqueda', ''),
-                'zona_geografica': listing_data.get('zona_geografica', ''),
+                'nombre': fix_encoding(listing_data.get('vendedor') or listing_data.get('nombre', '')),
+                'direccion': fix_encoding(listing_data.get('direccion') or listing_data.get('ubicacion', '')),
+                'zona': fix_encoding(listing_data.get('zona_geografica') or listing_data.get('zona_busqueda', '')),
+                'zona_busqueda': fix_encoding(listing_data.get('zona_busqueda', '')),
+                'zona_geografica': fix_encoding(listing_data.get('zona_geografica', '')),
                 'codigo_postal': listing_data.get('codigo_postal'),
                 'tipo_inmueble': listing_data.get('tipo_inmueble', 'piso'),
                 'precio': listing_data.get('precio'),
                 'habitaciones': listing_data.get('habitaciones'),
                 'metros': listing_data.get('metros'),
                 'banos': listing_data.get('banos'),
-                'descripcion': listing_data.get('descripcion', ''),
+                'descripcion': fix_encoding(listing_data.get('descripcion', '')),
                 'fotos': listing_data.get('fotos', []),
                 'url': listing_data.get('url_anuncio') or listing_data.get('detail_url', ''),
                 'es_particular': listing_data.get('es_particular', True),
-                'vendedor': listing_data.get('vendedor', ''),
+                'vendedor': fix_encoding(listing_data.get('vendedor', '')),
                 # ScrapingBee specific metadata
                 'scraper_type': 'scrapingbee',
                 'stealth_mode': self.use_stealth,
@@ -310,7 +347,7 @@ class ScrapingBeeClient:
                 self.tenant_id,
                 self.portal_name,
                 data_lake_path,
-                json.dumps(raw_data),
+                json.dumps(raw_data, ensure_ascii=False),
                 now,
             ))
 
