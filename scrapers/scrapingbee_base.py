@@ -32,20 +32,9 @@ def fix_encoding(text: str) -> str:
     if not text:
         return text
 
-    # Common Latin-1 -> UTF-8 misencoding patterns
-    replacements = {
-        'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
-        'Ã±': 'ñ', 'Ã': 'Á', 'Ã‰': 'É', 'Ã': 'Í', 'Ã"': 'Ó',
-        'Ãš': 'Ú', 'Ã'': 'Ñ', 'Ã¼': 'ü', 'Ãœ': 'Ü',
-        'Â¡': '¡', 'Â¿': '¿', 'â‚¬': '€',
-        '\x00': '',  # Null bytes
-    }
-    for bad, good in replacements.items():
-        text = text.replace(bad, good)
-
-    # Try to fix UTF-8 double encoding
+    # Try to fix UTF-8 double encoding (most common issue)
     try:
-        # If it looks like it was Latin-1 encoded UTF-8
+        # If text contains high bytes, try to fix double-encoding
         if any(ord(c) > 127 for c in text):
             # Try to decode as Latin-1 and re-encode as UTF-8
             fixed = text.encode('latin-1', errors='ignore').decode('utf-8', errors='ignore')
@@ -53,6 +42,9 @@ def fix_encoding(text: str) -> str:
                 return fixed
     except (UnicodeDecodeError, UnicodeEncodeError):
         pass
+
+    # Remove null bytes
+    text = text.replace('\x00', '')
 
     return text
 
