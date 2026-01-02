@@ -25,7 +25,7 @@ class LeadAdmin(admin.ModelAdmin):
         'zona_geografica', 'descripcion'
     ]
     readonly_fields = [
-        'lead_id', 'created_at', 'updated_at', 'fecha_scraping',
+        'lead_id', 'updated_at', 'fecha_scraping',
         'data_lake_reference'
     ]
     inlines = [NotaInline]
@@ -36,9 +36,9 @@ class LeadAdmin(admin.ModelAdmin):
         }),
         ('Propiedad', {
             'fields': (
-                'direccion', 'zona_geografica', 'codigo_postal',
-                'tipo_inmueble', 'precio', 'habitaciones', 'metros',
-                'descripcion', 'fotos'
+                'direccion', 'zona_geografica',
+                'tipo_inmueble', 'precio', 'habitaciones', 'banos', 'metros',
+                'titulo', 'descripcion'
             )
         }),
         ('Origen', {
@@ -47,12 +47,11 @@ class LeadAdmin(admin.ModelAdmin):
         ('Gestión', {
             'fields': (
                 'estado', 'asignado_a_id', 'numero_intentos',
-                'fecha_primer_contacto', 'fecha_ultimo_contacto',
-                'fecha_cambio_estado'
+                'fecha_primer_contacto', 'fecha_ultimo_contacto'
             )
         }),
         ('Metadata', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': ('updated_at',),
             'classes': ('collapse',)
         }),
     )
