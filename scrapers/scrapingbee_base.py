@@ -215,9 +215,15 @@ class ScrapingBeeClient:
             self.stats['credits_used'] += credits
 
             if response.status_code == 200:
-                # Ensure proper UTF-8 decoding
-                response.encoding = 'utf-8'
-                html = response.text
+                # Ensure proper UTF-8 decoding from raw bytes
+                try:
+                    html = response.content.decode('utf-8')
+                except UnicodeDecodeError:
+                    # Fallback: try latin-1 then convert to UTF-8
+                    try:
+                        html = response.content.decode('latin-1')
+                    except:
+                        html = response.content.decode('utf-8', errors='replace')
                 logger.info(f"Success: {len(html)} chars")
                 return html
             else:
