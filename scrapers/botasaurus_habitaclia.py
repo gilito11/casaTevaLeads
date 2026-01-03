@@ -381,20 +381,52 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                     title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
                     listing['titulo'] = title_match.group(1).strip() if title_match else None
 
-                    # Extract price
-                    price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|euros|€)', html, re.IGNORECASE)
-                    if price_match:
-                        price_str = price_match.group(1).replace('.', '')
-                        listing['precio'] = float(price_str)
+                    # Extract price - from feature-container (main listing price)
+                    # Structure: <ul class="feature-container"><li class="feature"><strong>145.600 €</strong></li>
+                    feature_container = re.search(
+                        r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</ul>',
+                        html, re.DOTALL | re.IGNORECASE
+                    )
+                    if feature_container:
+                        price_in_feature = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*€', feature_container.group(1))
+                        if price_in_feature:
+                            price_str = price_in_feature.group(1).replace('.', '')
+                            listing['precio'] = float(price_str)
 
-                    # Extract features
-                    metros_match = re.search(r'(\d+)\s*m[²2]', html)
-                    if metros_match:
-                        listing['metros'] = int(metros_match.group(1))
+                    # Fallback: Extract from title/meta (e.g., "Piso por 145.600 €")
+                    if 'precio' not in listing:
+                        title_price = re.search(r'por\s+(\d{1,3}(?:\.\d{3})*)\s*€', html, re.IGNORECASE)
+                        if title_price:
+                            price_str = title_price.group(1).replace('.', '')
+                            listing['precio'] = float(price_str)
 
-                    habs_match = re.search(r'(\d+)\s*hab', html, re.IGNORECASE)
-                    if habs_match:
-                        listing['habitaciones'] = int(habs_match.group(1))
+                    # Extract features from <li> tags (Habitaclia structure)
+                    # Patterns: <li>2 habitaciones</li>, <li>Superficie 83&nbsp;m<sup>2</sup></li>
+
+                    # Extract habitaciones from <li> tags
+                    habs_li = re.search(r'<li>(\d+)\s*habitacion', html, re.IGNORECASE)
+                    if habs_li:
+                        listing['habitaciones'] = int(habs_li.group(1))
+
+                    # Extract superficie/metros from <li> - handles &nbsp; and <sup>2</sup>
+                    metros_li = re.search(r'<li>Superficie\s*(\d+)(?:&nbsp;|\s)*m', html, re.IGNORECASE)
+                    if metros_li:
+                        listing['metros'] = int(metros_li.group(1))
+
+                    # Extract baños from <li> or <strong>
+                    banos_li = re.search(r'<li>(\d+)\s*Ba[ñn]o', html, re.IGNORECASE)
+                    if banos_li:
+                        listing['banos'] = int(banos_li.group(1))
+                    else:
+                        banos_strong = re.search(r'<strong>(\d+)</strong>\s*ba[ñn]o', html, re.IGNORECASE)
+                        if banos_strong:
+                            listing['banos'] = int(banos_strong.group(1))
+
+                    # Fallback: Try to extract from title/meta (e.g., "83 metros")
+                    if 'metros' not in listing:
+                        title_metros = re.search(r'de\s+(\d+)\s+metros', html, re.IGNORECASE)
+                        if title_metros:
+                            listing['metros'] = int(title_metros.group(1))
 
                     # Extract location
                     ubicacion_match = re.search(r'class="[^"]*location[^"]*"[^>]*>([^<]+)', html, re.IGNORECASE)
@@ -402,70 +434,40 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         listing['ubicacion'] = ubicacion_match.group(1).strip()
 
                     # Extract description - Habitaclia structure:
-                    # Section "Información detallada" with <h3>Title</h3> followed by description <p>
-                    # Try multiple patterns in order of reliability
-                    desc_match = None
+                    # Main description is in <p id="js-detail-description" class="detail-description">
 
-                    # Pattern 1: Look for section with h3 + description text
-                    section_match = re.search(
-                        r'<section[^>]*>.*?<h3[^>]*>([^<]+)</h3>\s*<p[^>]*>([^<]+)</p>',
+                    # Pattern 1: Look for detail-description class (most reliable)
+                    detail_desc = re.search(
+                        r'<p[^>]*class="[^"]*detail-description[^"]*"[^>]*>(.*?)</p>',
                         html, re.DOTALL | re.IGNORECASE
                     )
-                    if section_match:
-                        h3_text = section_match.group(1).strip()
-                        p_text = section_match.group(2).strip()
-                        # Combine h3 + p if both are meaningful
-                        if len(p_text) > 20:
-                            listing['descripcion'] = f"{h3_text}\n{p_text}"[:2000]
+                    if detail_desc:
+                        # Clean HTML tags (like <br>)
+                        desc_text = re.sub(r'<[^>]+>', '\n', detail_desc.group(1))
+                        desc_text = re.sub(r'\n+', '\n', desc_text).strip()
+                        listing['descripcion'] = desc_text[:2000]
 
-                    # Pattern 2: Habitaclia uses class="comment" for descriptions
+                    # Pattern 2: Look for h3 title + description paragraph
                     if 'descripcion' not in listing:
-                        desc_match = re.search(
-                            r'<div[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</div>',
+                        h3_p_match = re.search(
+                            r'<h3[^>]*>([^<]{5,80})</h3>\s*<p[^>]*>([^<]{50,})</p>',
                             html, re.DOTALL | re.IGNORECASE
                         )
-                    if not desc_match and 'descripcion' not in listing:
-                        # Try section with comment
-                        desc_match = re.search(
-                            r'<section[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</section>',
-                            html, re.DOTALL | re.IGNORECASE
-                        )
-                    if not desc_match and 'descripcion' not in listing:
-                        # Try any element with descripcion/description in class
-                        desc_match = re.search(
-                            r'class="[^"]*(?:descripcion|description)[^"]*"[^>]*>(.*?)</(?:div|section|p)',
-                            html, re.DOTALL | re.IGNORECASE
-                        )
-                    # Fallback: find long text blocks directly in HTML (>100 chars between tags)
+                        if h3_p_match:
+                            title_text = h3_p_match.group(1).strip()
+                            body_text = h3_p_match.group(2).strip()
+                            # Skip SEO text
+                            if not body_text.lower().startswith(('piso por', 'casa por')):
+                                listing['descripcion'] = f"{title_text}\n{body_text}"[:2000]
+
+                    # Pattern 3: Fallback to meta description
                     if 'descripcion' not in listing:
-                        text_blocks = re.findall(r'>([^<]{100,})<', html)
-                        for block in text_blocks:
-                            clean_text = block.strip()
-                            # Skip JavaScript code, CSS, cookie banners, consent text, and other non-content
-                            skip_patterns = [
-                                'cookie', 'javascript', 'privacy', 'google', 'analytics',
-                                'gdpr', 'window.', 'function', '__tcfapi', 'addEventListener',
-                                'position:', 'display:', 'background:', 'font-', 'margin:',
-                                'padding:', 'border:', 'z-index', '.fb_', 'visibility:',
-                                'overflow:', 'height:', 'width:', '@media', 'transform:',
-                                'transition:', 'animation:', 'opacity:', 'cursor:',
-                                'rgba(', '#didomi', 'document.', 'var(--', 'calc(',
-                                # Cookie consent / GDPR banners
-                                'personalised', 'personalized', 'advertising', 'content measurement',
-                                'audience research', 'services development', 'store and/or access',
-                                'legitimate interest', 'consent', 'tcf', 'vendors', 'iab',
-                            ]
-                            if (clean_text and
-                                not any(skip in clean_text.lower() for skip in skip_patterns) and
-                                not clean_text.startswith('{') and
-                                not clean_text.startswith('.')):
-                                listing['descripcion'] = clean_text[:2000]
-                                break
-                    if desc_match and 'descripcion' not in listing:
-                        desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
-                        desc_text = re.sub(r'\s+', ' ', desc_text).strip()
-                        if len(desc_text) > 30:
-                            listing['descripcion'] = desc_text[:2000]
+                        meta_desc = re.search(
+                            r'<meta[^>]*name="description"[^>]*content="([^"]+)"',
+                            html, re.IGNORECASE
+                        )
+                        if meta_desc:
+                            listing['descripcion'] = meta_desc.group(1).strip()[:2000]
 
                     # Try to extract phone from description (many sellers put it there)
                     descripcion = listing.get('descripcion', '')
@@ -480,8 +482,8 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
                     # Extract photos - Habitaclia uses images.habimg.com/imgh/ structure
                     # Pattern: //images.habimg.com/imgh/XXX-XXXXXXX/filename.jpg
-                    # IMPORTANT: Only capture photos matching THIS listing's ID to avoid
-                    # capturing images from "similar properties" sections
+                    # Photos come in multiple sizes: _XXL.jpg, _XL.jpg, _L.jpg, etc.
+                    # We want to keep only one version per unique image (preferably large)
                     anuncio_id = listing.get('anuncio_id', '')
                     # Extract the numeric part for matching (e.g., "500006030072" -> "6030072")
                     id_for_match = anuncio_id[-7:] if len(anuncio_id) > 7 else anuncio_id
@@ -490,19 +492,31 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         r'(?:https?:)?//images\.habimg\.com/imgh/[^"\'<>\s]+\.(?:jpg|jpeg|png|webp)',
                         html, re.IGNORECASE
                     )
+
+                    # Deduplicate by base filename (removing size suffixes like _XXL, _XL, _L, _M, _S)
                     unique_photos = []
-                    seen = set()
+                    seen_bases = set()
                     for photo in photos:
                         # Ensure https://
                         if photo.startswith('//'):
                             photo = 'https:' + photo
+                        # Skip logos and non-listing photos
+                        if 'logo' in photo.lower():
+                            continue
                         # Only keep photos that contain this listing's ID in the path
-                        # This filters out "similar properties" images
-                        if id_for_match and id_for_match in photo:
-                            photo_base = re.sub(r'_[A-Z]{1,2}\.', '.', photo)
-                            if photo_base not in seen and 'logo' not in photo.lower():
-                                unique_photos.append(photo)
-                                seen.add(photo_base)
+                        if id_for_match and id_for_match not in photo:
+                            continue
+                        # Extract base filename without size suffix
+                        # Example: image_XXL.jpg -> image, image_L.jpg -> image
+                        base_match = re.search(r'/([^/]+?)(?:_(?:XXL|XL|L|M|S|T))?\.(?:jpg|jpeg|png|webp)$', photo, re.IGNORECASE)
+                        if base_match:
+                            base_name = base_match.group(1)
+                            if base_name not in seen_bases:
+                                seen_bases.add(base_name)
+                                # Prefer larger versions - try to get XXL or XL
+                                large_url = re.sub(r'_(?:L|M|S|T)\.', '_XXL.', photo)
+                                unique_photos.append(large_url)
+
                     listing['fotos'] = unique_photos[:10]
 
                     # Check if particular or agency
