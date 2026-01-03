@@ -170,6 +170,7 @@ class ScrapingBeeClient:
         url: str,
         wait_for: Optional[str] = None,
         custom_headers: Optional[Dict[str, str]] = None,
+        js_scenario: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """
         Fetch a page using ScrapingBee API.
@@ -178,6 +179,7 @@ class ScrapingBeeClient:
             url: URL to fetch
             wait_for: CSS selector to wait for (optional)
             custom_headers: Custom headers to send (optional)
+            js_scenario: JavaScript scenario with instructions (optional)
 
         Returns:
             HTML content or None if failed
@@ -195,6 +197,9 @@ class ScrapingBeeClient:
 
         if wait_for:
             params['wait_for'] = wait_for
+
+        if js_scenario:
+            params['js_scenario'] = json.dumps(js_scenario)
 
         if custom_headers:
             # ScrapingBee accepts headers as Spb-* prefixed
