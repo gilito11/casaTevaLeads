@@ -6,8 +6,8 @@ models:
       Lead dimension table containing deduplicated leads from all portals.
 
       This table is the single source of truth for leads in the CRM system.
-      It combines data from Fotocasa, Milanuncios, and Wallapop, deduplicating
-      by tenant_id + telefono_norm and keeping the most recent information.
+      It combines data from Habitaclia, Fotocasa, Milanuncios, and Idealista,
+      deduplicating by tenant_id + telefono_norm and keeping the most recent.
 
       Materialized incrementally for performance.
 
@@ -29,11 +29,11 @@ models:
           - not_null
 
       - name: source_portal
-        description: "Origin portal (pisos, habitaclia, fotocasa, milanuncios, idealista, wallapop)"
+        description: "Origin portal (habitaclia, fotocasa, milanuncios, idealista)"
         tests:
           - not_null
           - accepted_values:
-              values: ['pisos', 'habitaclia', 'fotocasa', 'milanuncios', 'idealista', 'wallapop']
+              values: ['habitaclia', 'fotocasa', 'milanuncios', 'idealista']
 
       - name: estado
         description: "CRM status of the lead"

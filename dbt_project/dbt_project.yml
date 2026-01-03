@@ -67,9 +67,3 @@ seeds:
     +schema: seeds
     +quote_columns: false
 
-# Snapshots configuration
-snapshots:
-  casa_teva:
-    +target_schema: snapshots
-    +strategy: timestamp
-    +updated_at: updated_at
