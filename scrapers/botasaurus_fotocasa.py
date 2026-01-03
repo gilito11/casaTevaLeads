@@ -347,20 +347,42 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                 title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
                 listing['titulo'] = title_match.group(1).strip() if title_match else None
 
-                # Extract price
-                price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|euros|€)', html, re.IGNORECASE)
-                if price_match:
-                    price_str = price_match.group(1).replace('.', '')
-                    listing['precio'] = float(price_str)
+                # Extract price - from re-DetailHeader-price class (main listing price)
+                price_header = re.search(
+                    r'class="[^"]*re-DetailHeader-price[^"]*"[^>]*>([^<]+)',
+                    html, re.IGNORECASE
+                )
+                if price_header:
+                    price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*€', price_header.group(1))
+                    if price_match:
+                        price_str = price_match.group(1).replace('.', '')
+                        listing['precio'] = float(price_str)
+                else:
+                    # Fallback to generic pattern
+                    price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|euros|€)', html, re.IGNORECASE)
+                    if price_match:
+                        price_str = price_match.group(1).replace('.', '')
+                        listing['precio'] = float(price_str)
 
-                # Extract features
-                metros_match = re.search(r'(\d+)\s*m[²2]', html)
-                if metros_match:
-                    listing['metros'] = int(metros_match.group(1))
+                # Extract metros - from feature spans (e.g. <span><span>170</span> m²)
+                metros_span = re.search(r'<span[^>]*>\s*<span>(\d+)</span>\s*m[²2]', html)
+                if metros_span:
+                    listing['metros'] = int(metros_span.group(1))
+                else:
+                    # Fallback - look in feature items
+                    metros_li = re.search(r'<li[^>]*>(\d+)\s*m[²2]</li>', html, re.IGNORECASE)
+                    if metros_li:
+                        listing['metros'] = int(metros_li.group(1))
 
-                habs_match = re.search(r'(\d+)\s*hab', html, re.IGNORECASE)
-                if habs_match:
-                    listing['habitaciones'] = int(habs_match.group(1))
+                # Extract habitaciones - from feature spans (e.g. <span><span>4</span> hab)
+                habs_span = re.search(r'<span[^>]*>\s*<span>(\d+)</span>\s*hab', html, re.IGNORECASE)
+                if habs_span:
+                    listing['habitaciones'] = int(habs_span.group(1))
+                else:
+                    # Fallback - look in feature items
+                    habs_li = re.search(r'<li[^>]*>(\d+)\s*hab', html, re.IGNORECASE)
+                    if habs_li:
+                        listing['habitaciones'] = int(habs_li.group(1))
 
                 # Extract description - look for substantial text blocks
                 # Fotocasa descriptions are typically in divs or paragraphs
