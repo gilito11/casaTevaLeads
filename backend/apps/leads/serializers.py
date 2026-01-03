@@ -23,25 +23,24 @@ class LeadListSerializer(serializers.ModelSerializer):
         fields = [
             'lead_id', 'tenant_id', 'telefono_norm', 'nombre', 'direccion',
             'zona_geografica', 'precio', 'portal', 'estado', 'fecha_scraping',
-            'created_at'
+            'updated_at'
         ]
 
 
 class LeadDetailSerializer(serializers.ModelSerializer):
     """Serializer completo para detalle de lead"""
     notas = NotaSerializer(many=True, read_only=True)
-    asignado_a_nombre = serializers.CharField(source='asignado_a.username', read_only=True)
 
     class Meta:
         model = Lead
         fields = [
             'lead_id', 'tenant_id', 'telefono_norm', 'email', 'nombre',
-            'direccion', 'zona_geografica', 'codigo_postal', 'tipo_inmueble',
-            'precio', 'habitaciones', 'metros', 'descripcion', 'fotos',
+            'direccion', 'zona_geografica', 'tipo_inmueble',
+            'precio', 'habitaciones', 'banos', 'metros', 'titulo', 'descripcion',
             'portal', 'url_anuncio', 'data_lake_reference', 'estado',
-            'asignado_a', 'asignado_a_nombre', 'numero_intentos',
+            'asignado_a_id', 'numero_intentos',
             'fecha_scraping', 'fecha_primer_contacto', 'fecha_ultimo_contacto',
-            'fecha_cambio_estado', 'created_at', 'updated_at', 'notas'
+            'updated_at', 'es_particular', 'lead_score', 'fecha_publicacion', 'notas'
         ]
 
 
