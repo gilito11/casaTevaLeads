@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 """
-Script maestro para configurar TODA la infraestructura de Casa Teva.
+Script maestro para configurar la infraestructura de Casa Teva.
 
 Este script ejecuta:
 1. Setup PostgreSQL (schemas + tablas)
-2. Setup MinIO (bucket + estructura)
-3. Verifica todo está listo
+2. Verifica todo está listo
+
+Nota: MinIO fue eliminado del proyecto. Los datos se guardan directamente
+en PostgreSQL como JSONB. Ver INSTRUCCIONES_SETUP.md para más detalles.
 
 Uso:
     python scripts/setup_all.py
@@ -13,8 +15,6 @@ Uso:
 """
 
 import sys
-import os
-import argparse
 import subprocess
 from pathlib import Path
 
@@ -36,106 +36,68 @@ def run_script(script_name, args=None):
     if args:
         cmd.extend(args)
 
-    print(f"🚀 Ejecutando: {' '.join(cmd)}\n")
+    print(f"Ejecutando: {' '.join(cmd)}\n")
 
     try:
         result = subprocess.run(cmd, check=False)
         return result.returncode
     except Exception as e:
-        print(f"❌ Error ejecutando {script_name}: {e}")
+        print(f"Error ejecutando {script_name}: {e}")
         return 1
 
 
 def main():
+    import argparse
     parser = argparse.ArgumentParser(
         description='Setup completo de infraestructura para Casa Teva'
     )
     parser.add_argument(
         '--reset',
         action='store_true',
-        help='Recrear toda la infraestructura desde cero (⚠️ PELIGROSO)'
-    )
-    parser.add_argument(
-        '--skip-postgres',
-        action='store_true',
-        help='Saltar setup de PostgreSQL'
-    )
-    parser.add_argument(
-        '--skip-minio',
-        action='store_true',
-        help='Saltar setup de MinIO'
+        help='Recrear toda la infraestructura desde cero (PELIGROSO)'
     )
     args = parser.parse_args()
 
-    print_header("SETUP COMPLETO - Casa Teva Lead System v2.0")
+    print_header("SETUP - Casa Teva Lead System")
 
     if args.reset:
-        print("⚠️  MODO RESET: Se recreará toda la infraestructura")
-        print("⚠️  Esto ELIMINARÁ todos los datos existentes")
+        print("MODO RESET: Se recreará toda la infraestructura")
+        print("Esto ELIMINARÁ todos los datos existentes")
         respuesta = input("\n¿Continuar? Escribe 'SI ESTOY SEGURO': ")
         if respuesta != 'SI ESTOY SEGURO':
             print("Operación cancelada.")
             sys.exit(0)
 
-    success = True
+    # Setup PostgreSQL
+    print_header("PostgreSQL Setup")
+    postgres_args = ['--drop-all'] if args.reset else []
+    returncode = run_script('setup_postgres.py', postgres_args)
 
-    # 1. Setup PostgreSQL
-    if not args.skip_postgres:
-        print_header("PASO 1/2: PostgreSQL Setup")
-        postgres_args = ['--drop-all'] if args.reset else []
-        returncode = run_script('setup_postgres.py', postgres_args)
+    if returncode != 0:
+        print("\nPostgreSQL setup falló")
+        sys.exit(1)
 
-        if returncode != 0:
-            print("\n❌ PostgreSQL setup falló")
-            success = False
-        else:
-            print("\n✅ PostgreSQL configurado correctamente")
-    else:
-        print_header("PASO 1/2: PostgreSQL Setup (SALTADO)")
-
-    # 2. Setup MinIO
-    if not args.skip_minio:
-        print_header("PASO 2/2: MinIO Setup")
-        minio_args = ['--recreate'] if args.reset else []
-        returncode = run_script('setup_minio.py', minio_args)
-
-        if returncode != 0:
-            print("\n❌ MinIO setup falló")
-            success = False
-        else:
-            print("\n✅ MinIO configurado correctamente")
-    else:
-        print_header("PASO 2/2: MinIO Setup (SALTADO)")
+    print("\nPostgreSQL configurado correctamente")
 
     # Resumen final
     print_header("RESUMEN FINAL")
 
-    if success:
-        print("🎉 ¡SETUP COMPLETADO EXITOSAMENTE!")
-        print("\n📊 Infraestructura lista:")
-        print("   ✅ PostgreSQL: Schemas + raw.raw_listings")
-        print("   ✅ MinIO: Bucket + estructura bronze/")
-        print("\n📝 Próximos pasos:")
-        print("   1. Ejecutar migraciones Django:")
-        print("      cd backend && python manage.py migrate")
-        print("\n   2. Ejecutar dbt:")
-        print("      cd dbt_project && dbt run")
-        print("\n   3. Test scraper → MinIO:")
-        print("      python run_fotocasa_scraper.py --tenant-id=1 --minio")
-        print("\n   4. Ejecutar Dagster:")
-        print("      dagster dev -f dagster/workspace.yaml")
-        print("\n   5. Verificar datos:")
-        print("      psql -U casa_teva -d casa_teva_db -c 'SELECT COUNT(*) FROM marts.dim_leads;'")
+    print("SETUP COMPLETADO EXITOSAMENTE!")
+    print("\nInfraestructura lista:")
+    print("   - PostgreSQL: Schemas + raw.raw_listings (JSONB)")
+    print("\nPróximos pasos:")
+    print("   1. Ejecutar migraciones Django:")
+    print("      cd backend && python manage.py migrate")
+    print("\n   2. Ejecutar dbt:")
+    print("      cd dbt_project && dbt run")
+    print("\n   3. Test scraper:")
+    print("      python run_all_scrapers.py --zones salou --postgres")
+    print("\n   4. Iniciar servicios:")
+    print("      docker-compose up -d")
 
-        print("\n🌐 URLs útiles:")
-        print("   - MinIO Console: http://localhost:9001")
-        print("   - Dagster UI: http://localhost:3000")
-        print("   - Django Admin: http://localhost:8000/admin")
-
-    else:
-        print("❌ SETUP INCOMPLETO")
-        print("\nRevisa los errores arriba y vuelve a ejecutar.")
-        sys.exit(1)
+    print("\nURLs útiles:")
+    print("   - Django Web: http://localhost:8000")
+    print("   - Dagster UI: http://localhost:3000")
 
 
 if __name__ == '__main__':

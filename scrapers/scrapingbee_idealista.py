@@ -360,17 +360,16 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
         if location_match:
             listing['ubicacion'] = location_match.group(1).strip()
 
-        # Extract phone - Idealista often hides phones, look for revealed ones
-        phones = self.extract_phones_from_html(html)
-        if phones:
-            listing['telefono'] = phones[0]
-            listing['telefono_norm'] = self.normalize_phone(phones[0])
-
-        # Try tel: links
-        tel_match = re.search(r'tel:(\d{9,})', html)
-        if tel_match and 'telefono' not in listing:
-            listing['telefono'] = tel_match.group(1)
-            listing['telefono_norm'] = self.normalize_phone(tel_match.group(1))
+        # Try to extract phone from description (many sellers put it there)
+        descripcion = listing.get('descripcion', '')
+        phone = self.extract_phone_from_description(descripcion)
+        if phone:
+            listing['telefono'] = phone
+            listing['telefono_norm'] = phone
+            logger.info(f"Phone found in description: {phone}")
+        else:
+            listing['telefono'] = None
+            listing['telefono_norm'] = None
 
         # Extract features from info-features section
         # Metros cuadrados

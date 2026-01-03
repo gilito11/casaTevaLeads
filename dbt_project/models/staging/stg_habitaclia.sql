@@ -47,7 +47,7 @@ extracted AS (
         raw_data->>'habitaciones' AS habitaciones_text,
         raw_data->>'banos' AS banos_text,
         COALESCE(raw_data->>'zona_busqueda', raw_data->>'zona_geografica', raw_data->>'zona') AS zona_busqueda,
-        raw_data->>'fotos' AS fotos,
+        raw_data->'fotos' AS fotos_json,
         COALESCE((raw_data->>'es_particular')::BOOLEAN, TRUE) AS es_particular_raw,
 
         -- Store entire raw_data for reference
@@ -207,16 +207,18 @@ final AS (
         -- Publishing info
         NULL::TIMESTAMP AS fecha_publicacion,
 
+        -- Photos
+        fotos_json,
+
         -- Raw data for reference
         raw_data
 
     FROM classified
 
     -- Apply filters
+    -- Habitaclia hides phones behind login/AJAX, so we allow NULL phones
     WHERE
-        telefono_norm IS NOT NULL
-        AND LENGTH(telefono_norm) >= 9
-        AND precio > 5000
+        precio > 5000
 )
 
 SELECT * FROM final

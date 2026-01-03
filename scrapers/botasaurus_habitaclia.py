@@ -387,11 +387,6 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         price_str = price_match.group(1).replace('.', '')
                         listing['precio'] = float(price_str)
 
-                    # Habitaclia hides phones behind login/AJAX - don't try to extract
-                    # Leads will be saved without phone numbers
-                    listing['telefono'] = None
-                    listing['telefono_norm'] = None
-
                     # Extract features
                     metros_match = re.search(r'(\d+)\s*m[²2]', html)
                     if metros_match:
@@ -450,6 +445,17 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         desc_text = re.sub(r'\s+', ' ', desc_text).strip()
                         if len(desc_text) > 30:
                             listing['descripcion'] = desc_text[:2000]
+
+                    # Try to extract phone from description (many sellers put it there)
+                    descripcion = listing.get('descripcion', '')
+                    phone = self.extract_phone_from_description(descripcion)
+                    if phone:
+                        listing['telefono'] = phone
+                        listing['telefono_norm'] = phone
+                        logger.info(f"Phone found in description: {phone}")
+                    else:
+                        listing['telefono'] = None
+                        listing['telefono_norm'] = None
 
                     # Extract photos - Habitaclia uses images.habimg.com/imgh/ structure
                     # Pattern: //images.habimg.com/imgh/XXX-XXXXXXX/filename.jpg

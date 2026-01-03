@@ -1,45 +1,15 @@
-# dbt profiles configuration for Casa Teva
-# This file should be placed in ~/.dbt/ directory or in the project root for development
-
 casa_teva:
-  target: dev
+  target: prod
   outputs:
-    dev:
-      type: postgres
-      host: "{{ env_var('DBT_HOST', 'postgres') }}"
-      port: 5432
-      user: casa_teva
-      password: "{{ env_var('CASA_TEVA_DB_PASSWORD', 'casateva2024') }}"
-      dbname: casa_teva_db
-      schema: public
-      threads: 4
-      keepalives_idle: 0
-      connect_timeout: 10
-      search_path: public,raw,staging,marts,analytics
-
     prod:
       type: postgres
-      host: "{{ env_var('DBT_HOST', 'localhost') }}"
-      port: "{{ env_var('DBT_PORT', '5432') | int }}"
-      user: "{{ env_var('DBT_USER', 'casa_teva') }}"
-      password: "{{ env_var('DBT_PASSWORD', '') }}"
-      dbname: "{{ env_var('DBT_DATABASE', 'casa_teva_db') }}"
+      host: inmoleads-db.postgres.database.azure.com
+      port: 5432
+      user: inmoleadsadmin
+      password: "ataulfo1!"
+      dbname: inmoleadsdb
       schema: public
       threads: 4
-      keepalives_idle: 0
       connect_timeout: 30
       search_path: public,raw,staging,marts,analytics
-      sslmode: "{{ env_var('DBT_SSLMODE', 'prefer') }}"
-
-    test:
-      type: postgres
-      host: localhost
-      port: 5432
-      user: casa_teva
-      password: "{{ env_var('CASA_TEVA_DB_PASSWORD', 'casateva2024') }}"
-      dbname: casa_teva_test_db
-      schema: public
-      threads: 2
-      keepalives_idle: 0
-      connect_timeout: 10
-      search_path: public,raw,staging,marts,analytics
+      sslmode: require

@@ -66,14 +66,12 @@ services:
       DAGSTER_POSTGRES_PASSWORD: casateva2024
       DAGSTER_HOME: /opt/dagster/dagster_home
       TMPDIR: /tmp/dagster
-      # ScrapingBee API key (optional - enables Milanuncios and Idealista scrapers)
-      SCRAPINGBEE_API_KEY: ${SCRAPINGBEE_API_KEY:-}
     volumes:
       - ./dagster:/app/dagster
       - ./dbt_project:/app/dbt_project
       - ./scrapers:/app/scrapers
-      - ./run_scrapingbee_milanuncios.py:/app/run_scrapingbee_milanuncios.py
-      - ./run_scrapingbee_idealista.py:/app/run_scrapingbee_idealista.py
+      - ./run_camoufox_milanuncios_scraper.py:/app/run_camoufox_milanuncios_scraper.py
+      - ./run_camoufox_idealista_scraper.py:/app/run_camoufox_idealista_scraper.py
     depends_on:
       postgres:
         condition: service_healthy

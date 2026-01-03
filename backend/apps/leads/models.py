@@ -122,9 +122,9 @@ class AnuncioBlacklist(models.Model):
     """
     PORTAL_CHOICES = [
         ('milanuncios', 'Milanuncios'),
-        ('wallapop', 'Wallapop'),
         ('fotocasa', 'Fotocasa'),
-        ('pisos', 'Pisos.com'),
+        ('habitaclia', 'Habitaclia'),
+        ('idealista', 'Idealista'),
     ]
 
     tenant = models.ForeignKey(

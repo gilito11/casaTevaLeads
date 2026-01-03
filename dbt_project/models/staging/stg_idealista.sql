@@ -52,6 +52,7 @@ extracted AS (
         raw_data->>'zona_busqueda' AS zona_busqueda,
         raw_data->>'zona_geografica' AS zona_geografica,
         COALESCE((raw_data->>'es_particular')::BOOLEAN, TRUE) AS es_particular,
+        raw_data->'fotos' AS fotos_json,
 
         -- ScrapingBee metadata
         raw_data->>'scraper_type' AS scraper_type,
@@ -208,6 +209,9 @@ final AS (
         -- Publishing info
         NULL::TIMESTAMP AS fecha_publicacion,
 
+        -- Photos
+        fotos_json,
+
         -- Raw data for reference
         raw_data
 
@@ -215,10 +219,7 @@ final AS (
 
     -- Apply filters
     WHERE
-        telefono_norm IS NOT NULL
-        AND LENGTH(telefono_norm) >= 9
-        AND precio > 5000  -- Filter out rentals
-        AND es_particular = TRUE  -- Only particular listings
+        precio > 5000  -- Filter out rentals
 )
 
 SELECT * FROM final

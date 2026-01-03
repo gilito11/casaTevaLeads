@@ -353,12 +353,6 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                     price_str = price_match.group(1).replace('.', '')
                     listing['precio'] = float(price_str)
 
-                # Extract phones
-                phones = self.extract_phones_from_html(html)
-                if phones:
-                    listing['telefono'] = phones[0]
-                    listing['telefono_norm'] = self.normalize_phone(phones[0])
-
                 # Extract features
                 metros_match = re.search(r'(\d+)\s*m[²2]', html)
                 if metros_match:
@@ -390,6 +384,17 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                     desc_text = re.sub(r'\s+', ' ', desc_text).strip()
                     if len(desc_text) > 50:
                         listing['descripcion'] = desc_text[:2000]
+
+                # Try to extract phone from description (many sellers put it there)
+                descripcion = listing.get('descripcion', '')
+                phone = self.extract_phone_from_description(descripcion)
+                if phone:
+                    listing['telefono'] = phone
+                    listing['telefono_norm'] = phone
+                    logger.info(f"Phone found in description: {phone}")
+                else:
+                    listing['telefono'] = None
+                    listing['telefono_norm'] = None
 
                 # Extract photos - Fotocasa uses static.fotocasa.es/images/
                 # Match full UUIDs and paths

@@ -211,3 +211,28 @@ logs_latest.zip
 
 # Scraper output
 output/
+
+# Deprecated/archived code
+old/
+
+# Temporary test files
+check_db.py
+quick_check.py
+run_*_test.py
+run_milan*.bat
+run_idealista_test.py
+
+# Backup files
+*.bak
+profiles_azure.yml
+
+# Downloaded logs
+*.zip
+crm_error_logs/
+
+# Frontend (not in use)
+frontend/
+
+# Tailwind config (not in use)
+tailwind.config.js
+postcss.config.js

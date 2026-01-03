@@ -49,6 +49,7 @@ extracted AS (
         raw_data->>'permite_inmobiliarias' AS permite_inmobiliarias_text,
         raw_data->>'anunciante' AS anunciante,
         raw_data->>'fecha_publicacion' AS fecha_publicacion,
+        raw_data->'fotos' AS fotos_json,
 
         -- Store entire raw_data for reference
         raw_data
@@ -191,7 +192,10 @@ final AS (
         permite_inmobiliarias,
 
         -- Publishing info
-        fecha_publicacion,
+        fecha_publicacion::TIMESTAMP AS fecha_publicacion,
+
+        -- Photos
+        fotos_json,
 
         -- Raw data for reference
         raw_data
@@ -200,11 +204,7 @@ final AS (
 
     -- Apply filters as specified
     WHERE
-        es_particular = TRUE
-        AND permite_inmobiliarias = TRUE
-        AND telefono_norm IS NOT NULL  -- Must have a phone number
-        AND LENGTH(telefono_norm) >= 9  -- Valid phone number length
-        AND precio > 0  -- Must have a valid price
+        precio > 0  -- Must have a valid price
 )
 
 SELECT * FROM final

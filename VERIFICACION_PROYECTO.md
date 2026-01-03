@@ -15,7 +15,7 @@
 | `dagster/` | ✅ Required | ✅ Existe | Workspace + assets + resources + schedules |
 | `dbt_project/` | ✅ Required | ✅ Existe | Configuración completa |
 | `backend/` | ✅ Required | ✅ Existe | Django project |
-| `data_lake/` | ⚠️ Required | ❌ Falta | MinIO initialization scripts |
+| `data_lake/` | ❌ Eliminado | N/A | Se usa PostgreSQL JSONB en su lugar |
 | `docs/` | ⚠️ Recommended | ❌ Falta | Documentación legal y técnica |
 | `scripts/` | ⚠️ Recommended | ❌ Falta | Setup scripts |
 | `tests/` | ✅ Required | ⚠️ Parcial | Existe pero vacío |
@@ -30,10 +30,10 @@
 | `scrapers/fotocasa_scraper.py` | ✅ | ✅ | Revisar filtros particulares |
 | `scrapers/milanuncios_scraper.py` | ✅ | ❌ | Por implementar |
 | `scrapers/wallapop_scraper.py` | ✅ | ❌ | Por implementar |
-| `scrapers/pipelines.py` | ✅ | ❓ | Verificar MinIO pipeline |
+| `scrapers/pipelines.py` | ✅ | ❓ | Verificar pipeline PostgreSQL |
 | `scrapers/utils/particular_filter.py` | ⚠️ CRÍTICO | ❓ | Verificar filtrado |
 | `scrapers/utils/phone_normalizer.py` | ✅ | ❓ | Verificar normalización |
-| `scrapers/utils/minio_uploader.py` | ✅ NUEVO | ❓ | Verificar upload Data Lake |
+| `scrapers/utils/minio_uploader.py` | ❌ Eliminado | N/A | Ya no se usa Data Lake |
 
 **CRÍTICO**: Verificar filtros de particulares según spec:
 - ❌ NO scrapear otras inmobiliarias
@@ -57,7 +57,7 @@
 | **Assets dbt** | | | |
 | `assets/dbt_assets.py` | ✅ | ❌ | FALTA: Integración Dagster + dbt |
 | **Resources** | | | |
-| `resources/minio_resource.py` | ✅ | ✅ | Completo |
+| `resources/minio_resource.py` | ❌ | Eliminado | Ya no se usa |
 | `resources/postgres_resource.py` | ✅ | ✅ | Completo |
 | `resources/scrapy_resource.py` | ⚠️ | ❌ | FALTA |
 | **Schedules** | | | |
@@ -142,22 +142,25 @@
 
 ---
 
-### 7. DATA LAKE (MinIO)
+### 7. ALMACENAMIENTO DE DATOS
 
-| Componente | Spec v2.0 | Estado | Notas |
-|------------|-----------|--------|-------|
-| MinIO instalado | ✅ | ❓ | Verificar si está corriendo |
-| Bucket: `casa-teva-data-lake` | ✅ | ❓ | Verificar existe |
-| **Estructura Bronze** | | | |
-| `bronze/tenant_X/fotocasa/` | ✅ | ❓ | Verificar estructura |
-| `bronze/tenant_X/milanuncios/` | ✅ | ❓ | Por crear |
-| `bronze/tenant_X/wallapop/` | ✅ | ❓ | Por crear |
-| `screenshots/` | ⚠️ | ❓ | Opcional |
-| `logs/` | ⚠️ | ❓ | Opcional |
-| **Scripts** | | | |
-| `data_lake/minio_init.sh` | ✅ | ❌ | FALTA |
+> **Decisión de Diseño: Sin MinIO/Data Lake**
+>
+> Se eliminó MinIO del proyecto. Los datos se almacenan directamente en PostgreSQL
+> como JSONB en la tabla `raw.raw_listings`. Ver `INSTRUCCIONES_SETUP.md` para
+> más detalles sobre esta decisión.
 
-**ACCIÓN REQUERIDA**: Setup MinIO + crear scripts inicialización
+| Componente | Estado | Notas |
+|------------|--------|-------|
+| PostgreSQL `raw.raw_listings` | ✅ | Almacena datos como JSONB |
+| Índices JSONB | ✅ | Para queries eficientes |
+| Deduplicación | ✅ | Por `anuncio_id` único |
+
+**Ventajas de esta arquitectura:**
+- Una sola fuente de verdad
+- Queries SQL sobre datos JSON
+- Menos servicios que mantener
+- Backups integrados en PostgreSQL
 
 ---
 
@@ -190,9 +193,9 @@
    - ⚠️ Falta facts (scrapings, contacts)
 
 2. **Scrapers**:
-   - ⚠️ Solo Fotocasa (falta Milanuncios, Wallapop)
+   - ✅ Milanuncios implementado
+   - ⚠️ Fotocasa y Wallapop parciales
    - ⚠️ Verificar filtros de particulares
-   - ⚠️ Verificar integración MinIO
 
 ### ❌ FALTA IMPLEMENTAR
 
@@ -207,11 +210,7 @@
    - ❌ Setup scripts (create schemas, tables)
    - ❌ Seed data
 
-4. **MinIO**:
-   - ❌ Setup scripts
-   - ❌ Verificar instalación
-
-5. **Docs & Scripts**:
+4. **Docs & Scripts**:
    - ❌ Documentación legal (RGPD)
    - ❌ Scripts de setup
    - ❌ Tests
@@ -223,11 +222,10 @@
 ### PASO 1: Verificar Infraestructura Base
 ```bash
 # PostgreSQL
-psql -U casa_teva -d casa_teva_db -c "\dn"  # Listar schemas
+docker exec -it casa-teva-postgres psql -U casa_teva -d casa_teva_db -c "\dn"
 
-# MinIO
-mc alias set minio http://localhost:9000 minioadmin minioadmin
-mc ls minio/  # Listar buckets
+# Verificar tabla raw_listings
+docker exec -it casa-teva-postgres psql -U casa_teva -d casa_teva_db -c "\dt raw.*"
 ```
 
 ### PASO 2: Verificar Backend Django
@@ -254,17 +252,19 @@ dagster dev -f dagster/workspace.yaml
 
 ### PASO 5: Test End-to-End
 ```bash
-# 1. Ejecutar scraper → MinIO
-python run_fotocasa_scraper.py --tenant-id=1 --minio
+# 1. Ejecutar scraper → PostgreSQL
+python run_all_scrapers.py --zones salou --postgres
 
-# 2. Dagster: Cargar a PostgreSQL
-# (via Dagster UI)
+# 2. Verificar datos en raw
+docker exec -it casa-teva-postgres psql -U casa_teva -d casa_teva_db \
+  -c "SELECT COUNT(*) FROM raw.raw_listings;"
 
 # 3. dbt: Transformar
-dbt run
+cd dbt_project && dbt run
 
 # 4. Verificar datos finales
-psql -c "SELECT COUNT(*) FROM marts.dim_leads;"
+docker exec -it casa-teva-postgres psql -U casa_teva -d casa_teva_db \
+  -c "SELECT COUNT(*) FROM marts.dim_leads;"
 ```
 
 ---
@@ -273,10 +273,9 @@ psql -c "SELECT COUNT(*) FROM marts.dim_leads;"
 
 ### Prioridad 1 - CRÍTICO (para funcionalidad básica):
 1. ✅ Verificar PostgreSQL schemas y tablas
-2. ✅ Verificar MinIO instalado y configurado
-3. ✅ Verificar Django apps (Tenant, Lead models)
-4. ❌ Crear dbt_assets.py en Dagster
-5. ❌ Ejecutar dbt run y verificar schemas creados
+2. ✅ Verificar Django apps (Tenant, Lead models)
+3. ❌ Crear dbt_assets.py en Dagster
+4. ❌ Ejecutar dbt run y verificar schemas creados
 
 ### Prioridad 2 - IMPORTANTE (para completitud):
 1. ❌ Implementar modelos dbt analytics
@@ -296,22 +295,21 @@ psql -c "SELECT COUNT(*) FROM marts.dim_leads;"
 
 | Categoría | Completitud | Notas |
 |-----------|-------------|-------|
-| Scrapers | 40% | Solo Fotocasa, falta verificar filtros |
+| Scrapers | 70% | Milanuncios OK, Fotocasa/Wallapop parciales |
 | Dagster | 70% | Core completo, falta dbt integration |
 | dbt | 60% | Staging + Marts core, falta analytics |
-| Django | 0% | No verificado |
-| PostgreSQL | 0% | No verificado |
-| MinIO | 0% | No verificado |
-| Docs | 0% | No existe |
+| Django | 80% | Web CRM funcional |
+| PostgreSQL | 90% | Schemas y tablas OK |
+| Docs | 30% | Documentación básica |
 | Tests | 0% | Vacío |
-| **TOTAL** | **35%** | **Core data pipeline implementado** |
+| **TOTAL** | **60%** | **Core funcional, falta pulir** |
 
 ---
 
 ## ✅ PRÓXIMOS PASOS RECOMENDADOS
 
-1. **AHORA**: Verificar PostgreSQL, MinIO, Django
-2. **HOY**: Crear dbt_assets.py para integración Dagster + dbt
-3. **MAÑANA**: Implementar analytics layer en dbt
-4. **ESTA SEMANA**: Setup scripts + Tests básicos
-5. **PRÓXIMA SEMANA**: Scrapers adicionales + Docs
+1. **Despliegue Azure**: Configurar Azure Functions para scrapers automáticos
+2. **dbt**: Crear dbt_assets.py para integración Dagster + dbt
+3. **Analytics**: Implementar analytics layer en dbt
+4. **Tests**: Añadir tests unitarios básicos
+5. **Scrapers**: Completar Fotocasa y Wallapop

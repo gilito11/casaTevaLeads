@@ -135,6 +135,41 @@ class BotasaurusBaseScraper:
 
         return mobiles
 
+    def extract_phone_from_description(self, description: str) -> Optional[str]:
+        """
+        Extract phone number from listing description.
+
+        Many sellers put their phone in the description to avoid portal fees.
+        This is the most reliable way to get phones without login.
+        """
+        if not description:
+            return None
+
+        # Clean the description - remove common separators
+        clean_desc = description.replace(' ', '').replace('.', '').replace('-', '').replace('/', '')
+
+        # Find all 9-digit Spanish phone numbers (6xx, 7xx, 8xx, 9xx)
+        phones = re.findall(r'[6789]\d{8}', clean_desc)
+
+        # Filter out fake/invalid numbers
+        BLACKLIST = {
+            '666666666', '777777777', '888888888', '999999999',
+            '600000000', '700000000', '800000000', '900000000',
+            '123456789', '987654321',
+        }
+
+        for phone in phones:
+            # Skip blacklisted
+            if phone in BLACKLIST:
+                continue
+            # Skip numbers with too many repeated digits (e.g., 666777888)
+            if re.match(r'(\d)\1{5,}', phone):
+                continue
+            # Valid phone found
+            return phone
+
+        return None
+
     def should_scrape(self, listing_data: Dict[str, Any]) -> bool:
         """Check if listing should be scraped (particular filter)."""
         return debe_scrapear(listing_data)

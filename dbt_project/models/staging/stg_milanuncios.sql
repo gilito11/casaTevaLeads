@@ -34,21 +34,22 @@ extracted AS (
 
         -- Extract fields from JSONB (campos del scraper de Milanuncios)
         raw_data->>'anuncio_id' AS anuncio_id,
-        raw_data->>'url_anuncio' AS url,
+        COALESCE(raw_data->>'url', raw_data->>'url_anuncio', raw_data->>'detail_url') AS url,
         raw_data->>'titulo' AS titulo,
-        raw_data->>'precio' AS precio_text,
+        COALESCE(raw_data->>'precio', (raw_data->'precio')::TEXT) AS precio_text,
         raw_data->>'descripcion' AS descripcion,
-        raw_data->>'ubicacion' AS ubicacion,
+        COALESCE(raw_data->>'ubicacion', raw_data->>'direccion') AS ubicacion,
         raw_data->>'codigo_postal' AS codigo_postal,
-        raw_data->>'telefono' AS telefono_raw,
+        COALESCE(raw_data->>'telefono', raw_data->>'telefono_norm') AS telefono_raw,
         raw_data->>'email' AS email,
-        raw_data->>'vendedor' AS vendedor,
-        raw_data->>'metros' AS metros_text,
-        raw_data->>'habitaciones' AS habitaciones_text,
-        raw_data->>'banos' AS banos_text,
+        COALESCE(raw_data->>'vendedor', raw_data->>'nombre', 'Particular') AS vendedor,
+        COALESCE(raw_data->>'metros', (raw_data->'metros')::TEXT) AS metros_text,
+        COALESCE(raw_data->>'habitaciones', (raw_data->'habitaciones')::TEXT) AS habitaciones_text,
+        COALESCE(raw_data->>'banos', (raw_data->'banos')::TEXT) AS banos_text,
         raw_data->>'certificado_energetico' AS certificado_energetico,
-        raw_data->>'zona_busqueda' AS zona_busqueda,
+        COALESCE(raw_data->>'zona_busqueda', raw_data->>'zona_geografica', raw_data->>'zona') AS zona_busqueda,
         raw_data->>'imagen_principal' AS imagen_principal,
+        raw_data->'fotos' AS fotos_json,
 
         -- Store entire raw_data for reference
         raw_data
@@ -194,6 +195,9 @@ final AS (
         -- Publishing info (Milanuncios no lo proporciona directamente)
         NULL::TIMESTAMP AS fecha_publicacion,
 
+        -- Photos
+        fotos_json,
+
         -- Raw data for reference
         raw_data
 
@@ -201,9 +205,7 @@ final AS (
 
     -- Apply filters
     WHERE
-        telefono_norm IS NOT NULL
-        AND LENGTH(telefono_norm) >= 9  -- Valid phone number length
-        AND precio > 5000  -- Filter out rentals (precio_min)
+        precio > 5000  -- Filter out rentals
 )
 
 SELECT * FROM final

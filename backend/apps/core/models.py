@@ -149,8 +149,7 @@ class ZonaGeografica(models.Model):
     scrapear_milanuncios = models.BooleanField(default=True)
     scrapear_fotocasa = models.BooleanField(default=True)
     scrapear_habitaclia = models.BooleanField(default=True)
-    scrapear_wallapop = models.BooleanField(default=False)  # Deshabilitado (bloqueado)
-    scrapear_pisos = models.BooleanField(default=True)
+    scrapear_idealista = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -264,7 +263,7 @@ class ScrapingJob(models.Model):
         ('milanuncios', 'Milanuncios'),
         ('fotocasa', 'Fotocasa'),
         ('habitaclia', 'Habitaclia'),
-        ('pisos', 'Pisos.com'),
+        ('idealista', 'Idealista'),
         ('all', 'Todos los portales'),
     ]
 

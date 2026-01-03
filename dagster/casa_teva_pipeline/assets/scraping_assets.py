@@ -62,42 +62,6 @@ ZONA_MAPPING_MILANUNCIOS = {
     'sant_carles_rapita': 'sant_carles_rapita',
 }
 
-ZONA_MAPPING_PISOS = {
-    # Lleida
-    'lleida_ciudad': 'lleida_capital',
-    'lleida_20km': 'lleida_provincia',
-    'lleida_30km': 'lleida_provincia',
-    'lleida_40km': 'lleida_provincia',
-    'lleida_50km': 'lleida_provincia',
-    'la_bordeta': 'lleida_capital',
-    'mollerussa': 'lleida_provincia',
-    'tremp': 'lleida_provincia',
-    'tarrega': 'lleida_provincia',
-    'balaguer': 'lleida_provincia',
-    # Tarragona
-    'tarragona_ciudad': 'tarragona_capital',
-    'tarragona_20km': 'tarragona_provincia',
-    'tarragona_30km': 'tarragona_provincia',
-    'tarragona_40km': 'tarragona_provincia',
-    'tarragona_50km': 'tarragona_provincia',
-    # Costa Daurada
-    'salou': 'salou',
-    'cambrils': 'cambrils',
-    'reus': 'reus',
-    'vendrell': 'vendrell',
-    'calafell': 'calafell',
-    'torredembarra': 'torredembarra',
-    'altafulla': 'altafulla',
-    'miami_platja': 'tarragona_provincia',
-    'vila_seca': 'tarragona_provincia',
-    'valls': 'valls',
-    'montblanc': 'tarragona_provincia',
-    # Terres de l'Ebre
-    'tortosa': 'tortosa',
-    'amposta': 'amposta',
-    'sant_carles_rapita': 'tarragona_provincia',
-}
-
 # Mapping para Habitaclia (Botasaurus)
 ZONA_MAPPING_HABITACLIA = {
     # Lleida
@@ -171,7 +135,7 @@ ZONA_MAPPING_FOTOCASA = {
     'sant_carles_rapita': 'sant_carles_rapita',
 }
 
-# Mapping para Idealista (Camoufox - free anti-detect browser)
+# Mapping para Idealista (ScrapingBee - stealth proxy)
 ZONA_MAPPING_IDEALISTA = {
     # Lleida
     'lleida_ciudad': 'lleida',
@@ -414,26 +378,12 @@ def scraping_all_portals(
                 if mapped not in milanuncios_zones:
                     milanuncios_zones.append(mapped)
 
-        # Mapear zonas para Pisos.com
-        pisos_zones = []
-        for slug in zone_slugs:
-            if slug in ZONA_MAPPING_PISOS:
-                mapped = ZONA_MAPPING_PISOS[slug]
-                if mapped not in pisos_zones:
-                    pisos_zones.append(mapped)
-
         # === Milanuncios with ScrapingBee (paid - bypasses GeeTest via stealth proxy) ===
         if milanuncios_zones:
             context.log.info("Running Milanuncios with ScrapingBee (stealth proxy)")
             result = run_scraper(context, 'scrapingbee_milanuncios', milanuncios_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
-
-        # Pisos.com DISABLED - casi todos son inmobiliarias/bancos, no hay particulares reales
-        # if pisos_zones:
-        #     result = run_scraper(context, 'pisos', pisos_zones, tenant_id)
-        #     all_results.append(result)
-        #     total_leads += result.get('leads_found', 0)
 
         # Mapear zonas para Habitaclia (Botasaurus)
         habitaclia_zones = []

@@ -374,42 +374,9 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         """Scrape detail page to extract full listing data."""
         detail_url = listing['detail_url']
 
-        # Use js_scenario to click the phone reveal button
-        # Milanuncios hides phones behind a button that needs to be clicked
-        # We try multiple selectors as Milanuncios may use different elements
-        js_scenario = {
-            "instructions": [
-                {"wait": 2000},  # Wait for page to fully load
-                # Try clicking various phone button selectors (first match wins)
-                {"evaluate": """
-                    (function() {
-                        var selectors = [
-                            '[data-testid="PHONE_BUTTON"]',
-                            '.ma-CallPhoneButton',
-                            '.ma-PhoneButton',
-                            'button[class*="Phone"]',
-                            'a[class*="Phone"]',
-                            '[data-testid*="phone"]',
-                            '[data-testid*="PHONE"]'
-                        ];
-                        for (var i = 0; i < selectors.length; i++) {
-                            var el = document.querySelector(selectors[i]);
-                            if (el) {
-                                el.click();
-                                return 'clicked: ' + selectors[i];
-                            }
-                        }
-                        return 'no phone button found';
-                    })()
-                """},
-                {"wait": 2000},  # Wait for phone to be revealed
-            ]
-        }
-
         html = self.fetch_page(
             detail_url,
             wait_for='[data-testid="AD_DETAIL"]',
-            js_scenario=js_scenario,
         )
 
         if not html:
@@ -476,53 +443,16 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
                 listing['ubicacion'] = location_match.group(1).strip()
                 break
 
-        # Extract phone - after clicking reveal button, phone should be visible
-        # Priority 1: Look for tel: links (most reliable after button click)
-        tel_links = re.findall(r'href="tel:(?:\+?34)?(\d{9})"', html)
-        if tel_links:
-            phone = tel_links[0]
+        # Try to extract phone from description (many sellers put it there)
+        descripcion = listing.get('descripcion', '')
+        phone = self.extract_phone_from_description(descripcion)
+        if phone:
             listing['telefono'] = phone
             listing['telefono_norm'] = phone
-            logger.info(f"Phone found via tel: link: {phone}")
+            logger.info(f"Phone found in description: {phone}")
         else:
-            # Priority 2: Look for phone in data attributes or specific elements
-            phone_patterns = [
-                # Phone in data attribute (revealed state)
-                r'data-phone="(?:\+?34)?(\d{9})"',
-                # Phone in phone container after reveal
-                r'(?:data-testid="PHONE"|class="[^"]*[Pp]hone[Nn]umber[^"]*")[^>]*>.*?(\d{9})',
-                # Phone number displayed directly
-                r'class="[^"]*ma-PhoneNumber[^"]*"[^>]*>(?:\+34\s?)?(\d{3}\s?\d{3}\s?\d{3})',
-                # Any visible phone number format
-                r'>(?:\+34\s?)?([6-9]\d{2}[\s\-]?\d{3}[\s\-]?\d{3})<',
-            ]
-
-            phone_found = False
-            for pattern in phone_patterns:
-                phone_match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
-                if phone_match:
-                    phone = re.sub(r'\s|-', '', phone_match.group(1))
-                    if len(phone) == 9 and phone[0] in '679':
-                        listing['telefono'] = phone
-                        listing['telefono_norm'] = phone
-                        phone_found = True
-                        logger.info(f"Phone found via pattern: {phone}")
-                        break
-
-            if not phone_found:
-                # Last resort: extract from general text, but be very strict
-                phones = self.extract_phones_from_html(html)
-                # Filter to only mobile numbers (6xx, 7xx) and exclude common IDs
-                filtered_phones = [
-                    p for p in phones
-                    if p[0] in '67'  # Only mobile prefixes
-                    and p not in ('666666666', '777777777', '699999999')
-                    and not re.match(r'(\d)\1{8}', p)  # No repeated digits
-                ]
-                if filtered_phones:
-                    listing['telefono'] = filtered_phones[0]
-                    listing['telefono_norm'] = filtered_phones[0]
-                    logger.info(f"Phone found via extraction: {filtered_phones[0]}")
+            listing['telefono'] = None
+            listing['telefono_norm'] = None
 
         # Extract features
         metros_match = re.search(r'(\d+)\s*m[²2]', html)
