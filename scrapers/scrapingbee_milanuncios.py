@@ -467,10 +467,12 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         if banos_match:
             listing['banos'] = int(banos_match.group(1))
 
-        # Extract photos from images-re.milanuncios.com CDN
-        # Milanuncios uses UUID-based URLs: https://images-re.milanuncios.com/images/ads/{UUID}
+        # Extract photos from images.milanuncios.com CDN
+        # Milanuncios uses UUID-based URLs: https://images.milanuncios.com/api/v1/ma-ad-media-pro/images/{UUID}
         photo_patterns = [
-            # Main pattern: UUID-based image URLs (with or without size rules)
+            # New format (2025+): API-based image URLs
+            r'https://images\.milanuncios\.com/api/v1/ma-ad-media-pro/images/([a-f0-9-]{36})(?:\?rule=[^"\'<>\s]*)?',
+            # Legacy format (fallback)
             r'https://images-re\.milanuncios\.com/images/ads/([a-f0-9-]{36})(?:\?rule=[^"\'<>\s]*)?',
         ]
 
@@ -482,8 +484,8 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         # Build full URLs with high-quality size rule
         unique_photos = []
         for photo_id in all_photo_ids:
-            # Use detail_640x480 for good quality
-            photo_url = f"https://images-re.milanuncios.com/images/ads/{photo_id}?rule=detail_640x480"
+            # Use new API format with detail_640x480 for good quality
+            photo_url = f"https://images.milanuncios.com/api/v1/ma-ad-media-pro/images/{photo_id}?rule=detail_640x480"
             unique_photos.append(photo_url)
 
         listing['fotos'] = unique_photos[:10]
