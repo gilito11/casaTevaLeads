@@ -82,10 +82,11 @@ deduplicated AS (
     SELECT
         *,
         -- Create a unique key: use phone when available, otherwise use URL
-        COALESCE(telefono_norm, MD5(url)) AS lead_unique_key,
+        -- NULLIF handles empty strings ('') that COALESCE would not catch
+        COALESCE(NULLIF(telefono_norm, ''), MD5(url)) AS lead_unique_key,
         -- Use ROW_NUMBER to keep most recent listing per tenant + unique key
         ROW_NUMBER() OVER (
-            PARTITION BY tenant_id, COALESCE(telefono_norm, MD5(url))
+            PARTITION BY tenant_id, COALESCE(NULLIF(telefono_norm, ''), MD5(url))
             ORDER BY scraping_timestamp DESC, created_at DESC
         ) AS rn
     FROM all_staging_sources
