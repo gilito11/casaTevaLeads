@@ -51,6 +51,7 @@ class Lead(models.Model):
     es_particular = models.BooleanField(null=True, blank=True)
     lead_score = models.IntegerField(null=True, blank=True)
     fecha_publicacion = models.DateTimeField(null=True, blank=True)
+    fotos = models.JSONField(null=True, blank=True, db_column='fotos_json')
 
     class Meta:
         db_table = 'public_marts"."dim_leads'
