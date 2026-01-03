@@ -274,6 +274,9 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             matches = re.findall(url_pattern, html)
 
         seen_ids = set()
+        particulares_count = 0
+        agencies_count = 0
+
         for path, anuncio_id in matches:
             if anuncio_id in seen_ids:
                 continue
@@ -282,6 +285,21 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             detail_url = f"{self.BASE_URL}{path}"
             zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
+            # Pre-detect agency from search results HTML (look for agency markers near the listing)
+            # Search for agency indicators within ~500 chars around the listing URL
+            url_pos = html.find(path)
+            if url_pos > 0:
+                context = html[max(0, url_pos-300):url_pos+500]
+                is_likely_agency = bool(re.search(
+                    r'professional-name|logo-profesional|item-link-professional',
+                    context, re.IGNORECASE
+                ))
+                if is_likely_agency and self.only_particulares:
+                    agencies_count += 1
+                    self.stats['credits_saved'] += 75
+                    continue  # Skip agency, save 75 credits!
+
+            particulares_count += 1
             listings.append({
                 'anuncio_id': anuncio_id,
                 'detail_url': detail_url,
@@ -291,7 +309,9 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
                 'zona_geografica': zona_info.get('nombre', zona_key),
             })
 
-        logger.info(f"Found {len(listings)} listing URLs in search results")
+        if agencies_count > 0:
+            logger.info(f"Pre-filtered {agencies_count} agency listings from search (saved {agencies_count * 75} credits)")
+        logger.info(f"Found {len(listings)} particular listing URLs in search results")
         return listings
 
     def _scrape_detail_page(self, listing: Dict[str, Any]) -> Dict[str, Any]:
@@ -459,9 +479,20 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
 
             self.stats['pages_scraped'] += 1
 
-            # Scrape each detail page
+            # Scrape each detail page (skip if already in DB)
+            skipped = 0
             for i, listing in enumerate(basic_listings[:10]):  # Limit per page
-                logger.info(f"Detail page {i+1}/{len(basic_listings[:10])}")
+                url = listing.get('detail_url') or listing.get('url_anuncio')
+
+                # Skip if URL already exists in database
+                if url and self.url_exists_in_db(url):
+                    skipped += 1
+                    self.stats['listings_skipped'] += 1
+                    self.stats['credits_saved'] += 75
+                    logger.debug(f"Skipping existing URL: {url[:50]}...")
+                    continue
+
+                logger.info(f"Detail page {i+1}/{len(basic_listings[:10])} (skipped {skipped})")
 
                 enriched = self._scrape_detail_page(listing)
                 self.stats['listings_found'] += 1
@@ -474,6 +505,9 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
 
                 # Delay between requests
                 time.sleep(0.5)
+
+            if skipped > 0:
+                logger.info(f"Skipped {skipped} already-scraped listings (saved {skipped * 75} credits)")
 
             # Check if we should continue to next page
             if len(basic_listings) < 10:

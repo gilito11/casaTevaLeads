@@ -134,9 +134,11 @@ class ScrapingBeeClient:
         self.stats = {
             'requests': 0,
             'credits_used': 0,
+            'credits_saved': 0,  # Credits saved by skipping duplicates/agencies
             'pages_scraped': 0,
             'listings_found': 0,
             'listings_saved': 0,
+            'listings_skipped': 0,  # Skipped due to already in DB
             'errors': 0,
         }
 
@@ -322,6 +324,23 @@ class ScrapingBeeClient:
 
         return None
 
+    def url_exists_in_db(self, url: str) -> bool:
+        """Check if URL already exists in raw_listings."""
+        if not self.postgres_conn:
+            return False
+        try:
+            cursor = self.postgres_conn.cursor()
+            cursor.execute(
+                "SELECT 1 FROM raw.raw_listings WHERE raw_data->>'url' = %s LIMIT 1",
+                (url,)
+            )
+            exists = cursor.fetchone() is not None
+            cursor.close()
+            return exists
+        except Exception as e:
+            logger.warning(f"Error checking URL existence: {e}")
+            return False
+
     def save_to_postgres(self, listing_data: Dict[str, Any]) -> bool:
         """
         Save listing to PostgreSQL raw.raw_listings table.
@@ -407,11 +426,15 @@ class ScrapingBeeClient:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get scraping statistics."""
+        credits_used = self.stats['credits_used']
+        credits_saved = self.stats['credits_saved']
         return {
             **self.stats,
             'portal': self.portal_name,
             'tenant_id': self.tenant_id,
-            'cost_estimate_eur': round(self.stats['credits_used'] / 250000 * 50, 2),
+            'cost_estimate_eur': round(credits_used / 250000 * 50, 2),
+            'savings_estimate_eur': round(credits_saved / 250000 * 50, 2),
+            'efficiency_pct': round(credits_saved / (credits_used + credits_saved) * 100, 1) if (credits_used + credits_saved) > 0 else 0,
         }
 
     def close(self):

@@ -533,9 +533,20 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
 
             self.stats['pages_scraped'] += 1
 
-            # Scrape each detail page
+            # Scrape each detail page (skip if already in DB)
+            skipped = 0
             for i, listing in enumerate(basic_listings[:15]):  # Limit per page
-                logger.info(f"Detail page {i+1}/{len(basic_listings[:15])}")
+                url = listing.get('detail_url') or listing.get('url_anuncio')
+
+                # Skip if URL already exists in database
+                if url and self.url_exists_in_db(url):
+                    skipped += 1
+                    self.stats['listings_skipped'] += 1
+                    self.stats['credits_saved'] += 75
+                    logger.debug(f"Skipping existing URL: {url[:50]}...")
+                    continue
+
+                logger.info(f"Detail page {i+1}/{len(basic_listings[:15])} (skipped {skipped})")
 
                 enriched = self._scrape_detail_page(listing)
                 self.stats['listings_found'] += 1
@@ -543,6 +554,9 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
 
                 # Small delay between requests
                 time.sleep(0.5)
+
+            if skipped > 0:
+                logger.info(f"Skipped {skipped} already-scraped listings (saved {skipped * 75} credits)")
 
             # Check if we should continue to next page
             if len(basic_listings) < 10:
