@@ -401,30 +401,47 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                     if ubicacion_match:
                         listing['ubicacion'] = ubicacion_match.group(1).strip()
 
-                    # Extract description - Habitaclia uses class="comment" for descriptions
-                    # First try to find the comment section (permissive match)
-                    desc_match = re.search(
-                        r'<div[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</div>',
+                    # Extract description - Habitaclia structure:
+                    # Section "Información detallada" with <h3>Title</h3> followed by description <p>
+                    # Try multiple patterns in order of reliability
+                    desc_match = None
+
+                    # Pattern 1: Look for section with h3 + description text
+                    section_match = re.search(
+                        r'<section[^>]*>.*?<h3[^>]*>([^<]+)</h3>\s*<p[^>]*>([^<]+)</p>',
                         html, re.DOTALL | re.IGNORECASE
                     )
-                    if not desc_match:
+                    if section_match:
+                        h3_text = section_match.group(1).strip()
+                        p_text = section_match.group(2).strip()
+                        # Combine h3 + p if both are meaningful
+                        if len(p_text) > 20:
+                            listing['descripcion'] = f"{h3_text}\n{p_text}"[:2000]
+
+                    # Pattern 2: Habitaclia uses class="comment" for descriptions
+                    if 'descripcion' not in listing:
+                        desc_match = re.search(
+                            r'<div[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</div>',
+                            html, re.DOTALL | re.IGNORECASE
+                        )
+                    if not desc_match and 'descripcion' not in listing:
                         # Try section with comment
                         desc_match = re.search(
                             r'<section[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</section>',
                             html, re.DOTALL | re.IGNORECASE
                         )
-                    if not desc_match:
+                    if not desc_match and 'descripcion' not in listing:
                         # Try any element with descripcion/description in class
                         desc_match = re.search(
                             r'class="[^"]*(?:descripcion|description)[^"]*"[^>]*>(.*?)</(?:div|section|p)',
                             html, re.DOTALL | re.IGNORECASE
                         )
                     # Fallback: find long text blocks directly in HTML (>100 chars between tags)
-                    if not desc_match or 'descripcion' not in listing:
+                    if 'descripcion' not in listing:
                         text_blocks = re.findall(r'>([^<]{100,})<', html)
                         for block in text_blocks:
                             clean_text = block.strip()
-                            # Skip JavaScript code, CSS, cookie banners, and other non-content
+                            # Skip JavaScript code, CSS, cookie banners, consent text, and other non-content
                             skip_patterns = [
                                 'cookie', 'javascript', 'privacy', 'google', 'analytics',
                                 'gdpr', 'window.', 'function', '__tcfapi', 'addEventListener',
@@ -433,6 +450,10 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                                 'overflow:', 'height:', 'width:', '@media', 'transform:',
                                 'transition:', 'animation:', 'opacity:', 'cursor:',
                                 'rgba(', '#didomi', 'document.', 'var(--', 'calc(',
+                                # Cookie consent / GDPR banners
+                                'personalised', 'personalized', 'advertising', 'content measurement',
+                                'audience research', 'services development', 'store and/or access',
+                                'legitimate interest', 'consent', 'tcf', 'vendors', 'iab',
                             ]
                             if (clean_text and
                                 not any(skip in clean_text.lower() for skip in skip_patterns) and
