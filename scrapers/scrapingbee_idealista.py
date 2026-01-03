@@ -391,21 +391,41 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             listing['telefono'] = None
             listing['telefono_norm'] = None
 
-        # Extract features from info-features section
-        # Metros cuadrados
-        metros_match = re.search(r'(\d+)\s*m[²2]', html)
+        # Extract features from info-features section (most reliable)
+        # The info-features section contains the main listing data
+        info_features = re.search(
+            r'class="[^"]*info-features[^"]*"[^>]*>(.*?)</(?:div|section|ul)',
+            html, re.DOTALL
+        )
+        features_section = info_features.group(1) if info_features else html
+
+        # Metros cuadrados - from info-features first, fallback to full HTML
+        metros_match = re.search(r'(\d+)\s*m[²2]', features_section)
         if metros_match:
             listing['metros'] = int(metros_match.group(1))
+        else:
+            # Fallback to first m² in page (might get description values)
+            metros_fallback = re.search(r'(\d+)\s*m[²2]', html)
+            if metros_fallback:
+                listing['metros'] = int(metros_fallback.group(1))
 
-        # Habitaciones
-        habs_match = re.search(r'(\d+)\s*(?:hab|habitaci|dormitor)', html, re.IGNORECASE)
+        # Habitaciones - from info-features first
+        habs_match = re.search(r'(\d+)\s*(?:hab|habitaci|dormitor)', features_section, re.IGNORECASE)
         if habs_match:
             listing['habitaciones'] = int(habs_match.group(1))
+        else:
+            habs_fallback = re.search(r'(\d+)\s*(?:hab|habitaci|dormitor)', html, re.IGNORECASE)
+            if habs_fallback:
+                listing['habitaciones'] = int(habs_fallback.group(1))
 
-        # Baños
-        banos_match = re.search(r'(\d+)\s*(?:baño|wc)', html, re.IGNORECASE)
+        # Baños - from info-features first
+        banos_match = re.search(r'(\d+)\s*(?:baño|wc)', features_section, re.IGNORECASE)
         if banos_match:
             listing['banos'] = int(banos_match.group(1))
+        else:
+            banos_fallback = re.search(r'(\d+)\s*(?:baño|wc)', html, re.IGNORECASE)
+            if banos_fallback:
+                listing['banos'] = int(banos_fallback.group(1))
 
         # Extract photos (Idealista CDN: img3.idealista.com)
         photos = re.findall(
