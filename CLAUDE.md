@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 4 January 2026 (dbt staging fotocasa fix, pagination improvements)
+> **Last Updated**: 4 January 2026 (Fotocasa scraper fix - only particulares)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
