@@ -245,21 +245,39 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                 logger.warning(f"Possible blocking or empty results (HTML: {len(html)} bytes)")
                 return []
 
-            # Extract listing URLs - multiple patterns for Fotocasa
-            # Pattern 1: Standard format /es/comprar/vivienda/.../ID or .../ID/d
-            # Pattern 2: Obra nueva format /es/comprar/vivienda/obra-nueva/.../ID1/ID2
-            links = re.findall(r'href="(/es/comprar/vivienda/[^?"]+)"', html)
+            # Fotocasa page structure:
+            # 1. First section: PARTICULARES listings (what we want)
+            # 2. Divider text: "Mira algunos de los anuncios de inmobiliarias"
+            # 3. Second section: AGENCY listings (skip these)
 
-            # Filter to property detail links (must contain at least one 7+ digit ID)
-            filtered_links = []
-            for link in links:
-                # Match URLs with property IDs (7+ digits)
-                if re.search(r'/\d{7,}', link):
-                    filtered_links.append(link)
+            # Find the divider position and only use HTML before it
+            html_lower = html.lower()
+            divider_markers = [
+                'anuncios de inmobiliarias',
+                'ver más anuncios',
+                'mira algunos de los anuncios',
+            ]
+
+            divider_pos = len(html)  # Default: use all HTML
+            for marker in divider_markers:
+                pos = html_lower.find(marker)
+                if pos > 0 and pos < divider_pos:
+                    divider_pos = pos
+                    logger.info(f"Found divider '{marker}' at position {pos}")
+
+            # Only search for links in the particulares section (before divider)
+            particulares_html = html[:divider_pos]
+            logger.info(f"Searching in first {len(particulares_html)} chars (before agency section)")
+
+            # Extract listing URLs from particulares section only
+            # Links have format: /es/comprar/vivienda/.../ID/d?from=pl&amp;...
+            links = re.findall(r'href="(/es/comprar/vivienda/[^"]+/\d{7,}/d)', particulares_html)
+
+            # Deduplicate (same listing appears multiple times with different params)
+            filtered_links = list(dict.fromkeys(links))
 
             unique_links = list(dict.fromkeys(filtered_links))
-
-            logger.info(f"Found {len(unique_links)} listing links")
+            logger.info(f"Found {len(unique_links)} PARTICULAR listing links (before agency divider)")
 
             listings = []
             for link in unique_links[:20]:  # Limit to avoid timeout
