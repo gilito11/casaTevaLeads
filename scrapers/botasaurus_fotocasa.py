@@ -443,14 +443,49 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                         seen.add(photo_base)
                 listing['fotos'] = unique_photos[:10]
 
-                # Since we're using /particulares/ URL filter, Fotocasa already shows only
-                # particular listings. We trust the URL filter and mark all as particular.
-                # This avoids false positives from overly aggressive agency detection.
-                listing['vendedor'] = 'Particular'
-                listing['es_particular'] = True
-                logger.info(f"ACCEPTED: {listing.get('titulo', 'N/A')[:50]}")
+                # Detect if listing is from agency or particular
+                # Fotocasa shows "Anuncio Particular" for private sellers
+                is_particular = False
 
-                results.append(listing)
+                # Check for particular indicators (exact text from Fotocasa)
+                particular_indicators = [
+                    'anuncio particular',  # Main indicator
+                    'particular_user_icon',  # SVG icon
+                    'anunciante particular',
+                ]
+                html_lower = html.lower()
+                for indicator in particular_indicators:
+                    if indicator in html_lower:
+                        is_particular = True
+                        break
+
+                # If no particular indicator found, check if it's clearly an agency
+                if not is_particular:
+                    # Check for agency names/indicators near contact section
+                    agency_patterns = [
+                        r'partner\s+inmobiliario',
+                        r'inmuebles\s+\w+',  # "Inmuebles [company name]"
+                        r'servicios\s+integrales',
+                        r'tu\s+agente',
+                    ]
+                    for pattern in agency_patterns:
+                        if re.search(pattern, html_lower):
+                            logger.info(f"SKIPPED (agency pattern): {listing.get('titulo', 'N/A')[:50]}")
+                            break
+                    else:
+                        # No clear agency indicator, might be particular without badge
+                        # Accept if we're using /particulares/ URL
+                        is_particular = True
+
+                if is_particular:
+                    listing['vendedor'] = 'Particular'
+                    listing['es_particular'] = True
+                    logger.info(f"ACCEPTED: {listing.get('titulo', 'N/A')[:50]}")
+                    results.append(listing)
+                else:
+                    listing['vendedor'] = 'Agencia'
+                    listing['es_particular'] = False
+                    logger.info(f"SKIPPED (agency): {listing.get('titulo', 'N/A')[:50]}")
 
             except Exception as e:
                 logger.error(f"Error processing {url}: {e}")
