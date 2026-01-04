@@ -270,34 +270,96 @@
 
     <!-- Pagination -->
     {% if leads.has_other_pages %}
-    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
         <p class="text-sm text-gray-500 dark:text-gray-400">
             Mostrando {{ leads.start_index }} - {{ leads.end_index }} de {{ leads.paginator.count }} resultados
         </p>
-        <nav class="flex items-center space-x-2">
+        <nav class="flex items-center space-x-1">
+            <!-- Primera página -->
+            {% if leads.number > 2 %}
+            <a href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+               hx-get="{% url 'leads:list' %}?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}"
+               hx-target="#leads-table-container"
+               hx-push-url="true"
+               class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                1
+            </a>
+            {% if leads.number > 3 %}
+            <span class="px-2 text-gray-400">...</span>
+            {% endif %}
+            {% endif %}
+
+            <!-- Anterior -->
             {% if leads.has_previous %}
             <a href="?page={{ leads.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
                hx-get="{% url 'leads:list' %}?page={{ leads.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}"
                hx-target="#leads-table-container"
                hx-push-url="true"
-               class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
-                Anterior
+               class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+               title="Página anterior">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
             </a>
             {% endif %}
 
-            <span class="px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400">
-                Pagina {{ leads.number }} de {{ leads.paginator.num_pages }}
-            </span>
+            <!-- Páginas cercanas -->
+            {% for page_num in leads.paginator.page_range %}
+                {% if page_num >= leads.number|add:"-1" and page_num <= leads.number|add:"1" %}
+                    {% if page_num == leads.number %}
+                    <span class="px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg">
+                        {{ page_num }}
+                    </span>
+                    {% else %}
+                    <a href="?page={{ page_num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                       hx-get="{% url 'leads:list' %}?page={{ page_num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}"
+                       hx-target="#leads-table-container"
+                       hx-push-url="true"
+                       class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                        {{ page_num }}
+                    </a>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
 
+            <!-- Siguiente -->
             {% if leads.has_next %}
             <a href="?page={{ leads.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
                hx-get="{% url 'leads:list' %}?page={{ leads.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}"
                hx-target="#leads-table-container"
                hx-push-url="true"
-               class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
-                Siguiente
+               class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+               title="Página siguiente">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
             </a>
             {% endif %}
+
+            <!-- Última página -->
+            {% if leads.number < leads.paginator.num_pages|add:"-1" %}
+            {% if leads.number < leads.paginator.num_pages|add:"-2" %}
+            <span class="px-2 text-gray-400">...</span>
+            {% endif %}
+            <a href="?page={{ leads.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+               hx-get="{% url 'leads:list' %}?page={{ leads.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}"
+               hx-target="#leads-table-container"
+               hx-push-url="true"
+               class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                {{ leads.paginator.num_pages }}
+            </a>
+            {% endif %}
+
+            <!-- Input para ir a página específica -->
+            <div class="ml-2 flex items-center space-x-1">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Ir a</span>
+                <input type="number"
+                       min="1"
+                       max="{{ leads.paginator.num_pages }}"
+                       value="{{ leads.number }}"
+                       class="w-16 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                       onkeydown="if(event.key==='Enter'){const val=parseInt(this.value);if(val>=1&&val<={{ leads.paginator.num_pages }}){const params=new URLSearchParams(window.location.search);params.set('page',val);htmx.ajax('GET','{% url 'leads:list' %}?'+params.toString(),'#leads-table-container').then(()=>history.pushState({},'','?'+params.toString()))}}">
+            </div>
         </nav>
     </div>
     {% endif %}

@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 3 January 2026 (Habitaclia extraction fix deployed)
+> **Last Updated**: 4 January 2026 (dbt staging fotocasa fix, pagination improvements)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -22,8 +22,18 @@ Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
 | milanuncios | ScrapingBee | OK | OK | 75 credits/req | titulo, precio, metros, fotos, telefono |
 | idealista | ScrapingBee | OK | OK | 75 credits/req | titulo, precio, metros, fotos, telefono |
 
+### Extraction Patterns (Fixed Jan 2026)
+Los scrapers extraen datos de elementos HTML especificos para evitar valores incorrectos:
+
+| Portal | Precio | Metros | Habitaciones |
+|--------|--------|--------|--------------|
+| habitaclia | `feature-container` class | `<li>Superficie X m2</li>` | `<li>X habitaciones</li>` |
+| fotocasa | `re-DetailHeader-price` class | `<span><span>N</span> m²` | `<span><span>N</span> hab` |
+| idealista | `info-data-price` class | `info-features` section | `info-features` section |
+| milanuncios | JSON-LD / data attributes | Generic (detail page only) | Generic (detail page only) |
+
 ### Extraccion de telefonos
-- **Milanuncios/Idealista**: Click en boton "Ver telefono" via js_scenario de ScrapingBee
+- **Milanuncios/Idealista**: Busqueda en descripcion (regex)
 - **Habitaclia/Fotocasa**: Busqueda de patrones en descripcion del anuncio (regex)
 
 ### Portales eliminados (Enero 2026)

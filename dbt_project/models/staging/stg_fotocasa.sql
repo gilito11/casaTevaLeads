@@ -32,23 +32,29 @@ extracted AS (
         scraping_timestamp,
         created_at,
 
-        -- Extract fields from JSONB
+        -- Extract fields from JSONB (using actual field names from scraper)
         raw_data->>'url' AS url,
         raw_data->>'titulo' AS titulo,
-        raw_data->>'precio' AS precio_text,
         raw_data->>'descripcion' AS descripcion,
-        raw_data->>'ubicacion' AS ubicacion,
+        COALESCE(raw_data->>'direccion', raw_data->>'zona_geografica') AS ubicacion,
         raw_data->>'telefono' AS telefono_raw,
         raw_data->>'email' AS email,
-        raw_data->>'nombre_contacto' AS nombre_contacto,
-        raw_data->>'tipo_propiedad' AS tipo_propiedad,
-        raw_data->>'superficie' AS superficie_text,
-        raw_data->>'habitaciones' AS habitaciones_text,
-        raw_data->>'banos' AS banos_text,
-        raw_data->>'es_particular' AS es_particular_text,
-        raw_data->>'permite_inmobiliarias' AS permite_inmobiliarias_text,
-        raw_data->>'anunciante' AS anunciante,
-        raw_data->>'fecha_publicacion' AS fecha_publicacion,
+        raw_data->>'nombre' AS nombre_contacto,
+        raw_data->>'vendedor' AS anunciante,
+        raw_data->>'zona_geografica' AS zona_geografica,
+
+        -- Numeric fields (already stored as numbers by scraper)
+        (raw_data->>'precio')::NUMERIC AS precio_num,
+        (raw_data->>'metros')::INTEGER AS metros,
+        (raw_data->>'habitaciones')::INTEGER AS habitaciones_num,
+
+        -- Type extraction from title or tipo_inmueble
+        COALESCE(raw_data->>'tipo_inmueble', raw_data->>'tipo_propiedad') AS tipo_inmueble,
+
+        -- Boolean fields
+        (raw_data->>'es_particular')::BOOLEAN AS es_particular_bool,
+
+        -- Photos
         raw_data->'fotos' AS fotos_json,
 
         -- Store entire raw_data for reference
@@ -66,11 +72,11 @@ normalized AS (
             REGEXP_REPLACE(
                 REGEXP_REPLACE(
                     COALESCE(telefono_raw, ''),
-                    '(\\+34|0034)',  -- Remove country code
+                    '(\+34|0034)',  -- Remove country code
                     '',
                     'g'
                 ),
-                '[\\s\\(\\)\\-]',  -- Remove spaces, parentheses, dashes
+                '[\s\(\)\-]',  -- Remove spaces, parentheses, dashes
                 '',
                 'g'
             ),
@@ -78,39 +84,37 @@ normalized AS (
             ''
         ) AS telefono_norm,
 
-        -- Parse numeric fields
-        CAST(
-            REGEXP_REPLACE(COALESCE(precio_text, '0'), '[^0-9]', '', 'g')
-            AS INTEGER
-        ) AS precio,
+        -- Price already numeric from scraper
+        COALESCE(precio_num, 0)::INTEGER AS precio,
 
-        CAST(
-            REGEXP_REPLACE(COALESCE(superficie_text, '0'), '[^0-9]', '', 'g')
-            AS INTEGER
-        ) AS superficie_m2,
+        -- Metros already extracted
+        COALESCE(metros, 0) AS superficie_m2,
 
-        CAST(
-            REGEXP_REPLACE(COALESCE(habitaciones_text, '0'), '[^0-9]', '', 'g')
-            AS INTEGER
-        ) AS habitaciones,
+        -- Habitaciones already extracted
+        COALESCE(habitaciones_num, 0) AS habitaciones,
 
-        CAST(
-            REGEXP_REPLACE(COALESCE(banos_text, '0'), '[^0-9]', '', 'g')
-            AS INTEGER
-        ) AS banos,
+        -- Banos not available in current scraper
+        0 AS banos,
 
-        -- Parse boolean fields
+        -- Es particular already boolean
+        COALESCE(es_particular_bool, TRUE) AS es_particular,
+
+        -- Not applicable for Fotocasa
+        NULL::BOOLEAN AS permite_inmobiliarias,
+
+        -- Extract property type from title
         CASE
-            WHEN LOWER(es_particular_text) IN ('true', 'si', 'sí', 's', '1', 'yes') THEN TRUE
-            WHEN LOWER(es_particular_text) IN ('false', 'no', 'n', '0') THEN FALSE
-            ELSE NULL
-        END AS es_particular,
-
-        CASE
-            WHEN LOWER(permite_inmobiliarias_text) IN ('true', 'si', 'sí', 's', '1', 'yes') THEN TRUE
-            WHEN LOWER(permite_inmobiliarias_text) IN ('false', 'no', 'n', '0') THEN FALSE
-            ELSE NULL
-        END AS permite_inmobiliarias
+            WHEN LOWER(titulo) LIKE '%piso%' THEN 'piso'
+            WHEN LOWER(titulo) LIKE '%apartamento%' THEN 'apartamento'
+            WHEN LOWER(titulo) LIKE '%casa%' OR LOWER(titulo) LIKE '%chalet%' THEN 'casa'
+            WHEN LOWER(titulo) LIKE '%ático%' OR LOWER(titulo) LIKE '%atico%' THEN 'atico'
+            WHEN LOWER(titulo) LIKE '%dúplex%' OR LOWER(titulo) LIKE '%duplex%' THEN 'duplex'
+            WHEN LOWER(titulo) LIKE '%estudio%' THEN 'estudio'
+            WHEN LOWER(titulo) LIKE '%local%' THEN 'local'
+            WHEN LOWER(titulo) LIKE '%terreno%' OR LOWER(titulo) LIKE '%parcela%' THEN 'terreno'
+            WHEN tipo_inmueble IS NOT NULL THEN LOWER(tipo_inmueble)
+            ELSE 'otros'
+        END AS tipo_propiedad
 
     FROM extracted
 ),
@@ -119,36 +123,17 @@ classified AS (
     SELECT
         *,
 
-        -- Classify zone based on ubicacion
-        CASE
-            -- Barcelona zones
-            WHEN LOWER(ubicacion) LIKE '%eixample%' THEN 'Barcelona - Eixample'
-            WHEN LOWER(ubicacion) LIKE '%gràcia%' OR LOWER(ubicacion) LIKE '%gracia%' THEN 'Barcelona - Gràcia'
-            WHEN LOWER(ubicacion) LIKE '%sant%' AND LOWER(ubicacion) LIKE '%martí%' THEN 'Barcelona - Sant Martí'
-            WHEN LOWER(ubicacion) LIKE '%sants%' THEN 'Barcelona - Sants'
-            WHEN LOWER(ubicacion) LIKE '%les corts%' THEN 'Barcelona - Les Corts'
-            WHEN LOWER(ubicacion) LIKE '%sarrià%' OR LOWER(ubicacion) LIKE '%sarria%' THEN 'Barcelona - Sarrià-Sant Gervasi'
-            WHEN LOWER(ubicacion) LIKE '%ciutat vella%' THEN 'Barcelona - Ciutat Vella'
-            WHEN LOWER(ubicacion) LIKE '%horta%' THEN 'Barcelona - Horta-Guinardó'
-            WHEN LOWER(ubicacion) LIKE '%nou barris%' THEN 'Barcelona - Nou Barris'
-            WHEN LOWER(ubicacion) LIKE '%barcelona%' THEN 'Barcelona - Otros'
-
-            -- Metropolitan area
-            WHEN LOWER(ubicacion) LIKE '%hospitalet%' OR LOWER(ubicacion) LIKE '%l''hospitalet%' THEN 'L''Hospitalet de Llobregat'
-            WHEN LOWER(ubicacion) LIKE '%badalona%' THEN 'Badalona'
-            WHEN LOWER(ubicacion) LIKE '%santa coloma%' THEN 'Santa Coloma de Gramenet'
-            WHEN LOWER(ubicacion) LIKE '%cornellà%' OR LOWER(ubicacion) LIKE '%cornella%' THEN 'Cornellà de Llobregat'
-            WHEN LOWER(ubicacion) LIKE '%terrassa%' THEN 'Terrassa'
-            WHEN LOWER(ubicacion) LIKE '%sabadell%' THEN 'Sabadell'
-
-            ELSE 'Otros'
-        END AS zona_clasificada,
+        -- Use zona_geografica from scraper (already has good zone names)
+        COALESCE(zona_geografica, 'Otros') AS zona_clasificada,
 
         -- Calculate price per m2
         CASE
             WHEN superficie_m2 > 0 THEN ROUND(precio::NUMERIC / superficie_m2, 2)
             ELSE NULL
-        END AS precio_por_m2
+        END AS precio_por_m2,
+
+        -- Fecha publicacion not available
+        NULL::TIMESTAMP AS fecha_publicacion
 
     FROM normalized
 ),
@@ -192,7 +177,7 @@ final AS (
         permite_inmobiliarias,
 
         -- Publishing info
-        fecha_publicacion::TIMESTAMP AS fecha_publicacion,
+        fecha_publicacion,
 
         -- Photos
         fotos_json,
