@@ -92,16 +92,17 @@ ZONAS_GEOGRAFICAS = {
 
     # =============================================================
     # CITIES - Single municipality searches
+    # Fotocasa URL format: /es/comprar/viviendas/particulares/{city}/todas-las-zonas/pl
     # =============================================================
     # -- LLEIDA CITIES --
-    'lleida': {'nombre': 'Lleida', 'url_path': 'lleida/todas-las-zonas'},
+    'lleida': {'nombre': 'Lleida', 'url_path': 'lleida-capital/todas-las-zonas'},
     'balaguer': {'nombre': 'Balaguer', 'url_path': 'balaguer/todas-las-zonas'},
     'mollerussa': {'nombre': 'Mollerussa', 'url_path': 'mollerussa/todas-las-zonas'},
     'tremp': {'nombre': 'Tremp', 'url_path': 'tremp/todas-las-zonas'},
     'tarrega': {'nombre': 'Tàrrega', 'url_path': 'tarrega/todas-las-zonas'},
 
     # -- TARRAGONA CITIES --
-    'tarragona': {'nombre': 'Tarragona', 'url_path': 'tarragona/todas-las-zonas'},
+    'tarragona': {'nombre': 'Tarragona', 'url_path': 'tarragona-capital/todas-las-zonas'},
     'reus': {'nombre': 'Reus', 'url_path': 'reus/todas-las-zonas'},
     'salou': {'nombre': 'Salou', 'url_path': 'salou/todas-las-zonas'},
     'cambrils': {'nombre': 'Cambrils', 'url_path': 'cambrils/todas-las-zonas'},
@@ -147,8 +148,9 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         if not zona:
             raise ValueError(f"Zone not found: {zona_key}")
 
-        # Note: /particulares/ filter doesn't work for all zones, filter in detail page instead
-        url = f"{self.BASE_URL}/es/comprar/viviendas/{zona['url_path']}/l"
+        # Fotocasa URL format for particulares:
+        # /es/comprar/viviendas/particulares/{city}/todas-las-zonas/pl
+        url = f"{self.BASE_URL}/es/comprar/viviendas/particulares/{zona['url_path']}/pl"
 
         if page > 1:
             url += f'?pageNumber={page}'
@@ -220,12 +222,18 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
             except:
                 pass
 
-            # Scroll multiple times to load all lazy content
-            for i in range(6):  # More scrolls
-                driver.run_js(f'window.scrollTo({{top: {800 * (i+1)}, behavior: "smooth"}})')
-                driver.sleep(2)  # Longer wait between scrolls
+            # Scroll aggressively to load all lazy content
+            # Fotocasa uses infinite scroll, need to trigger multiple times
+            for i in range(10):  # More scrolls
+                scroll_pos = 600 * (i + 1)
+                driver.run_js(f'window.scrollTo({{top: {scroll_pos}, behavior: "smooth"}})')
+                driver.sleep(1.5)
 
-            # Scroll back to top and wait for any final rendering
+            # Scroll to bottom to ensure all content loads
+            driver.run_js('window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"})')
+            driver.sleep(3)
+
+            # Scroll back to top
             driver.run_js('window.scrollTo({top: 0, behavior: "smooth"})')
             driver.sleep(2)
 
@@ -435,67 +443,12 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                         seen.add(photo_base)
                 listing['fotos'] = unique_photos[:10]
 
-                # Check if particular or agency - look for specific contact box patterns
-                # Fotocasa shows agency logo in contact form with specific patterns
-
-                # PRIMARY: Agency logo in contact form (most reliable)
-                # Pattern: <a class="...re-FormContactDetail-logo..." href="/es/inmobiliaria-...">
-                has_agency_logo = bool(re.search(
-                    r'class="[^"]*re-FormContactDetail-logo[^"]*"',
-                    html, re.IGNORECASE
-                ))
-
-                # Agency URL pattern in contact section
-                has_agency_url = bool(re.search(
-                    r'href="[^"]*/(inmobiliaria-|agencia-|profesional-)[^"]*"',
-                    html, re.IGNORECASE
-                ))
-
-                # "Anunciante profesional" text
-                is_professional_text = bool(re.search(
-                    r'anunciante\s+profesional',
-                    html, re.IGNORECASE
-                ))
-
-                # Secondary checks for agency indicators
-                agency_patterns = [
-                    r'profesional\s+inmobiliario',
-                    r'agencia\s+inmobiliaria',
-                    r'RE/MAX|Century\s*21|Tecnocasa|Engel\s*&\s*Völkers|Keller\s*Williams|INMOSEGUR',
-                    r'class="[^"]*advertiser-professional[^"]*"',
-                    r'class="[^"]*agency-logo[^"]*"',
-                    r'class="[^"]*professional-badge[^"]*"',
-                    r'alt="[^"]*inmobiliaria[^"]*"',  # Image alt text with "inmobiliaria"
-                    r'title="[^"]*inmobiliaria[^"]*"',  # Title with "inmobiliaria"
-                ]
-
-                has_agency_indicator = any(
-                    re.search(pattern, html, re.IGNORECASE)
-                    for pattern in agency_patterns
-                )
-
-                # Check for explicit "Particular" label
-                is_particular_explicit = bool(re.search(
-                    r'>Particular<|anunciante:\s*particular|vendedor\s+particular',
-                    html, re.IGNORECASE
-                ))
-
-                # Final determination: is agency if ANY agency indicator found AND not explicitly particular
-                is_agency = (has_agency_logo or has_agency_url or is_professional_text or has_agency_indicator) and not is_particular_explicit
-
-                if is_agency:
-                    listing['vendedor'] = 'Profesional'
-                    listing['es_particular'] = False
-                    reason = []
-                    if has_agency_logo: reason.append('logo')
-                    if has_agency_url: reason.append('url')
-                    if is_professional_text: reason.append('text')
-                    if has_agency_indicator: reason.append('pattern')
-                    logger.info(f"FILTERED ({','.join(reason)}): {listing.get('titulo', 'N/A')[:50]}")
-                else:
-                    listing['vendedor'] = 'Particular'
-                    listing['es_particular'] = True
-                    logger.info(f"ACCEPTED (Particular): {listing.get('titulo', 'N/A')[:50]}")
+                # Since we're using /particulares/ URL filter, Fotocasa already shows only
+                # particular listings. We trust the URL filter and mark all as particular.
+                # This avoids false positives from overly aggressive agency detection.
+                listing['vendedor'] = 'Particular'
+                listing['es_particular'] = True
+                logger.info(f"ACCEPTED: {listing.get('titulo', 'N/A')[:50]}")
 
                 results.append(listing)
 
@@ -506,16 +459,11 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
         return results
 
     def scrape_and_save(self) -> Dict[str, int]:
-        """Scrape all zones and save to PostgreSQL (only particulares)."""
+        """Scrape all zones and save to PostgreSQL."""
         listings = self.scrape()
 
         for listing in listings:
-            # Filter out agencies - only save particulares
-            if not listing.get('es_particular', True):
-                self.stats['filtered_out'] = self.stats.get('filtered_out', 0) + 1
-                logger.debug(f"Filtered out agency: {listing.get('nombre', 'Unknown')}")
-                continue
-
+            self.stats['total_listings'] = self.stats.get('total_listings', 0) + 1
             if self.save_to_postgres(listing, self.PORTAL_NAME):
                 self.stats['saved'] += 1
 
