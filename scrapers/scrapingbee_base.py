@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from urllib.parse import urlencode
@@ -21,7 +22,27 @@ from urllib.parse import urlencode
 import requests
 import psycopg2
 
+from scrapers.error_handling import (
+    RetryConfig,
+    retry_with_backoff,
+    send_alert,
+    AlertSeverity,
+    validate_scraping_results,
+)
+
 logger = logging.getLogger(__name__)
+
+# Retry config for ScrapingBee API calls
+SCRAPINGBEE_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    initial_delay=2.0,
+    max_delay=30.0,
+    exponential_base=2.0,
+    retryable_exceptions=(
+        requests.exceptions.Timeout,
+        requests.exceptions.ConnectionError,
+    ),
+)
 
 
 def fix_encoding(text: str) -> str:
@@ -175,7 +196,7 @@ class ScrapingBeeClient:
         js_scenario: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """
-        Fetch a page using ScrapingBee API.
+        Fetch a page using ScrapingBee API with retry logic.
 
         Args:
             url: URL to fetch
@@ -186,12 +207,24 @@ class ScrapingBeeClient:
         Returns:
             HTML content or None if failed
         """
+        return self._fetch_page_with_retry(url, wait_for, custom_headers, js_scenario)
+
+    def _fetch_page_with_retry(
+        self,
+        url: str,
+        wait_for: Optional[str] = None,
+        custom_headers: Optional[Dict[str, str]] = None,
+        js_scenario: Optional[Dict[str, Any]] = None,
+        attempt: int = 1,
+        max_attempts: int = 3,
+    ) -> Optional[str]:
+        """Internal method with retry logic."""
         params = {
             'api_key': self.api_key,
             'url': url,
-            'render_js': 'true',  # Enable JS rendering
-            'premium_proxy': 'true',  # Use premium proxies
-            'country_code': 'es',  # Spanish IP for geo-targeted content
+            'render_js': 'true',
+            'premium_proxy': 'true',
+            'country_code': 'es',
         }
 
         if self.use_stealth:
@@ -204,12 +237,11 @@ class ScrapingBeeClient:
             params['js_scenario'] = json.dumps(js_scenario)
 
         if custom_headers:
-            # ScrapingBee accepts headers as Spb-* prefixed
             for key, value in custom_headers.items():
                 params[f'Spb-{key}'] = value
 
         try:
-            logger.info(f"Fetching: {url[:80]}...")
+            logger.info(f"Fetching (attempt {attempt}/{max_attempts}): {url[:80]}...")
             response = requests.get(
                 self.SCRAPINGBEE_ENDPOINT,
                 params=params,
@@ -222,22 +254,53 @@ class ScrapingBeeClient:
             self.stats['credits_used'] += credits
 
             if response.status_code == 200:
-                # Ensure proper UTF-8 decoding from raw bytes
                 try:
                     html = response.content.decode('utf-8')
                 except UnicodeDecodeError:
-                    # Fallback: try latin-1 then convert to UTF-8
                     try:
                         html = response.content.decode('latin-1')
                     except:
                         html = response.content.decode('utf-8', errors='replace')
                 logger.info(f"Success: {len(html)} chars")
                 return html
+
+            # Handle retryable HTTP errors (429, 500, 502, 503, 504)
+            elif response.status_code in (429, 500, 502, 503, 504):
+                logger.warning(
+                    f"Retryable error {response.status_code} on attempt {attempt}"
+                )
+                if attempt < max_attempts:
+                    delay = min(2.0 * (2 ** (attempt - 1)), 30.0)  # Exponential backoff
+                    logger.info(f"Retrying in {delay:.1f}s...")
+                    time.sleep(delay)
+                    return self._fetch_page_with_retry(
+                        url, wait_for, custom_headers, js_scenario,
+                        attempt + 1, max_attempts
+                    )
+                else:
+                    logger.error(f"Max retries reached for {url[:50]}")
+                    self.stats['errors'] += 1
+                    return None
             else:
                 logger.error(
                     f"ScrapingBee error: {response.status_code} - "
                     f"{response.text[:200]}"
                 )
+                self.stats['errors'] += 1
+                return None
+
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            logger.warning(f"Network error on attempt {attempt}: {e}")
+            if attempt < max_attempts:
+                delay = min(2.0 * (2 ** (attempt - 1)), 30.0)
+                logger.info(f"Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+                return self._fetch_page_with_retry(
+                    url, wait_for, custom_headers, js_scenario,
+                    attempt + 1, max_attempts
+                )
+            else:
+                logger.error(f"Max retries reached due to network error: {e}")
                 self.stats['errors'] += 1
                 return None
 

@@ -16,6 +16,21 @@ from dagster import asset, AssetExecutionContext, MetadataValue, Output
 
 from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 
+# Import alerting utilities (with fallback if not available)
+try:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    from scrapers.error_handling import send_alert, AlertSeverity
+    ALERTING_AVAILABLE = True
+except ImportError:
+    ALERTING_AVAILABLE = False
+    def send_alert(*args, **kwargs):
+        pass
+    class AlertSeverity:
+        INFO = "info"
+        WARNING = "warning"
+        ERROR = "error"
+        CRITICAL = "critical"
+
 
 logger = logging.getLogger(__name__)
 
@@ -431,21 +446,58 @@ def scraping_all_portals(
     completed = sum(1 for r in all_results if r['status'] == 'completed')
     errors = sum(1 for r in all_results if r['status'] == 'error')
     skipped = sum(1 for r in all_results if r['status'] == 'skipped')
+    timeouts = sum(1 for r in all_results if r['status'] == 'timeout')
+
+    # Identify which scrapers had errors
+    failed_scrapers = [r['scraper'] for r in all_results if r['status'] in ('error', 'timeout')]
 
     summary = {
         'fecha': fecha,
-        'status': 'completed',
+        'status': 'completed' if errors == 0 else 'completed_with_errors',
         'zonas_activas': len(zones),
         'scrapers_ejecutados': len(all_results),
         'scrapers_completados': completed,
         'scrapers_con_error': errors,
+        'scrapers_timeout': timeouts,
         'scrapers_omitidos': skipped,
         'total_leads_encontrados': total_leads,
+        'failed_scrapers': failed_scrapers,
         'resultados': all_results,
     }
 
     context.log.info(f"Scraping completado: {completed} OK, {errors} errores, {skipped} omitidos")
     context.log.info(f"Total leads encontrados: {total_leads}")
+
+    # Send alerts based on results
+    if errors > 0 or timeouts > 0:
+        send_alert(
+            title="Scraping completado con errores",
+            message=f"{errors} scrapers fallaron, {timeouts} timeouts",
+            severity=AlertSeverity.ERROR if errors > len(all_results) // 2 else AlertSeverity.WARNING,
+            details={
+                'total_leads': total_leads,
+                'completed': completed,
+                'errors': errors,
+                'timeouts': timeouts,
+                'failed_scrapers': ', '.join(failed_scrapers) if failed_scrapers else 'None',
+            },
+        )
+    elif total_leads == 0:
+        send_alert(
+            title="Scraping sin resultados",
+            message="No se encontraron leads en ningún portal",
+            severity=AlertSeverity.WARNING,
+            details={'zonas_activas': len(zones)},
+        )
+    elif total_leads > 0:
+        # Only send success alert if configured (optional)
+        if os.environ.get('ALERT_ON_SUCCESS', '').lower() == 'true':
+            send_alert(
+                title="Scraping completado",
+                message=f"Se encontraron {total_leads} leads de {completed} portales",
+                severity=AlertSeverity.INFO,
+                details={'total_leads': total_leads, 'portales': completed},
+            )
 
     return Output(
         value=summary,
@@ -522,6 +574,12 @@ def dbt_transform(
 
         if result.returncode != 0:
             context.log.error(f"dbt run falló: {result.stderr[-1000:]}")
+            send_alert(
+                title="dbt transformation failed",
+                message=f"dbt run failed with returncode {result.returncode}",
+                severity=AlertSeverity.ERROR,
+                details={'error': result.stderr[-300:] if result.stderr else 'No stderr'},
+            )
             return Output(
                 value={
                     'status': 'error',
@@ -548,12 +606,22 @@ def dbt_transform(
 
     except subprocess.TimeoutExpired:
         context.log.error("dbt run excedió el timeout")
+        send_alert(
+            title="dbt transformation timeout",
+            message="dbt run exceeded 10 minute timeout",
+            severity=AlertSeverity.ERROR,
+        )
         return Output(
             value={'status': 'timeout'},
             metadata={'status': MetadataValue.text('TIMEOUT')}
         )
     except Exception as e:
         context.log.error(f"Error ejecutando dbt: {e}")
+        send_alert(
+            title="dbt transformation error",
+            message=str(e),
+            severity=AlertSeverity.ERROR,
+        )
         return Output(
             value={'status': 'error', 'error': str(e)},
             metadata={'status': MetadataValue.text('ERROR')}

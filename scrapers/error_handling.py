@@ -1,0 +1,437 @@
+"""
+Error handling utilities for Casa Teva scrapers.
+
+Provides:
+- Retry logic with exponential backoff
+- Webhook alerting (Discord/Telegram)
+- Data quality validation
+- Error categorization
+"""
+
+import logging
+import os
+import time
+from datetime import datetime
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, TypeVar
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+# Type variable for generic retry decorator
+T = TypeVar('T')
+
+
+# =============================================================================
+# RETRY LOGIC
+# =============================================================================
+
+class RetryConfig:
+    """Configuration for retry behavior."""
+
+    def __init__(
+        self,
+        max_attempts: int = 3,
+        initial_delay: float = 1.0,
+        max_delay: float = 60.0,
+        exponential_base: float = 2.0,
+        retryable_exceptions: tuple = (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.HTTPError,
+        ),
+    ):
+        self.max_attempts = max_attempts
+        self.initial_delay = initial_delay
+        self.max_delay = max_delay
+        self.exponential_base = exponential_base
+        self.retryable_exceptions = retryable_exceptions
+
+
+def retry_with_backoff(config: Optional[RetryConfig] = None):
+    """
+    Decorator for retry with exponential backoff.
+
+    Usage:
+        @retry_with_backoff(RetryConfig(max_attempts=3))
+        def fetch_page(url):
+            ...
+    """
+    if config is None:
+        config = RetryConfig()
+
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> T:
+            last_exception = None
+
+            for attempt in range(1, config.max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except config.retryable_exceptions as e:
+                    last_exception = e
+
+                    if attempt == config.max_attempts:
+                        logger.error(
+                            f"{func.__name__} failed after {config.max_attempts} attempts: {e}"
+                        )
+                        raise
+
+                    delay = min(
+                        config.initial_delay * (config.exponential_base ** (attempt - 1)),
+                        config.max_delay
+                    )
+                    logger.warning(
+                        f"{func.__name__} attempt {attempt}/{config.max_attempts} failed: {e}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                except Exception as e:
+                    # Non-retryable exception, raise immediately
+                    logger.error(f"{func.__name__} failed with non-retryable error: {e}")
+                    raise
+
+            # Should never reach here, but just in case
+            if last_exception:
+                raise last_exception
+
+        return wrapper
+    return decorator
+
+
+# =============================================================================
+# WEBHOOK ALERTING
+# =============================================================================
+
+class AlertSeverity:
+    """Alert severity levels."""
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+def get_webhook_url() -> Optional[str]:
+    """Get webhook URL from environment."""
+    return os.environ.get('ALERT_WEBHOOK_URL')
+
+
+def send_alert(
+    title: str,
+    message: str,
+    severity: str = AlertSeverity.ERROR,
+    details: Optional[Dict[str, Any]] = None,
+    webhook_url: Optional[str] = None,
+) -> bool:
+    """
+    Send alert via webhook (Discord/Telegram/Slack compatible).
+
+    Args:
+        title: Alert title
+        message: Alert message
+        severity: Alert severity level
+        details: Additional details dict
+        webhook_url: Override webhook URL (uses env var if None)
+
+    Returns:
+        True if alert sent successfully
+    """
+    url = webhook_url or get_webhook_url()
+
+    if not url:
+        logger.debug("No webhook URL configured, skipping alert")
+        return False
+
+    # Emoji based on severity
+    emoji_map = {
+        AlertSeverity.INFO: "ℹ️",
+        AlertSeverity.WARNING: "⚠️",
+        AlertSeverity.ERROR: "❌",
+        AlertSeverity.CRITICAL: "🚨",
+    }
+    emoji = emoji_map.get(severity, "📋")
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Build message content
+    content_parts = [
+        f"{emoji} **{title}**",
+        f"_{severity.upper()}_ - {timestamp}",
+        "",
+        message,
+    ]
+
+    if details:
+        content_parts.append("")
+        content_parts.append("**Details:**")
+        for key, value in details.items():
+            content_parts.append(f"• {key}: `{value}`")
+
+    content = "\n".join(content_parts)
+
+    # Try Discord format first
+    payload = {"content": content}
+
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            timeout=10,
+            headers={"Content-Type": "application/json"}
+        )
+
+        if response.status_code in (200, 204):
+            logger.info(f"Alert sent: {title}")
+            return True
+        else:
+            logger.warning(f"Webhook returned {response.status_code}: {response.text[:100]}")
+            return False
+
+    except Exception as e:
+        logger.error(f"Failed to send alert: {e}")
+        return False
+
+
+def alert_on_failure(
+    alert_title: str,
+    include_traceback: bool = True,
+):
+    """
+    Decorator that sends alert when function fails.
+
+    Usage:
+        @alert_on_failure("Scraper failed")
+        def scrape_portal():
+            ...
+    """
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> T:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                import traceback
+
+                details = {
+                    "function": func.__name__,
+                    "error_type": type(e).__name__,
+                }
+
+                message = str(e)
+                if include_traceback:
+                    tb = traceback.format_exc()
+                    # Truncate traceback if too long
+                    if len(tb) > 500:
+                        tb = tb[-500:]
+                    message = f"{message}\n\n```\n{tb}\n```"
+
+                send_alert(
+                    title=alert_title,
+                    message=message,
+                    severity=AlertSeverity.ERROR,
+                    details=details,
+                )
+                raise
+
+        return wrapper
+    return decorator
+
+
+# =============================================================================
+# DATA QUALITY VALIDATION
+# =============================================================================
+
+class DataQualityResult:
+    """Result of data quality check."""
+
+    def __init__(self):
+        self.passed = True
+        self.warnings: List[str] = []
+        self.errors: List[str] = []
+        self.metrics: Dict[str, Any] = {}
+
+    def add_warning(self, msg: str):
+        self.warnings.append(msg)
+
+    def add_error(self, msg: str):
+        self.errors.append(msg)
+        self.passed = False
+
+    def set_metric(self, key: str, value: Any):
+        self.metrics[key] = value
+
+    def __bool__(self):
+        return self.passed
+
+
+def validate_scraping_results(
+    listings: List[Dict[str, Any]],
+    portal_name: str,
+    expected_min_count: int = 1,
+    required_fields: Optional[List[str]] = None,
+    alert_on_failure: bool = True,
+) -> DataQualityResult:
+    """
+    Validate scraping results for data quality issues.
+
+    Args:
+        listings: List of scraped listings
+        portal_name: Name of portal for alert context
+        expected_min_count: Minimum expected listings
+        required_fields: Fields that should not be null
+        alert_on_failure: Send alert if validation fails
+
+    Returns:
+        DataQualityResult with validation status
+    """
+    if required_fields is None:
+        required_fields = ['titulo', 'precio', 'url']
+
+    result = DataQualityResult()
+
+    # Check total count
+    total = len(listings)
+    result.set_metric('total_listings', total)
+
+    if total == 0:
+        result.add_error(f"No listings found for {portal_name}")
+    elif total < expected_min_count:
+        result.add_warning(
+            f"Low listing count for {portal_name}: {total} (expected >= {expected_min_count})"
+        )
+
+    if total == 0:
+        if alert_on_failure:
+            send_alert(
+                title=f"Data Quality Alert: {portal_name}",
+                message="No listings were scraped",
+                severity=AlertSeverity.ERROR,
+                details={"portal": portal_name, "count": 0},
+            )
+        return result
+
+    # Check field completeness
+    field_null_counts = {field: 0 for field in required_fields}
+
+    for listing in listings:
+        for field in required_fields:
+            value = listing.get(field)
+            if value is None or value == '' or value == []:
+                field_null_counts[field] += 1
+
+    # Calculate null percentages
+    for field, null_count in field_null_counts.items():
+        null_pct = (null_count / total) * 100
+        result.set_metric(f'{field}_null_pct', round(null_pct, 1))
+
+        if null_pct > 50:
+            result.add_error(
+                f"Critical: {field} is null in {null_pct:.1f}% of listings"
+            )
+        elif null_pct > 20:
+            result.add_warning(
+                f"Warning: {field} is null in {null_pct:.1f}% of listings"
+            )
+
+    # Check for phone extraction rate
+    phones_found = sum(1 for l in listings if l.get('telefono_norm'))
+    phone_rate = (phones_found / total) * 100
+    result.set_metric('phone_extraction_rate', round(phone_rate, 1))
+
+    if phone_rate < 10:
+        result.add_warning(f"Low phone extraction rate: {phone_rate:.1f}%")
+
+    # Check for particulares rate
+    particulares = sum(1 for l in listings if l.get('es_particular', False))
+    particular_rate = (particulares / total) * 100
+    result.set_metric('particular_rate', round(particular_rate, 1))
+
+    if particular_rate < 50:
+        result.add_warning(f"Low particular rate: {particular_rate:.1f}% (might be scraping agencies)")
+
+    # Send alert if there are errors
+    if not result.passed and alert_on_failure:
+        send_alert(
+            title=f"Data Quality Alert: {portal_name}",
+            message="\n".join(result.errors),
+            severity=AlertSeverity.ERROR,
+            details={
+                "portal": portal_name,
+                "total_listings": total,
+                **result.metrics,
+            },
+        )
+    elif result.warnings and alert_on_failure:
+        send_alert(
+            title=f"Data Quality Warning: {portal_name}",
+            message="\n".join(result.warnings),
+            severity=AlertSeverity.WARNING,
+            details={
+                "portal": portal_name,
+                "total_listings": total,
+                **result.metrics,
+            },
+        )
+
+    return result
+
+
+# =============================================================================
+# SCRAPING REPORT
+# =============================================================================
+
+def generate_scraping_report(
+    portal_results: Dict[str, Dict[str, Any]],
+    send_summary: bool = True,
+) -> Dict[str, Any]:
+    """
+    Generate summary report of scraping run.
+
+    Args:
+        portal_results: Dict of {portal_name: stats_dict}
+        send_summary: Send summary alert
+
+    Returns:
+        Summary report dict
+    """
+    total_leads = 0
+    total_errors = 0
+    portals_with_errors = []
+
+    for portal, stats in portal_results.items():
+        total_leads += stats.get('listings_saved', 0)
+        errors = stats.get('errors', 0)
+        total_errors += errors
+        if errors > 0:
+            portals_with_errors.append(f"{portal} ({errors})")
+
+    report = {
+        'timestamp': datetime.now().isoformat(),
+        'total_leads': total_leads,
+        'total_errors': total_errors,
+        'portals_processed': len(portal_results),
+        'portals_with_errors': portals_with_errors,
+        'portal_details': portal_results,
+    }
+
+    if send_summary:
+        if total_errors > 0:
+            send_alert(
+                title="Scraping Complete (with errors)",
+                message=f"Scraped {total_leads} leads with {total_errors} errors",
+                severity=AlertSeverity.WARNING,
+                details={
+                    'total_leads': total_leads,
+                    'portals_with_errors': ', '.join(portals_with_errors) or 'None',
+                },
+            )
+        elif total_leads > 0:
+            send_alert(
+                title="Scraping Complete",
+                message=f"Successfully scraped {total_leads} leads from {len(portal_results)} portals",
+                severity=AlertSeverity.INFO,
+                details={'total_leads': total_leads},
+            )
+
+    return report
