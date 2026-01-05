@@ -380,6 +380,32 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
         if location_match:
             listing['ubicacion'] = location_match.group(1).strip()
 
+        # Extract publication/update date (for analytics)
+        # Idealista shows "Anuncio actualizado el DD de mes de YYYY"
+        date_patterns = [
+            # "actualizado el 5 de enero de 2026" or similar
+            r'actualizado?\s+(?:el\s+)?(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})',
+            # ISO date in JSON if available
+            r'"datePosted"\s*:\s*"([^"]+)"',
+            r'"dateModified"\s*:\s*"([^"]+)"',
+        ]
+        for pattern in date_patterns:
+            date_match = re.search(pattern, html, re.IGNORECASE)
+            if date_match:
+                if len(date_match.groups()) == 3:
+                    # Spanish date format - convert to ISO
+                    day, month_name, year = date_match.groups()
+                    months = {
+                        'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+                        'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+                        'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+                    }
+                    month = months.get(month_name.lower(), '01')
+                    listing['fecha_publicacion'] = f"{year}-{month}-{day.zfill(2)}T00:00:00Z"
+                else:
+                    listing['fecha_publicacion'] = date_match.group(1)
+                break
+
         # Try to extract phone from description (many sellers put it there)
         descripcion = listing.get('descripcion', '')
         phone = self.extract_phone_from_description(descripcion)

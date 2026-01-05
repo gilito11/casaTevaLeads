@@ -443,6 +443,17 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
                 listing['ubicacion'] = location_match.group(1).strip()
                 break
 
+        # Extract publication date (for analytics)
+        # Milanuncios provides ISO 8601 dates in JSON: publishDate, updateDate
+        publish_date_match = re.search(r'"publishDate"\s*:\s*"([^"]+)"', html)
+        if publish_date_match:
+            listing['fecha_publicacion'] = publish_date_match.group(1)
+            logger.debug(f"Publication date: {listing['fecha_publicacion']}")
+
+        update_date_match = re.search(r'"updateDate"\s*:\s*"([^"]+)"', html)
+        if update_date_match:
+            listing['fecha_actualizacion'] = update_date_match.group(1)
+
         # Try to extract phone from description (many sellers put it there)
         descripcion = listing.get('descripcion', '')
         phone = self.extract_phone_from_description(descripcion)

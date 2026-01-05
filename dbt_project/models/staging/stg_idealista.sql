@@ -206,8 +206,12 @@ final AS (
         es_particular,
         permite_inmobiliarias,
 
-        -- Publishing info
-        NULL::TIMESTAMP AS fecha_publicacion,
+        -- Publishing info (extracted from page)
+        CASE
+            WHEN raw_data->>'fecha_publicacion' IS NOT NULL
+            THEN (raw_data->>'fecha_publicacion')::TIMESTAMP WITH TIME ZONE
+            ELSE NULL
+        END AS fecha_publicacion,
 
         -- Photos
         fotos_json,
