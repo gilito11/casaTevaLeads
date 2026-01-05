@@ -444,15 +444,20 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
                 break
 
         # Extract publication date (for analytics)
-        # Milanuncios provides ISO 8601 dates in JSON: publishDate, updateDate
-        publish_date_match = re.search(r'"publishDate"\s*:\s*"([^"]+)"', html)
+        # Milanuncios provides ISO 8601 dates in JSON (may be escaped): publishDate, updateDate
+        # Pattern handles both escaped (\\") and unescaped (") quotes
+        publish_date_match = re.search(r'[\\"]publishDate[\\"]:\s*[\\"](\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?)[\\"]', html)
         if publish_date_match:
             listing['fecha_publicacion'] = publish_date_match.group(1)
+            if not listing['fecha_publicacion'].endswith('Z'):
+                listing['fecha_publicacion'] += 'Z'
             logger.debug(f"Publication date: {listing['fecha_publicacion']}")
 
-        update_date_match = re.search(r'"updateDate"\s*:\s*"([^"]+)"', html)
+        update_date_match = re.search(r'[\\"]updateDate[\\"]:\s*[\\"](\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?)[\\"]', html)
         if update_date_match:
             listing['fecha_actualizacion'] = update_date_match.group(1)
+            if not listing['fecha_actualizacion'].endswith('Z'):
+                listing['fecha_actualizacion'] += 'Z'
 
         # Try to extract phone from description (many sellers put it there)
         descripcion = listing.get('descripcion', '')
