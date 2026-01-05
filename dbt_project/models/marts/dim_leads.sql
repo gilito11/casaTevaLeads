@@ -140,18 +140,38 @@ enriched AS (
         NULL::TEXT AS motivo_descarte,
 
         -- Lead quality score (0-100)
-        CASE
-            -- Higher score for complete information
-            WHEN email IS NOT NULL AND nombre_contacto IS NOT NULL THEN 85
-            WHEN email IS NOT NULL OR nombre_contacto IS NOT NULL THEN 70
-            ELSE 50
-        END +
-        CASE
-            -- Bonus for good zones
-            WHEN zona_clasificada LIKE 'Barcelona - Eixample' THEN 10
-            WHEN zona_clasificada LIKE 'Barcelona -%' THEN 5
-            ELSE 0
-        END AS lead_score,
+        -- Criterios: telefono (+30), precio (<100k:+20, 100-200k:+15, >200k:+10),
+        -- zona prioritaria (+15), antiguedad (<24h:+20, <7d:+10, >7d:+5), particular (+10)
+        (
+            -- Telefono disponible: +30pts (lo mas importante)
+            CASE WHEN telefono_norm IS NOT NULL AND telefono_norm != '' THEN 30 ELSE 0 END
+            -- Precio: <100k:+20, 100-200k:+15, >200k:+10
+            + CASE
+                WHEN precio IS NULL THEN 0
+                WHEN precio < 100000 THEN 20
+                WHEN precio <= 200000 THEN 15
+                ELSE 10
+            END
+            -- Zona prioritaria (Salou, Cambrils, Tarragona): +15pts
+            + CASE
+                WHEN LOWER(COALESCE(zona_clasificada, '')) LIKE '%salou%'
+                     OR LOWER(COALESCE(zona_clasificada, '')) LIKE '%cambrils%'
+                     OR LOWER(COALESCE(zona_clasificada, '')) LIKE '%tarragona%'
+                     OR LOWER(COALESCE(ubicacion, '')) LIKE '%salou%'
+                     OR LOWER(COALESCE(ubicacion, '')) LIKE '%cambrils%'
+                     OR LOWER(COALESCE(ubicacion, '')) LIKE '%tarragona%'
+                THEN 15 ELSE 0
+            END
+            -- Antiguedad: <24h:+20, <7d:+10, >7d:+5
+            + CASE
+                WHEN fecha_publicacion IS NULL THEN 5
+                WHEN fecha_publicacion >= NOW() - INTERVAL '24 hours' THEN 20
+                WHEN fecha_publicacion >= NOW() - INTERVAL '7 days' THEN 10
+                ELSE 5
+            END
+            -- Particular confirmado: +10pts
+            + CASE WHEN es_particular = TRUE THEN 10 ELSE 0 END
+        ) AS lead_score,
 
         -- Timestamps
         fecha_publicacion,

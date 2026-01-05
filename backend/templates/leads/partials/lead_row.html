@@ -66,6 +66,9 @@
         </span>
     </td>
     <td class="px-6 py-4 whitespace-nowrap">
+        {% include 'components/score_badge.html' with score=lead.lead_score %}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
         <!-- Estado con dropdown para cambiar -->
         <div x-data="{ open: false }" class="relative">
             <button @click="open = !open" class="flex items-center space-x-1 hover:opacity-80">

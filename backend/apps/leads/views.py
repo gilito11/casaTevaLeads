@@ -58,6 +58,13 @@ def lead_list_view(request):
     if zona:
         leads_qs = leads_qs.filter(zona_geografica=zona)
 
+    # Ordenamiento
+    orden = request.GET.get('orden', '')
+    if orden == '-lead_score':
+        leads_qs = leads_qs.order_by('-lead_score', '-fecha_scraping')
+    elif orden == 'lead_score':
+        leads_qs = leads_qs.order_by('lead_score', '-fecha_scraping')
+
     # Filtrar por estado usando LeadEstado
     if estado:
         # Obtener lead_ids que tienen el estado especificado en LeadEstado
@@ -75,8 +82,9 @@ def lead_list_view(request):
             # Para otros estados: solo los que tienen ese estado en LeadEstado
             leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_with_estado])
 
-    # Ordenar
-    leads_qs = leads_qs.order_by('-fecha_scraping')
+    # Ordenar por defecto si no hay orden especificado
+    if not orden:
+        leads_qs = leads_qs.order_by('-fecha_scraping')
 
     # Paginacion
     paginator = Paginator(leads_qs, 25)

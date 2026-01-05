@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 5 January 2026 (Optimized schedule 12:00/18:00 based on 220-listing analysis)
+> **Last Updated**: 5 January 2026 (Lead scoring system implementation)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
