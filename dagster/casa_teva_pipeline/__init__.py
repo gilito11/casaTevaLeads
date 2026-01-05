@@ -4,7 +4,7 @@ Pipeline de Dagster para Casa Teva.
 Define todos los assets, resources, schedules y jobs del sistema.
 
 Schedules configurados:
-- scraping_schedule_spanish: 9:00, 11:00, 13:00, 15:00, 17:00, 19:00 hora española
+- scraping_schedule_optimized: 12:00, 18:00 hora española (basado en análisis de 220 anuncios)
 - scraping_schedule_daily: 2:00 AM diario (backup)
 """
 import os
@@ -36,16 +36,17 @@ scraping_job = define_asset_job(
     }
 )
 
-# Schedule principal: 9, 11, 13, 15, 17, 19 hora española
-# Cron: minuto hora día mes día_semana
-# 0 9,11,13,15,17,19 * * * = A las 9:00, 11:00, 13:00, 15:00, 17:00, 19:00
-scraping_schedule_spanish = ScheduleDefinition(
-    name="scraping_schedule_spanish",
-    cron_schedule="0 9,11,13,15,17,19 * * *",
+# Schedule optimizado basado en análisis de 220 anuncios de Milanuncios
+# Picos de publicación: 9:00-11:00 (mañana) y 16:00 (tarde)
+# Scraping 1-2h después de picos para captar anuncios frescos
+# Cron: 0 12,18 * * * = A las 12:00 y 18:00 hora española
+scraping_schedule_optimized = ScheduleDefinition(
+    name="scraping_schedule_optimized",
+    cron_schedule="0 12,18 * * *",
     job=scraping_job,
     execution_timezone="Europe/Madrid",
-    default_status=DefaultScheduleStatus.STOPPED,  # PAUSADO hasta definir horario óptimo
-    description="Scraping cada 2 horas en horario laboral español (9-11-13-15-17-19)",
+    default_status=DefaultScheduleStatus.RUNNING,  # ACTIVO - horario optimizado
+    description="Scraping optimizado: 12:00 (tras pico mañana) y 18:00 (tras pico tarde)",
 )
 
 # Schedule de backup: 2 AM diario
@@ -105,6 +106,6 @@ resources = {
 defs = Definitions(
     assets=all_assets,
     jobs=[scraping_job],
-    schedules=[scraping_schedule_spanish, scraping_schedule_daily],
+    schedules=[scraping_schedule_optimized, scraping_schedule_daily],
     resources=resources,
 )
