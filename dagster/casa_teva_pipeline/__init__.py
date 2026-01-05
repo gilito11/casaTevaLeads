@@ -44,7 +44,7 @@ scraping_schedule_spanish = ScheduleDefinition(
     cron_schedule="0 9,11,13,15,17,19 * * *",
     job=scraping_job,
     execution_timezone="Europe/Madrid",
-    default_status=DefaultScheduleStatus.RUNNING,  # Activado por defecto
+    default_status=DefaultScheduleStatus.STOPPED,  # PAUSADO hasta definir horario óptimo
     description="Scraping cada 2 horas en horario laboral español (9-11-13-15-17-19)",
 )
 
