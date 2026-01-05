@@ -223,12 +223,12 @@ def scrapers_view(request):
             'zonas': region_zonas,
         })
 
-    # Scrapers disponibles (activos con Botasaurus)
+    # Scrapers disponibles (4 portales activos)
     scrapers = [
-        {'id': 'milanuncios', 'nombre': 'Milanuncios', 'descripcion': 'Portal de anuncios clasificados'},
-        {'id': 'fotocasa', 'nombre': 'Fotocasa', 'descripcion': 'Portal inmobiliario'},
-        {'id': 'habitaclia', 'nombre': 'Habitaclia', 'descripcion': 'Portal inmobiliario catalan'},
-        {'id': 'pisos', 'nombre': 'Pisos.com', 'descripcion': 'Portal inmobiliario grande'},
+        {'id': 'habitaclia', 'nombre': 'Habitaclia', 'descripcion': 'Portal inmobiliario catalan (Botasaurus)'},
+        {'id': 'fotocasa', 'nombre': 'Fotocasa', 'descripcion': 'Portal inmobiliario (Botasaurus)'},
+        {'id': 'milanuncios', 'nombre': 'Milanuncios', 'descripcion': 'Anuncios clasificados (ScrapingBee)'},
+        {'id': 'idealista', 'nombre': 'Idealista', 'descripcion': 'Portal inmobiliario (ScrapingBee)'},
     ]
 
     context = {
@@ -540,8 +540,11 @@ def run_all_scrapers_view(request):
 
 def _run_botasaurus_scraper(job_id, portal, zona_slug):
     """
-    Ejecuta el scraper Botasaurus en background y actualiza el ScrapingJob.
+    Ejecuta el scraper en background y actualiza el ScrapingJob.
+    Soporta Botasaurus (habitaclia, fotocasa) y ScrapingBee (milanuncios, idealista).
     """
+    import re as regex_module
+
     try:
         job = ScrapingJob.objects.get(id=job_id)
         job.mark_running()
@@ -550,65 +553,93 @@ def _run_botasaurus_scraper(job_id, portal, zona_slug):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
 
-        # Determinar qué portales ejecutar
-        if portal == 'all':
-            portals_arg = ['milanuncios', 'fotocasa', 'habitaclia', 'pisos']
-        else:
-            portals_arg = [portal]
-
-        # Construir comando
-        script_path = os.path.join(project_root, 'run_botasaurus_scrapers.py')
-        cmd = [
-            sys.executable, script_path,
-            '--portals', *portals_arg,
-            '--zones', zona_slug,
-            '--postgres'
-        ]
-
-        # Ejecutar scraper
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600,  # 10 minutos max
-            cwd=project_root,
-            env={**os.environ, 'PYTHONPATH': project_root}
-        )
-
-        # Parsear output para extraer estadísticas
-        output = result.stdout
         encontrados = 0
         guardados = 0
         filtrados = 0
+        errors = []
 
-        # Buscar líneas como "[OK] milanuncios: 3 guardados, 0 filtrados"
-        import re
-        for line in output.split('\n'):
-            match = re.search(r'\[OK\]\s+\w+:\s+(\d+)\s+guardados?,\s+(\d+)\s+filtrados?', line)
-            if match:
-                guardados += int(match.group(1))
-                filtrados += int(match.group(2))
-            # Buscar "Total listings scraped: X"
-            total_match = re.search(r'Total listings scraped:\s+(\d+)', line)
-            if total_match:
-                encontrados += int(total_match.group(1))
+        # Mapeo de portales a scripts
+        BOTASAURUS_PORTALS = {'habitaclia', 'fotocasa'}
+        SCRAPINGBEE_PORTALS = {'milanuncios', 'idealista'}
 
-        if result.returncode == 0:
+        # Determinar qué portales ejecutar
+        if portal == 'all':
+            portals_to_run = ['habitaclia', 'fotocasa', 'milanuncios', 'idealista']
+        else:
+            portals_to_run = [portal]
+
+        # Preparar environment
+        scraper_env = {
+            **os.environ,
+            'PYTHONPATH': project_root,
+        }
+
+        for p in portals_to_run:
+            if p in BOTASAURUS_PORTALS:
+                # Botasaurus scraper
+                script_path = os.path.join(project_root, f'run_{p}_scraper.py')
+                cmd = [sys.executable, script_path, '--zones', zona_slug, '--postgres']
+            elif p in SCRAPINGBEE_PORTALS:
+                # ScrapingBee scraper
+                script_path = os.path.join(project_root, f'run_scrapingbee_{p}_scraper.py')
+                cmd = [sys.executable, script_path, '--zones', zona_slug, '--postgres']
+            else:
+                continue
+
+            if not os.path.exists(script_path):
+                errors.append(f"{p}: script not found")
+                continue
+
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,  # 5 minutos por portal
+                    cwd=project_root,
+                    env=scraper_env
+                )
+
+                # Parsear output
+                output = result.stdout or ''
+                for line in output.split('\n'):
+                    # Buscar líneas de estadísticas
+                    match = regex_module.search(r'(\d+)\s+guardados?', line)
+                    if match:
+                        guardados += int(match.group(1))
+                    match = regex_module.search(r'(\d+)\s+filtrados?', line)
+                    if match:
+                        filtrados += int(match.group(1))
+                    match = regex_module.search(r'Found\s+(\d+)\s+listings?', line, regex_module.IGNORECASE)
+                    if match:
+                        encontrados += int(match.group(1))
+                    match = regex_module.search(r'Scraped\s+(\d+)', line, regex_module.IGNORECASE)
+                    if match:
+                        encontrados += int(match.group(1))
+
+                if result.returncode != 0:
+                    errors.append(f"{p}: {result.stderr[-200:] if result.stderr else 'unknown error'}")
+
+            except subprocess.TimeoutExpired:
+                errors.append(f"{p}: timeout (>5min)")
+
+        # Actualizar job
+        if errors and not guardados:
+            job.mark_error("; ".join(errors)[:500])
+        else:
             job.mark_completed(
                 encontrados=encontrados,
                 guardados=guardados,
                 filtrados=filtrados
             )
-        else:
-            job.mark_error(f"Error (code {result.returncode}): {result.stderr[-500:]}")
+            if errors:
+                job.error_message = "; ".join(errors)[:500]
+                job.save(update_fields=['error_message'])
 
-    except subprocess.TimeoutExpired:
-        job = ScrapingJob.objects.get(id=job_id)
-        job.mark_error("Timeout: El scraping tardó más de 10 minutos")
     except Exception as e:
         try:
             job = ScrapingJob.objects.get(id=job_id)
-            job.mark_error(str(e))
+            job.mark_error(str(e)[:500])
         except:
             pass
 

@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 4 January 2026 (Fotocasa scraper fix - only particulares)
+> **Last Updated**: 5 January 2026 (Agency filter, new zones, LICENSE)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -39,6 +39,19 @@ Los scrapers extraen datos de elementos HTML especificos para evitar valores inc
 ### Portales eliminados (Enero 2026)
 - **Pisos.com**: Eliminado - pocos leads de calidad
 - **Wallapop**: Eliminado - no relevante para inmobiliaria
+
+### Filtro de agencias (dbt staging)
+Los modelos dbt filtran automaticamente anuncios con frases como:
+- "abstenerse agencias/inmobiliarias"
+- "no agencias/no inmobiliarias"
+- "sin intermediarios"
+
+### Zonas disponibles
+20+ zonas preconfiguradas en `backend/apps/core/models.py`:
+- **Lleida**: Lleida, Balaguer, Mollerussa, Tàrrega, Alcoletge, Alpicat, Torrefarrera...
+- **Costa Daurada**: Salou, Cambrils, Miami Platja, La Pineda, Vilafortuny, Mont-roig...
+- **Tarragona**: Tarragona, Reus, Valls, Montblanc
+- **Terres de l'Ebre**: Tortosa, Amposta, Deltebre, L'Ametlla de Mar
 
 ### ScrapingBee
 - API Key: configurada en Azure Container Apps y GitHub Secrets

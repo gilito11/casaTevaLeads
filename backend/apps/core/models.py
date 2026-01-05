@@ -13,6 +13,23 @@ ZONAS_POR_REGION = {
             'mollerussa': {'nombre': 'Mollerussa', 'lat': 41.6311, 'lon': 0.8947, 'provincia_id': 25, 'radio_default': 15},
             'tremp': {'nombre': 'Tremp', 'lat': 42.1667, 'lon': 0.8947, 'provincia_id': 25, 'radio_default': 20},
             'tarrega': {'nombre': 'Tàrrega', 'lat': 41.6472, 'lon': 1.1392, 'provincia_id': 25, 'radio_default': 15},
+            # Pueblos alrededor de Lleida
+            'alcoletge': {'nombre': 'Alcoletge', 'lat': 41.6417, 'lon': 0.6833, 'provincia_id': 25, 'radio_default': 5},
+            'alamus': {'nombre': 'Alamús', 'lat': 41.5833, 'lon': 0.7833, 'provincia_id': 25, 'radio_default': 5},
+            'artesa_lleida': {'nombre': 'Artesa de Lleida', 'lat': 41.5500, 'lon': 0.6833, 'provincia_id': 25, 'radio_default': 5},
+            'puigverd_lleida': {'nombre': 'Puigverd de Lleida', 'lat': 41.5667, 'lon': 0.7500, 'provincia_id': 25, 'radio_default': 5},
+            'albatarrec': {'nombre': 'Albatàrrec', 'lat': 41.5667, 'lon': 0.6167, 'provincia_id': 25, 'radio_default': 5},
+            'alcarras': {'nombre': 'Alcarràs', 'lat': 41.5667, 'lon': 0.5167, 'provincia_id': 25, 'radio_default': 5},
+            'sudanell': {'nombre': 'Sudanell', 'lat': 41.5500, 'lon': 0.5667, 'provincia_id': 25, 'radio_default': 5},
+            'montoliu_lleida': {'nombre': 'Montoliu de Lleida', 'lat': 41.5500, 'lon': 0.6500, 'provincia_id': 25, 'radio_default': 5},
+            'alpicat': {'nombre': 'Alpicat', 'lat': 41.6667, 'lon': 0.5500, 'provincia_id': 25, 'radio_default': 5},
+            'torrefarrera': {'nombre': 'Torrefarrera', 'lat': 41.6667, 'lon': 0.5833, 'provincia_id': 25, 'radio_default': 5},
+            'rossello': {'nombre': 'Rosselló', 'lat': 41.6667, 'lon': 0.7000, 'provincia_id': 25, 'radio_default': 5},
+            'benavent_segria': {'nombre': 'Benavent de Segrià', 'lat': 41.6833, 'lon': 0.6667, 'provincia_id': 25, 'radio_default': 5},
+            'vilanova_segria': {'nombre': 'Vilanova de Segrià', 'lat': 41.6833, 'lon': 0.6333, 'provincia_id': 25, 'radio_default': 5},
+            'vilanova_bellpuig': {'nombre': 'Vilanova de Bellpuig', 'lat': 41.6167, 'lon': 0.9667, 'provincia_id': 25, 'radio_default': 5},
+            'castelldans': {'nombre': 'Castelldans', 'lat': 41.5000, 'lon': 0.7500, 'provincia_id': 25, 'radio_default': 5},
+            'torres_segre': {'nombre': 'Torres de Segre', 'lat': 41.5333, 'lon': 0.5000, 'provincia_id': 25, 'radio_default': 5},
         }
     },
     'tarragona': {
@@ -35,6 +52,11 @@ ZONAS_POR_REGION = {
             'torredembarra': {'nombre': 'Torredembarra', 'lat': 41.1456, 'lon': 1.3958, 'provincia_id': 43, 'radio_default': 10},
             'coma_ruga': {'nombre': 'Coma-ruga', 'lat': 41.1833, 'lon': 1.5167, 'provincia_id': 43, 'radio_default': 10},
             'vila_seca': {'nombre': 'Vila-seca', 'lat': 41.1125, 'lon': 1.1458, 'provincia_id': 43, 'radio_default': 10},
+            # Zonas adicionales Costa Daurada
+            'la_pineda': {'nombre': 'La Pineda', 'lat': 41.0833, 'lon': 1.1667, 'provincia_id': 43, 'radio_default': 5},
+            'vilafortuny': {'nombre': 'Vilafortuny', 'lat': 41.0500, 'lon': 1.0333, 'provincia_id': 43, 'radio_default': 5},
+            'montroig_camp': {'nombre': 'Mont-roig del Camp', 'lat': 41.0833, 'lon': 0.9500, 'provincia_id': 43, 'radio_default': 10},
+            'calafat': {'nombre': 'Calafat', 'lat': 40.9000, 'lon': 0.7833, 'provincia_id': 43, 'radio_default': 5},
         }
     },
     'interior_tarragona': {
