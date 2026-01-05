@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 5 January 2026 (Agency filter, new zones, LICENSE)
+> **Last Updated**: 5 January 2026 (Optimized schedule 12:00/18:00 based on 220-listing analysis)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -57,6 +57,17 @@ Los modelos dbt filtran automaticamente anuncios con frases como:
 - API Key: configurada en Azure Container Apps y GitHub Secrets
 - Plan: 50eur/mes = 250,000 credits = ~3,333 requests
 - Stealth proxy: GeeTest (Milanuncios), DataDome (Idealista)
+
+### Schedule Optimizado (Enero 2026)
+Basado en analisis de 220 anuncios de Milanuncios:
+- **Pico manana**: 9:00-11:00 (26 anuncios a las 9:00)
+- **Pico tarde**: 16:00 (19 anuncios)
+- **Lunes mas activo** (23%), sabado casi nulo (3%)
+
+**Horario Dagster**: `0 12,18 * * *` (12:00 y 18:00 Espana)
+- 12:00: Captura pico de manana
+- 18:00: Captura pico de tarde
+- **Ahorro**: 67% creditos (de 6 a 2 scrapes/dia)
 
 ## Comandos
 
