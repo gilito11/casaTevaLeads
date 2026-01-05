@@ -4,8 +4,64 @@ from django.db import connection
 from django.http import JsonResponse
 from decimal import Decimal
 import json
+import unicodedata
+import re
 
 from core.models import ZONAS_PREESTABLECIDAS
+
+
+def normalize_zone_name(name):
+    """Normalize zone name for matching: remove accents, lowercase, simplify."""
+    if not name:
+        return ''
+    # Remove accents
+    name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('ASCII')
+    # Lowercase and remove extra spaces
+    name = name.lower().strip()
+    # Remove common prefixes/suffixes
+    name = re.sub(r'^(costa dorada|costa daurada|terres ebre|provincia de|tarragona)\s*[-:]\s*', '', name)
+    name = re.sub(r'\s*\(.*?\)\s*', '', name)  # Remove parenthetical content
+    return name
+
+
+def find_zone_coords(zona_nombre):
+    """Find coordinates for a zone name using fuzzy matching."""
+    if not zona_nombre:
+        return None
+
+    normalized_input = normalize_zone_name(zona_nombre)
+
+    # First pass: exact match on normalized name
+    for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
+        normalized_preset = normalize_zone_name(zona_data['nombre'])
+        if normalized_input == normalized_preset:
+            return {
+                'lat': zona_data['lat'],
+                'lon': zona_data['lon'],
+                'region': zona_data.get('region_nombre', ''),
+            }
+
+    # Second pass: one contains the other
+    for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
+        normalized_preset = normalize_zone_name(zona_data['nombre'])
+        if normalized_preset in normalized_input or normalized_input in normalized_preset:
+            return {
+                'lat': zona_data['lat'],
+                'lon': zona_data['lon'],
+                'region': zona_data.get('region_nombre', ''),
+            }
+
+    # Third pass: slug match
+    for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
+        slug_normalized = slug.replace('_', ' ')
+        if slug_normalized in normalized_input:
+            return {
+                'lat': zona_data['lat'],
+                'lon': zona_data['lon'],
+                'region': zona_data.get('region_nombre', ''),
+            }
+
+    return None
 
 
 def convert_decimals(obj):
@@ -323,19 +379,8 @@ def map_view(request):
             for row in rows:
                 zona_nombre = row['zona_geografica']
 
-                # Try to find coordinates from ZONAS_PREESTABLECIDAS
-                coords = None
-                for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
-                    # Match by name (case insensitive, partial match)
-                    if (zona_data['nombre'].lower() in zona_nombre.lower() or
-                        zona_nombre.lower() in zona_data['nombre'].lower() or
-                        slug.replace('_', ' ') in zona_nombre.lower()):
-                        coords = {
-                            'lat': zona_data['lat'],
-                            'lon': zona_data['lon'],
-                            'region': zona_data.get('region_nombre', ''),
-                        }
-                        break
+                # Try to find coordinates using improved matching
+                coords = find_zone_coords(zona_nombre)
 
                 if coords:
                     zones_data.append({
@@ -348,6 +393,9 @@ def map_view(request):
                         'precio_min': round(float(row['precio_min']), 0),
                         'precio_max': round(float(row['precio_max']), 0),
                     })
+                else:
+                    # Log unmatched zones for debugging
+                    print(f"Map: Could not find coords for zone '{zona_nombre}'")
 
         except Exception as e:
             print(f"Error fetching map data: {e}")
@@ -418,18 +466,14 @@ def map_data_api(request):
                     'precio_medio': round(float(row['precio_medio']), 0),
                 }
 
-            # Add coordinates
+            # Add coordinates using improved matching
             for zona_nombre, zona_data in zones_dict.items():
-                for slug, preset in ZONAS_PREESTABLECIDAS.items():
-                    if (preset['nombre'].lower() in zona_nombre.lower() or
-                        zona_nombre.lower() in preset['nombre'].lower()):
-                        zona_data['coords'] = {
-                            'lat': preset['lat'],
-                            'lon': preset['lon'],
-                        }
-                        break
-
-                if zona_data['coords']:
+                coords = find_zone_coords(zona_nombre)
+                if coords:
+                    zona_data['coords'] = {
+                        'lat': coords['lat'],
+                        'lon': coords['lon'],
+                    }
                     zones_data.append(zona_data)
 
         except Exception as e:

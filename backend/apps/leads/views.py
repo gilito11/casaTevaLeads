@@ -183,9 +183,12 @@ def change_status_view(request, lead_id):
 
         lead_estado.save()
 
-    # Si viene del detalle, recargar toda la pagina
+    # Si viene del detalle, usar HX-Redirect para recargar la pagina completa
     if request.headers.get('HX-Target') == 'body':
-        return redirect('leads:detail', lead_id=lead_id)
+        from django.urls import reverse
+        response = HttpResponse()
+        response['HX-Redirect'] = reverse('leads:detail', kwargs={'lead_id': lead_id})
+        return response
 
     # Obtener estado actual de LeadEstado
     lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()

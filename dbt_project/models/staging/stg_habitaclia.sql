@@ -219,6 +219,14 @@ final AS (
     -- Habitaclia hides phones behind login/AJAX, so we allow NULL phones
     WHERE
         precio > 5000
+        -- Filter out listings that reject agencies (they're looking for direct buyers)
+        AND NOT (
+            LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%abstener%inmobiliaria%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%no agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%no inmobiliaria%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%sin intermediario%'
+        )
 )
 
 SELECT * FROM final

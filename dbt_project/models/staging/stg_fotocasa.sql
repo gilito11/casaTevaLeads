@@ -190,6 +190,14 @@ final AS (
     -- Apply filters as specified
     WHERE
         precio > 0  -- Must have a valid price
+        -- Filter out listings that reject agencies (they're looking for direct buyers)
+        AND NOT (
+            LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%abstener%inmobiliaria%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%no agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%no inmobiliaria%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%sin intermediario%'
+        )
 )
 
 SELECT * FROM final
