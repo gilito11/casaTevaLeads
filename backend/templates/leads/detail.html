@@ -248,7 +248,13 @@
         <div class="space-y-6">
             <!-- Contact Info -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Contacto</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Contacto</h2>
+                    <a href="{% url 'leads:contact_from_lead' lead.lead_id %}"
+                       class="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+                        Ver Ficha Completa
+                    </a>
+                </div>
 
                 <div class="space-y-4">
                     <div>

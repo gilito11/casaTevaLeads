@@ -43,7 +43,29 @@
             <li>
                 <a href="{% url 'leads:list' %}"
                    class="flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors
-                   {% if 'leads' in request.path %}
+                   {% if request.path == '/leads/' %}
+                   bg-primary-50 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400
+                   {% else %}
+                   text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+                   {% endif %}">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    <span x-show="open" x-transition class="font-medium">Propiedades</span>
+                    {% if leads_nuevos_count %}
+                    <span x-show="open" class="ml-auto bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-medium px-2 py-0.5 rounded-full">
+                        {{ leads_nuevos_count }}
+                    </span>
+                    {% endif %}
+                </a>
+            </li>
+
+            <!-- Contacts -->
+            <li>
+                <a href="{% url 'leads:contact_list' %}"
+                   class="flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors
+                   {% if 'contacts' in request.path %}
                    bg-primary-50 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400
                    {% else %}
                    text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
@@ -52,12 +74,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
                     </svg>
-                    <span x-show="open" x-transition class="font-medium">Leads</span>
-                    {% if leads_nuevos_count %}
-                    <span x-show="open" class="ml-auto bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs font-medium px-2 py-0.5 rounded-full">
-                        {{ leads_nuevos_count }}
-                    </span>
-                    {% endif %}
+                    <span x-show="open" x-transition class="font-medium">Contactos</span>
                 </a>
             </li>
 
@@ -192,7 +209,8 @@
             <nav class="flex-1 py-4 overflow-y-auto">
                 <ul class="space-y-1 px-3">
                     <li><a href="{% url 'dashboard' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Dashboard</a></li>
-                    <li><a href="{% url 'leads:list' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Leads</a></li>
+                    <li><a href="{% url 'leads:list' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Propiedades</a></li>
+                    <li><a href="{% url 'leads:contact_list' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Contactos</a></li>
                     <li><a href="{% url 'scrapers' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Scrapers</a></li>
                     <li><a href="{% url 'analytics:dashboard' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Analytics</a></li>
                     <li><a href="{% url 'profile' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Mi Perfil</a></li>

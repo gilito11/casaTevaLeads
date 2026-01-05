@@ -13,7 +13,7 @@ from django.db.models import Q
 from django.db import connection
 from django.views.decorators.http import require_POST
 
-from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist
+from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction
 from core.models import TenantUser, Tenant
 
 
@@ -408,3 +408,178 @@ def bulk_delete_view(request):
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+
+# ============================================================
+# CONTACT MANAGEMENT VIEWS
+# ============================================================
+
+@login_required
+def contact_list_view(request):
+    """Vista de lista de contactos con sus propiedades agrupadas"""
+    tenant_id = get_user_tenant(request)
+
+    # Base queryset
+    contacts_qs = Contact.objects.filter(tenant_id=tenant_id).order_by('-updated_at')
+
+    # Filtros
+    q = request.GET.get('q', '').strip()
+    if q:
+        contacts_qs = contacts_qs.filter(
+            Q(telefono__icontains=q) |
+            Q(nombre__icontains=q) |
+            Q(email__icontains=q)
+        )
+
+    # Paginacion
+    paginator = Paginator(contacts_qs, 25)
+    page = request.GET.get('page', 1)
+    contacts = paginator.get_page(page)
+
+    context = {
+        'contacts': contacts,
+        'total_contacts': paginator.count,
+    }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'contacts/partials/contact_table.html', context)
+
+    return render(request, 'contacts/list.html', context)
+
+
+@login_required
+def contact_detail_view(request, contact_id):
+    """Vista de detalle de un contacto con sus propiedades e interacciones"""
+    tenant_id = get_user_tenant(request)
+    contact = get_object_or_404(Contact, id=contact_id, tenant_id=tenant_id)
+
+    # Obtener leads/propiedades del contacto
+    leads = contact.get_leads()
+
+    # Obtener estados de LeadEstado para los leads
+    lead_ids = [str(lead.lead_id) for lead in leads]
+    lead_estados = {
+        le.lead_id: le.estado
+        for le in LeadEstado.objects.filter(lead_id__in=lead_ids)
+    }
+
+    # Añadir estado_actual a cada lead
+    for lead in leads:
+        lead.estado_actual = lead_estados.get(str(lead.lead_id), lead.estado)
+
+    # Interacciones
+    interactions = contact.interactions.select_related('usuario').all()
+
+    context = {
+        'contact': contact,
+        'leads': leads,
+        'interactions': interactions,
+        'interaction_tipos': Interaction.TIPO_CHOICES,
+        'estados': Lead.ESTADO_CHOICES,
+    }
+
+    return render(request, 'contacts/detail.html', context)
+
+
+@login_required
+def contact_from_lead_view(request, lead_id):
+    """Crea o redirige al contacto asociado a un lead"""
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    if tenant_id and lead.tenant_id != tenant_id:
+        return redirect('leads:list')
+
+    tenant = get_object_or_404(Tenant, tenant_id=tenant_id)
+
+    # Buscar o crear contacto
+    contact, created = Contact.objects.get_or_create(
+        tenant=tenant,
+        telefono=lead.telefono_norm,
+        defaults={
+            'nombre': lead.nombre,
+            'email': lead.email,
+        }
+    )
+
+    return redirect('leads:contact_detail', contact_id=contact.id)
+
+
+@login_required
+@require_POST
+def contact_update_view(request, contact_id):
+    """Actualizar informacion de un contacto (HTMX)"""
+    tenant_id = get_user_tenant(request)
+    contact = get_object_or_404(Contact, id=contact_id, tenant_id=tenant_id)
+
+    # Actualizar campos
+    contact.nombre = request.POST.get('nombre', '').strip() or None
+    contact.telefono2 = request.POST.get('telefono2', '').strip() or None
+    contact.email = request.POST.get('email', '').strip() or None
+    contact.notas = request.POST.get('notas', '').strip() or None
+    contact.save()
+
+    # Si es HTMX, devolver el partial actualizado
+    if request.headers.get('HX-Request'):
+        context = {'contact': contact}
+        return render(request, 'contacts/partials/contact_info.html', context)
+
+    return redirect('leads:contact_detail', contact_id=contact.id)
+
+
+@login_required
+@require_POST
+def add_interaction_view(request, contact_id):
+    """Agregar una interaccion a un contacto (HTMX)"""
+    tenant_id = get_user_tenant(request)
+    contact = get_object_or_404(Contact, id=contact_id, tenant_id=tenant_id)
+
+    tipo = request.POST.get('tipo', 'nota')
+    descripcion = request.POST.get('descripcion', '').strip()
+    fecha_str = request.POST.get('fecha', '')
+
+    if descripcion:
+        # Parsear fecha si se proporciona
+        fecha = None
+        if fecha_str:
+            try:
+                from datetime import datetime
+                fecha = timezone.make_aware(datetime.strptime(fecha_str, '%Y-%m-%dT%H:%M'))
+            except ValueError:
+                fecha = timezone.now()
+        else:
+            fecha = timezone.now()
+
+        interaction = Interaction.objects.create(
+            contact=contact,
+            tipo=tipo,
+            descripcion=descripcion,
+            fecha=fecha,
+            usuario=request.user
+        )
+
+        # Devolver HTML de la interaccion creada
+        if request.headers.get('HX-Request'):
+            context = {'interaction': interaction}
+            return render(request, 'contacts/partials/interaction_item.html', context)
+
+    return redirect('leads:contact_detail', contact_id=contact.id)
+
+
+@login_required
+@require_POST
+def delete_interaction_view(request, interaction_id):
+    """Eliminar una interaccion (HTMX)"""
+    tenant_id = get_user_tenant(request)
+    interaction = get_object_or_404(
+        Interaction,
+        id=interaction_id,
+        contact__tenant_id=tenant_id
+    )
+
+    interaction.delete()
+
+    if request.headers.get('HX-Request'):
+        return HttpResponse('')
+
+    return redirect('leads:contact_detail', contact_id=interaction.contact_id)

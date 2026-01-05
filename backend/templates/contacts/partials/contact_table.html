@@ -1,0 +1,118 @@
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-900">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Contacto
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Telefono
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Email
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Propiedades
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Ultima Actualizacion
+                </th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Acciones
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% for contact in contacts %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span class="text-primary-600 dark:text-primary-400 font-medium text-sm">
+                                {% if contact.nombre %}
+                                    {{ contact.nombre|slice:":1"|upper }}
+                                {% else %}
+                                    ?
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="ml-4">
+                            <p class="font-medium text-gray-900 dark:text-white">
+                                {{ contact.nombre|default:"Sin nombre" }}
+                            </p>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <a href="tel:{{ contact.telefono }}" class="text-primary-600 dark:text-primary-400 hover:underline">
+                        {{ contact.telefono }}
+                    </a>
+                    {% if contact.telefono2 %}
+                    <br>
+                    <a href="tel:{{ contact.telefono2 }}" class="text-sm text-gray-500 dark:text-gray-400 hover:underline">
+                        {{ contact.telefono2 }}
+                    </a>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                    {% if contact.email %}
+                    <a href="mailto:{{ contact.email }}" class="hover:text-primary-600 dark:hover:text-primary-400">
+                        {{ contact.email }}
+                    </a>
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                        {{ contact.leads_count }} propiedad{% if contact.leads_count != 1 %}es{% endif %}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {{ contact.updated_at|date:"d/m/Y H:i" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right">
+                    <a href="{% url 'leads:contact_detail' contact.id %}"
+                       class="inline-flex items-center px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-lg transition-colors">
+                        Ver Detalle
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <p>No hay contactos registrados</p>
+                    <p class="text-sm mt-1">Los contactos se crean automaticamente desde los leads</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if contacts.has_other_pages %}
+    <div class="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-700 dark:text-gray-300">
+                Mostrando {{ contacts.start_index }}-{{ contacts.end_index }} de {{ contacts.paginator.count }}
+            </div>
+            <div class="flex gap-2">
+                {% if contacts.has_previous %}
+                <a href="?page={{ contacts.previous_page_number }}"
+                   class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Anterior
+                </a>
+                {% endif %}
+                {% if contacts.has_next %}
+                <a href="?page={{ contacts.next_page_number }}"
+                   class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Siguiente
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

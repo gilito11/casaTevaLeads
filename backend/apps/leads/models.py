@@ -115,6 +115,80 @@ class Nota(models.Model):
         return f"Nota de {self.autor} - {self.lead} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
 
 
+class Contact(models.Model):
+    """
+    Modelo para gestionar contactos de forma separada de los leads.
+    Un contacto puede tener multiples propiedades/leads asociados.
+    """
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='contacts')
+    telefono = models.CharField(max_length=20, db_index=True)
+    telefono2 = models.CharField(max_length=20, blank=True, null=True)
+    nombre = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    notas = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'leads_contact'
+        verbose_name = 'Contacto'
+        verbose_name_plural = 'Contactos'
+        unique_together = ['tenant', 'telefono']
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"{self.nombre or 'Sin nombre'} ({self.telefono})"
+
+    def get_leads(self):
+        """Obtiene todos los leads asociados a este contacto por telefono."""
+        return Lead.objects.filter(
+            tenant_id=self.tenant_id,
+            telefono_norm=self.telefono
+        ).order_by('-fecha_scraping')
+
+    @property
+    def leads_count(self):
+        """Numero de propiedades/leads asociados."""
+        return self.get_leads().count()
+
+
+class Interaction(models.Model):
+    """
+    Modelo para registrar interacciones con contactos.
+    Incluye llamadas, emails, notas, etc.
+    """
+    TIPO_CHOICES = [
+        ('llamada', 'Llamada'),
+        ('email', 'Email'),
+        ('nota', 'Nota'),
+        ('visita', 'Visita'),
+        ('whatsapp', 'WhatsApp'),
+        ('otro', 'Otro'),
+    ]
+
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='interactions')
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='nota')
+    descripcion = models.TextField()
+    fecha = models.DateTimeField(default=None)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='interactions')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'leads_interaction'
+        verbose_name = 'Interaccion'
+        verbose_name_plural = 'Interacciones'
+        ordering = ['-fecha', '-created_at']
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} - {self.contact} ({self.fecha.strftime('%d/%m/%Y')})"
+
+    def save(self, *args, **kwargs):
+        if self.fecha is None:
+            from django.utils import timezone
+            self.fecha = timezone.now()
+        super().save(*args, **kwargs)
+
+
 class AnuncioBlacklist(models.Model):
     """
     Modelo para almacenar anuncios que no deben volver a scrapearse.

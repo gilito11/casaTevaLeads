@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Contactos - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Contactos</h1>
+            <p class="text-gray-600 dark:text-gray-400">{{ total_contacts }} contactos registrados</p>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <form hx-get="{% url 'leads:contact_list' %}"
+              hx-target="#contacts-table"
+              hx-trigger="submit, keyup delay:300ms from:input[name='q']"
+              hx-swap="innerHTML">
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <input type="text" name="q" placeholder="Buscar por nombre, telefono o email..."
+                           value="{{ request.GET.q }}"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                </div>
+                <button type="submit"
+                        class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                    Buscar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Contacts Table -->
+    <div id="contacts-table">
+        {% include 'contacts/partials/contact_table.html' %}
+    </div>
+</div>
+{% endblock %}
