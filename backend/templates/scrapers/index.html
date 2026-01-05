@@ -12,44 +12,26 @@
                 Configura las zonas y ejecuta los scrapers de portales inmobiliarios
             </p>
         </div>
-        {% if zonas %}
-        <form action="{% url 'run_all_scrapers' %}" method="post">
-            {% csrf_token %}
-            <button type="submit"
-                    onclick="return confirm('Ejecutar scrapers en {{ zonas|length }} zonas? Esto puede tardar varios minutos.')"
-                    class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors shadow-sm">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                Actualizar Todo
-            </button>
-        </form>
-        {% endif %}
+        <!-- Scraping automático gestionado por Dagster -->
+        <a href="https://dagster-scrapers.happysky-957a1351.spaincentral.azurecontainerapps.io"
+           target="_blank"
+           class="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors shadow-sm">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            </svg>
+            Dagster UI
+        </a>
     </div>
 
-    <!-- Status Container with Auto-refresh (legacy) -->
-    <div id="scraper-status-container"
-         hx-get="{% url 'scraper_status_partial' %}"
-         hx-trigger="every 10s"
-         hx-swap="innerHTML">
-        {% include 'scrapers/partials/status_banner.html' %}
-    </div>
-
-    <!-- Scraping Jobs Status (new - with lead counts) -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Trabajos de Scraping</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Estado de los ultimos scrapers ejecutados</p>
-        </div>
-        <div class="p-4" id="scraping-jobs-container"
-             hx-get="{% url 'scraping_jobs_partial' %}"
-             hx-trigger="load"
-             hx-swap="innerHTML">
-            <div class="text-center py-4">
-                <svg class="animate-spin h-5 w-5 text-gray-400 mx-auto" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
+    <!-- Info: Scraping gestionado por Dagster -->
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+        <div class="flex items-start space-x-3">
+            <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div>
+                <p class="font-medium text-amber-800 dark:text-amber-300">Scraping automatico pausado</p>
+                <p class="text-sm text-amber-700 dark:text-amber-400">El scraping esta pausado mientras se define el horario optimo. Para ejecutar manualmente, accede a Dagster UI.</p>
             </div>
         </div>
     </div>
@@ -103,13 +85,11 @@
         <h3 class="font-medium text-blue-800 dark:text-blue-400 mb-2">Como usar</h3>
         <ol class="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
             <li>Anade las zonas geograficas que quieres scrapear desde "Zonas Disponibles"</li>
-            <li>Haz clic en <strong>"Actualizar Todo"</strong> para scrapear todas las zonas a la vez</li>
-            <li>O en "Mis Zonas", haz clic en MA (Milanuncios), FC (Fotocasa), HA (Habitaclia) o PI (Pisos) para scrapers individuales</li>
-            <li>El estado del scraping aparecera en "Trabajos de Scraping" con el numero de leads encontrados</li>
+            <li>Dagster ejecutara el scraping automaticamente segun el horario configurado</li>
             <li>Los leads encontrados apareceran automaticamente en la seccion de Leads</li>
         </ol>
         <p class="mt-3 text-xs text-blue-600 dark:text-blue-400">
-            <strong>Nota:</strong> Los scrapers se ejecutan en segundo plano. El panel de "Trabajos de Scraping" se actualiza automaticamente cada 3 segundos mientras hay scrapers activos.
+            <strong>Nota:</strong> Para ejecutar scraping manual o ver el estado de los jobs, accede a Dagster UI.
         </p>
     </div>
 </div>
