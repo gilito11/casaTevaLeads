@@ -236,3 +236,9 @@ frontend/
 # Tailwind config (not in use)
 tailwind.config.js
 postcss.config.js
+
+# TFG document (work in progress)
+docs/TFG_*.md
+
+# Analysis graphs
+publication_hours_analysis.png
