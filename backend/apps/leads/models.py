@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 from core.models import Tenant
 
 
@@ -169,7 +170,7 @@ class Interaction(models.Model):
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='interactions')
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='nota')
     descripcion = models.TextField()
-    fecha = models.DateTimeField(default=None)
+    fecha = models.DateTimeField(default=timezone.now)
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='interactions')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -180,13 +181,8 @@ class Interaction(models.Model):
         ordering = ['-fecha', '-created_at']
 
     def __str__(self):
-        return f"{self.get_tipo_display()} - {self.contact} ({self.fecha.strftime('%d/%m/%Y')})"
-
-    def save(self, *args, **kwargs):
-        if self.fecha is None:
-            from django.utils import timezone
-            self.fecha = timezone.now()
-        super().save(*args, **kwargs)
+        fecha_str = self.fecha.strftime('%d/%m/%Y') if self.fecha else 'Sin fecha'
+        return f"{self.get_tipo_display()} - {self.contact} ({fecha_str})"
 
 
 class AnuncioBlacklist(models.Model):

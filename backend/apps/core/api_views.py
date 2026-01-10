@@ -140,7 +140,7 @@ class ZonaGeograficaViewSet(viewsets.ModelViewSet):
         portal = request.data.get('portal')
         activo = request.data.get('activo', True)
 
-        portales_validos = ['milanuncios', 'fotocasa', 'wallapop']
+        portales_validos = ['milanuncios', 'fotocasa', 'habitaclia', 'idealista']
         if portal not in portales_validos:
             return Response(
                 {'error': f'Portal invalido. Opciones: {portales_validos}'},

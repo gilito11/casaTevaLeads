@@ -1,13 +1,16 @@
+import logging
+import re
+import unicodedata
+
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db import connection
 from django.http import JsonResponse
 from decimal import Decimal
-import json
-import unicodedata
-import re
 
 from core.models import ZONAS_PREESTABLECIDAS
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_zone_name(name):
@@ -142,7 +145,7 @@ def analytics_dashboard_view(request):
             """, [tenant_id])
             context['kpis'] = dict_fetchone(cursor)
         except Exception as e:
-            print(f"Error fetching KPIs: {e}")
+            logger.error(f"Error fetching KPIs: {e}")
             context['kpis'] = {
                 'total_leads': 0, 'leads_nuevos': 0, 'leads_en_proceso': 0,
                 'leads_interesados': 0, 'leads_convertidos': 0, 'tasa_conversion': 0,
@@ -193,7 +196,7 @@ def analytics_dashboard_view(request):
             """, [tenant_id])
             context['embudo'] = dict_fetchall(cursor)
         except Exception as e:
-            print(f"Error fetching embudo: {e}")
+            logger.error(f"Error fetching embudo: {e}")
 
         # Leads por día (últimos 30 días)
         try:
@@ -215,7 +218,7 @@ def analytics_dashboard_view(request):
                 row['precio_medio'] = float(row['precio_medio']) if row['precio_medio'] else 0
             context['leads_por_dia'] = rows
         except Exception as e:
-            print(f"Error fetching leads por dia: {e}")
+            logger.error(f"Error fetching leads por dia: {e}")
 
         # Evolución de precios (últimas 12 semanas)
         try:
@@ -243,7 +246,7 @@ def analytics_dashboard_view(request):
                 row['max_precio'] = float(row['max_precio']) if row['max_precio'] else 0
             context['evolucion_precios'] = list(reversed(rows))
         except Exception as e:
-            print(f"Error fetching evolucion precios: {e}")
+            logger.error(f"Error fetching evolucion precios: {e}")
 
         # Comparativa de portales
         try:
@@ -287,7 +290,7 @@ def analytics_dashboard_view(request):
                 row['precio_m2_medio'] = float(row['precio_m2_medio']) if row['precio_m2_medio'] else 0
             context['comparativa_portales'] = rows
         except Exception as e:
-            print(f"Error fetching comparativa portales: {e}")
+            logger.error(f"Error fetching comparativa portales: {e}")
 
         # Precios por zona
         try:
@@ -314,7 +317,7 @@ def analytics_dashboard_view(request):
                 row['precio_m2_medio'] = float(row['precio_m2_medio']) if row['precio_m2_medio'] else 0
             context['precios_por_zona'] = rows
         except Exception as e:
-            print(f"Error fetching precios por zona: {e}")
+            logger.error(f"Error fetching precios por zona: {e}")
 
         # Tipología de inmuebles
         try:
@@ -337,7 +340,7 @@ def analytics_dashboard_view(request):
                 row['porcentaje'] = float(row['porcentaje']) if row['porcentaje'] else 0
             context['tipologia_inmuebles'] = rows
         except Exception as e:
-            print(f"Error fetching tipologia: {e}")
+            logger.error(f"Error fetching tipologia: {e}")
 
     # Convert lists to JSON for JavaScript
     context['leads_por_dia_json'] = json.dumps(context['leads_por_dia'])
@@ -395,10 +398,10 @@ def map_view(request):
                     })
                 else:
                     # Log unmatched zones for debugging
-                    print(f"Map: Could not find coords for zone '{zona_nombre}'")
+                    logger.debug(f"Map: Could not find coords for zone '{zona_nombre}'")
 
         except Exception as e:
-            print(f"Error fetching map data: {e}")
+            logger.error(f"Error fetching map data: {e}")
 
     # Calculate map center (average of all points)
     if zones_data:
