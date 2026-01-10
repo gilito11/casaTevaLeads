@@ -3,6 +3,8 @@ Vistas para la gestion de Leads.
 Lista, detalle, cambio de estado, notas, etc.
 """
 import json
+import logging
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -10,11 +12,13 @@ from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.db.models import Q
-from django.db import connection
+from django.db import connection, IntegrityError
 from django.views.decorators.http import require_POST
 
 from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction
 from core.models import TenantUser, Tenant
+
+logger = logging.getLogger(__name__)
 
 
 def get_user_tenant(request):
@@ -290,6 +294,7 @@ def bulk_change_status_view(request):
 
         tenant_id = get_user_tenant(request)
         updated_count = 0
+        failed_ids = []
 
         for lead_id in lead_ids:
             try:
@@ -297,6 +302,7 @@ def bulk_change_status_view(request):
 
                 # Verificar que el lead pertenece al tenant
                 if tenant_id and lead.tenant_id != tenant_id:
+                    failed_ids.append({'id': lead_id, 'reason': 'tenant_mismatch'})
                     continue
 
                 # Usar LeadEstado para guardar el estado
@@ -322,9 +328,12 @@ def bulk_change_status_view(request):
                 updated_count += 1
 
             except Lead.DoesNotExist:
-                continue
+                failed_ids.append({'id': lead_id, 'reason': 'not_found'})
 
-        return JsonResponse({'updated': updated_count})
+        response = {'updated': updated_count}
+        if failed_ids:
+            response['failed'] = failed_ids
+        return JsonResponse(response)
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
@@ -345,6 +354,7 @@ def bulk_delete_view(request):
         tenant_id = get_user_tenant(request)
         deleted_count = 0
         blacklisted_count = 0
+        failed_ids = []
 
         for info in leads_info:
             lead_id = info.get('lead_id')
@@ -359,6 +369,7 @@ def bulk_delete_view(request):
 
                 # Verificar que el lead pertenece al tenant
                 if tenant_id and lead.tenant_id != tenant_id:
+                    failed_ids.append({'id': lead_id, 'reason': 'tenant_mismatch'})
                     continue
 
                 # Si hay que añadir a blacklist y tenemos la info necesaria
@@ -379,8 +390,8 @@ def bulk_delete_view(request):
                             }
                         )
                         blacklisted_count += 1
-                    except Exception:
-                        pass  # Si falla el blacklist, continuamos con el delete
+                    except (Tenant.DoesNotExist, IntegrityError) as e:
+                        logger.warning(f"Could not add lead {lead_id} to blacklist: {e}")
 
                 # Eliminar estado del lead
                 LeadEstado.objects.filter(lead_id=str(lead_id)).delete()
@@ -399,12 +410,15 @@ def bulk_delete_view(request):
                 deleted_count += 1
 
             except Lead.DoesNotExist:
-                continue
+                failed_ids.append({'id': lead_id, 'reason': 'not_found'})
 
-        return JsonResponse({
+        response = {
             'deleted': deleted_count,
             'blacklisted': blacklisted_count
-        })
+        }
+        if failed_ids:
+            response['failed'] = failed_ids
+        return JsonResponse(response)
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
