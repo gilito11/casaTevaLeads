@@ -538,6 +538,11 @@ def add_interaction_view(request, contact_id):
     descripcion = request.POST.get('descripcion', '').strip()
     fecha_str = request.POST.get('fecha', '')
 
+    # Validar tipo contra TIPO_CHOICES
+    tipos_validos = [choice[0] for choice in Interaction.TIPO_CHOICES]
+    if tipo not in tipos_validos:
+        tipo = 'nota'
+
     if descripcion:
         # Parsear fecha si se proporciona
         fecha = None
