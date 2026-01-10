@@ -6,27 +6,24 @@ run_storage:
   module: dagster_postgres.run_storage
   class: PostgresRunStorage
   config:
-    postgres_db:
-      postgres_url:
-        env: DATABASE_URL
+    postgres_url:
+      env: DATABASE_URL
 
 # Event log storage - stores asset materializations and run events
 event_log_storage:
   module: dagster_postgres.event_log
   class: PostgresEventLogStorage
   config:
-    postgres_db:
-      postgres_url:
-        env: DATABASE_URL
+    postgres_url:
+      env: DATABASE_URL
 
 # Schedule storage - stores schedule state and tick history (CRITICAL for schedule to work)
 schedule_storage:
   module: dagster_postgres.schedule_storage
   class: PostgresScheduleStorage
   config:
-    postgres_db:
-      postgres_url:
-        env: DATABASE_URL
+    postgres_url:
+      env: DATABASE_URL
 
 # Run launcher config
 run_launcher:
