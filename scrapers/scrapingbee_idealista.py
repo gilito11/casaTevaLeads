@@ -586,9 +586,8 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
         listings = self.scrape()
 
         for listing in listings:
-            # Only save if it has a phone (useful leads)
-            if listing.get('telefono_norm'):
-                self.save_to_postgres(listing)
+            # Save all listings (phone filtering done later in dbt pipeline)
+            self.save_to_postgres(listing)
 
         logger.info(f"Scraping complete. Stats: {self.get_stats()}")
         return self.get_stats()
