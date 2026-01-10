@@ -1,26 +1,32 @@
 # Dagster 1.5.x configuration for Casa Teva Lead System
-# Configures SQLite-based persistent storage for schedules and run history
+# Uses PostgreSQL for persistent storage (survives container restarts)
 
 # Run storage - stores run metadata
 run_storage:
-  module: dagster._core.storage.runs
-  class: SqliteRunStorage
+  module: dagster_postgres.run_storage
+  class: PostgresRunStorage
   config:
-    base_dir: /opt/dagster/dagster_home/history
+    postgres_db:
+      postgres_url:
+        env: DATABASE_URL
 
 # Event log storage - stores asset materializations and run events
 event_log_storage:
-  module: dagster._core.storage.event_log
-  class: SqliteEventLogStorage
+  module: dagster_postgres.event_log
+  class: PostgresEventLogStorage
   config:
-    base_dir: /opt/dagster/dagster_home/history
+    postgres_db:
+      postgres_url:
+        env: DATABASE_URL
 
 # Schedule storage - stores schedule state and tick history (CRITICAL for schedule to work)
 schedule_storage:
-  module: dagster._core.storage.schedules
-  class: SqliteScheduleStorage
+  module: dagster_postgres.schedule_storage
+  class: PostgresScheduleStorage
   config:
-    base_dir: /opt/dagster/dagster_home/schedules
+    postgres_db:
+      postgres_url:
+        env: DATABASE_URL
 
 # Run launcher config
 run_launcher:
