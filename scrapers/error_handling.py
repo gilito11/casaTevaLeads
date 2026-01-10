@@ -242,17 +242,6 @@ def alert_on_failure(
 # EMAIL ALERTING
 # =============================================================================
 
-def get_email_config() -> Dict[str, str]:
-    """Get email configuration from environment."""
-    return {
-        'smtp_server': os.environ.get('SMTP_SERVER', 'smtp.office365.com'),
-        'smtp_port': int(os.environ.get('SMTP_PORT', 587)),
-        'sender_email': os.environ.get('ALERT_EMAIL_FROM', ''),
-        'sender_password': os.environ.get('ALERT_EMAIL_PASSWORD', ''),
-        'recipient_email': os.environ.get('ALERT_EMAIL_TO', 'ericgc11@hotmail.com'),
-    }
-
-
 def send_email_alert(
     subject: str,
     body: str,
@@ -260,7 +249,7 @@ def send_email_alert(
     recipient: Optional[str] = None,
 ) -> bool:
     """
-    Send alert via email.
+    Send alert via SendGrid API.
 
     Args:
         subject: Email subject
@@ -270,18 +259,16 @@ def send_email_alert(
 
     Returns:
         True if email sent successfully
+
+    Requires env var: SENDGRID_API_KEY
     """
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-
-    config = get_email_config()
-
-    if not config['sender_email'] or not config['sender_password']:
-        logger.debug("Email not configured (missing ALERT_EMAIL_FROM or ALERT_EMAIL_PASSWORD)")
+    api_key = os.environ.get('SENDGRID_API_KEY')
+    if not api_key:
+        logger.debug("SendGrid not configured (missing SENDGRID_API_KEY)")
         return False
 
-    to_email = recipient or config['recipient_email']
+    to_email = recipient or os.environ.get('ALERT_EMAIL_TO', 'ericgc11@hotmail.com')
+    from_email = os.environ.get('ALERT_EMAIL_FROM', 'alertas@casateva.es')
 
     # Severity prefix
     prefix_map = {
@@ -292,29 +279,36 @@ def send_email_alert(
     }
     prefix = prefix_map.get(severity, "[ALERT]")
 
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = config['sender_email']
-        msg['To'] = to_email
-        msg['Subject'] = f"{prefix} Casa Teva Scrapers: {subject}"
-
-        # Add timestamp to body
-        full_body = f"""
-{body}
+    # Add timestamp to body
+    full_body = f"""{body}
 
 ---
 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 Environment: {'Azure' if os.environ.get('WEBSITE_INSTANCE_ID') else 'Local'}
 """
-        msg.attach(MIMEText(full_body, 'plain'))
 
-        with smtplib.SMTP(config['smtp_server'], config['smtp_port']) as server:
-            server.starttls()
-            server.login(config['sender_email'], config['sender_password'])
-            server.send_message(msg)
+    try:
+        response = requests.post(
+            'https://api.sendgrid.com/v3/mail/send',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            json={
+                'personalizations': [{'to': [{'email': to_email}]}],
+                'from': {'email': from_email, 'name': 'Casa Teva Alertas'},
+                'subject': f"{prefix} Casa Teva Scrapers: {subject}",
+                'content': [{'type': 'text/plain', 'value': full_body}],
+            },
+            timeout=10,
+        )
 
-        logger.info(f"Email alert sent to {to_email}: {subject}")
-        return True
+        if response.status_code in (200, 202):
+            logger.info(f"Email alert sent to {to_email}: {subject}")
+            return True
+        else:
+            logger.warning(f"SendGrid returned {response.status_code}: {response.text[:200]}")
+            return False
 
     except Exception as e:
         logger.error(f"Failed to send email alert: {e}")
