@@ -239,6 +239,143 @@ def alert_on_failure(
 
 
 # =============================================================================
+# EMAIL ALERTING
+# =============================================================================
+
+def get_email_config() -> Dict[str, str]:
+    """Get email configuration from environment."""
+    return {
+        'smtp_server': os.environ.get('SMTP_SERVER', 'smtp.office365.com'),
+        'smtp_port': int(os.environ.get('SMTP_PORT', 587)),
+        'sender_email': os.environ.get('ALERT_EMAIL_FROM', ''),
+        'sender_password': os.environ.get('ALERT_EMAIL_PASSWORD', ''),
+        'recipient_email': os.environ.get('ALERT_EMAIL_TO', 'ericgc11@hotmail.com'),
+    }
+
+
+def send_email_alert(
+    subject: str,
+    body: str,
+    severity: str = AlertSeverity.ERROR,
+    recipient: Optional[str] = None,
+) -> bool:
+    """
+    Send alert via email.
+
+    Args:
+        subject: Email subject
+        body: Email body (plain text)
+        severity: Alert severity for subject prefix
+        recipient: Override recipient email
+
+    Returns:
+        True if email sent successfully
+    """
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    config = get_email_config()
+
+    if not config['sender_email'] or not config['sender_password']:
+        logger.debug("Email not configured (missing ALERT_EMAIL_FROM or ALERT_EMAIL_PASSWORD)")
+        return False
+
+    to_email = recipient or config['recipient_email']
+
+    # Severity prefix
+    prefix_map = {
+        AlertSeverity.INFO: "[INFO]",
+        AlertSeverity.WARNING: "[WARNING]",
+        AlertSeverity.ERROR: "[ERROR]",
+        AlertSeverity.CRITICAL: "[CRITICAL]",
+    }
+    prefix = prefix_map.get(severity, "[ALERT]")
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = config['sender_email']
+        msg['To'] = to_email
+        msg['Subject'] = f"{prefix} Casa Teva Scrapers: {subject}"
+
+        # Add timestamp to body
+        full_body = f"""
+{body}
+
+---
+Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Environment: {'Azure' if os.environ.get('WEBSITE_INSTANCE_ID') else 'Local'}
+"""
+        msg.attach(MIMEText(full_body, 'plain'))
+
+        with smtplib.SMTP(config['smtp_server'], config['smtp_port']) as server:
+            server.starttls()
+            server.login(config['sender_email'], config['sender_password'])
+            server.send_message(msg)
+
+        logger.info(f"Email alert sent to {to_email}: {subject}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send email alert: {e}")
+        return False
+
+
+def send_html_change_alert(
+    portal: str,
+    issue_type: str,
+    details: str,
+    metrics: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """
+    Send alert specifically for HTML structure changes.
+
+    Args:
+        portal: Portal name (fotocasa, habitaclia, etc.)
+        issue_type: Type of issue (no_results, missing_fields, blocked, etc.)
+        details: Detailed description
+        metrics: Optional metrics dict (field_fill_rates, etc.)
+
+    Returns:
+        True if alert sent
+    """
+    subject = f"{portal.upper()} - Posible cambio de HTML ({issue_type})"
+
+    body = f"""
+ALERTA: Detectado posible cambio en la estructura HTML de {portal}
+
+Tipo de problema: {issue_type}
+Portal: {portal}
+
+Detalles:
+{details}
+"""
+
+    if metrics:
+        body += "\nMétricas:\n"
+        for key, value in metrics.items():
+            body += f"  - {key}: {value}\n"
+
+    body += """
+Acciones recomendadas:
+1. Verificar manualmente el portal
+2. Revisar los selectores CSS/XPath en el scraper
+3. Actualizar el código si es necesario
+"""
+
+    # Send both email and webhook
+    email_sent = send_email_alert(subject, body, AlertSeverity.WARNING)
+    webhook_sent = send_alert(
+        title=subject,
+        message=details,
+        severity=AlertSeverity.WARNING,
+        details=metrics,
+    )
+
+    return email_sent or webhook_sent
+
+
+# =============================================================================
 # DATA QUALITY VALIDATION
 # =============================================================================
 
@@ -350,18 +487,41 @@ def validate_scraping_results(
     if particular_rate < 50:
         result.add_warning(f"Low particular rate: {particular_rate:.1f}% (might be scraping agencies)")
 
-    # Send alert if there are errors
+    # Detect HTML structure change indicators
+    html_change_indicators = []
+    if total == 0:
+        html_change_indicators.append("no_results")
+    if result.metrics.get('titulo_null_pct', 0) > 50:
+        html_change_indicators.append("missing_titles")
+    if result.metrics.get('precio_null_pct', 0) > 50:
+        html_change_indicators.append("missing_prices")
+
+    # Send alert if there are errors (possible HTML change)
     if not result.passed and alert_on_failure:
-        send_alert(
-            title=f"Data Quality Alert: {portal_name}",
-            message="\n".join(result.errors),
-            severity=AlertSeverity.ERROR,
-            details={
-                "portal": portal_name,
-                "total_listings": total,
-                **result.metrics,
-            },
-        )
+        if html_change_indicators:
+            # Send HTML change alert (email + webhook)
+            send_html_change_alert(
+                portal=portal_name,
+                issue_type=", ".join(html_change_indicators),
+                details="\n".join(result.errors),
+                metrics={
+                    "portal": portal_name,
+                    "total_listings": total,
+                    **result.metrics,
+                },
+            )
+        else:
+            # Regular alert (webhook only)
+            send_alert(
+                title=f"Data Quality Alert: {portal_name}",
+                message="\n".join(result.errors),
+                severity=AlertSeverity.ERROR,
+                details={
+                    "portal": portal_name,
+                    "total_listings": total,
+                    **result.metrics,
+                },
+            )
     elif result.warnings and alert_on_failure:
         send_alert(
             title=f"Data Quality Warning: {portal_name}",
