@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 5 January 2026 (Contact management system - issue #26)
+> **Last Updated**: 10 January 2026 (Dagster PostgreSQL storage + Discord alerting - issue #15)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -9,7 +9,7 @@ Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
 - **Backend**: Django 5.x + DRF
 - **BD**: PostgreSQL 16 (Azure PostgreSQL en prod)
 - **Scrapers**: Botasaurus (habitaclia, fotocasa), ScrapingBee (milanuncios, idealista)
-- **Orquestacion**: Dagster
+- **Orquestacion**: Dagster (PostgreSQL storage para persistencia)
 - **ETL**: dbt (raw -> public_staging -> public_marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
 
@@ -68,6 +68,14 @@ Basado en analisis de 220 anuncios de Milanuncios:
 - 12:00: Captura pico de manana
 - 18:00: Captura pico de tarde
 - **Ahorro**: 67% creditos (de 6 a 2 scrapes/dia)
+- **Status**: Funcionando en produccion
+
+### Alertas Discord (Enero 2026)
+Sistema de alertas via webhook para detectar problemas de scraping:
+- **Variable de entorno**: `ALERT_WEBHOOK_URL`
+- **Deteccion de bloqueos**: Alerta si 0 resultados (posible bloqueo del portal)
+- **Deteccion de cambios HTML**: Alerta si >50% de anuncios sin titulo/precio (estructura HTML cambiada)
+- **Reintentos automaticos**: 3 intentos con backoff exponencial antes de alertar
 
 ## Comandos
 
