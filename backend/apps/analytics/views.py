@@ -139,8 +139,8 @@ def analytics_dashboard_view(request):
                         ELSE 0 END, 1
                     ) as tasa_conversion,
                     COALESCE(SUM(precio) FILTER (WHERE estado_real NOT IN ('NO_INTERESADO', 'NO_CONTACTAR', 'YA_VENDIDO')), 0) as valor_pipeline,
-                    COUNT(*) FILTER (WHERE fecha_scraping >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
-                    COUNT(*) FILTER (WHERE fecha_scraping >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes
+                    COUNT(*) FILTER (WHERE fecha_primera_captura >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
+                    COUNT(*) FILTER (WHERE fecha_primera_captura >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes
                 FROM lead_con_estado
             """, [tenant_id])
             context['kpis'] = dict_fetchone(cursor)
@@ -202,14 +202,14 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    DATE(fecha_scraping) as fecha,
+                    DATE(fecha_primera_captura) as fecha,
                     COUNT(*) as leads_captados,
                     COUNT(DISTINCT telefono_norm) as leads_unicos,
                     COALESCE(AVG(precio), 0) as precio_medio
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
-                  AND fecha_scraping >= CURRENT_DATE - INTERVAL '30 days'
-                GROUP BY DATE(fecha_scraping)
+                  AND fecha_primera_captura >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY DATE(fecha_primera_captura)
                 ORDER BY fecha
             """, [tenant_id])
             rows = dict_fetchall(cursor)
@@ -224,7 +224,7 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    DATE_TRUNC('week', fecha_scraping)::date as semana,
+                    DATE_TRUNC('week', fecha_primera_captura)::date as semana,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
                     COALESCE(MIN(precio), 0) as min_precio,
@@ -232,8 +232,8 @@ def analytics_dashboard_view(request):
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND precio > 0
-                  AND fecha_scraping >= CURRENT_DATE - INTERVAL '12 weeks'
-                GROUP BY DATE_TRUNC('week', fecha_scraping)
+                  AND fecha_primera_captura >= CURRENT_DATE - INTERVAL '12 weeks'
+                GROUP BY DATE_TRUNC('week', fecha_primera_captura)
                 ORDER BY semana DESC
                 LIMIT 12
             """, [tenant_id])
