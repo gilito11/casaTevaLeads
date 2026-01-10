@@ -1,0 +1,39 @@
+# Dagster 1.5.x configuration for Casa Teva Lead System
+# Configures SQLite-based persistent storage for schedules and run history
+
+# Run storage - stores run metadata
+run_storage:
+  module: dagster._core.storage.runs
+  class: SqliteRunStorage
+  config:
+    base_dir: /opt/dagster/dagster_home/history
+
+# Event log storage - stores asset materializations and run events
+event_log_storage:
+  module: dagster._core.storage.event_log
+  class: SqliteEventLogStorage
+  config:
+    base_dir: /opt/dagster/dagster_home/history
+
+# Schedule storage - stores schedule state and tick history (CRITICAL for schedule to work)
+schedule_storage:
+  module: dagster._core.storage.schedules
+  class: SqliteScheduleStorage
+  config:
+    base_dir: /opt/dagster/dagster_home/schedules
+
+# Run launcher config
+run_launcher:
+  module: dagster._core.launcher.default_run_launcher
+  class: DefaultRunLauncher
+
+# Run coordinator - limit concurrent runs to avoid resource issues
+run_coordinator:
+  module: dagster._core.run_coordinator
+  class: QueuedRunCoordinator
+  config:
+    max_concurrent_runs: 1
+
+# Disable telemetry
+telemetry:
+  enabled: false

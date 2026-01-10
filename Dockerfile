@@ -108,6 +108,9 @@ COPY --chown=casateva:casateva run_*_scraper.py /app/
 COPY --chown=casateva:casateva run_all_scrapers.py /app/
 COPY --chown=casateva:casateva scrapy.cfg /app/
 
+# Copiar dagster.yaml a DAGSTER_HOME para configuración de storage
+COPY --chown=casateva:casateva dagster/dagster.yaml /opt/dagster/dagster_home/
+
 # Cambiar a usuario no-root
 USER casateva
 

@@ -160,7 +160,9 @@ docker-compose.override.yml
 # Dagster
 dagster_home/
 .dagster/
-dagster.yaml
+# Allow dagster/dagster.yaml for deployment, ignore root level only
+/dagster.yaml
+!dagster/dagster.yaml
 
 # MinIO / S3
 minio-data/
