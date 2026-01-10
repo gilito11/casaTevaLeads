@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 10 January 2026 (Dagster PostgreSQL storage + Discord alerting - issue #15)
+> **Last Updated**: 10 January 2026 (Production reliability improvements)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -76,6 +76,13 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Deteccion de bloqueos**: Alerta si 0 resultados (posible bloqueo del portal)
 - **Deteccion de cambios HTML**: Alerta si >50% de anuncios sin titulo/precio (estructura HTML cambiada)
 - **Reintentos automaticos**: 3 intentos con backoff exponencial antes de alertar
+
+### Fiabilidad Produccion (Enero 2026)
+- **Backup PostgreSQL**: 35 dias retencion (Azure)
+- **Health Check**: `/health/` verifica conexion BD (retorna 503 si falla)
+- **Logs Centralizados**: Azure Log Analytics (`casateva-logs`)
+- **Validacion Datos**: Precio (1K-10M), telefono (9 digitos), URL, metros
+- **Logging**: JSON estructurado en produccion
 
 ## Comandos
 
