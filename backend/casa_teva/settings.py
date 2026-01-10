@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'django_filters',
+    'drf_spectacular',
     # Local apps
     'core',
     'leads',
@@ -231,4 +232,13 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 25,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# OpenAPI/Swagger documentation
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Casa Teva CRM API',
+    'DESCRIPTION': 'API para gestion de leads inmobiliarios',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }

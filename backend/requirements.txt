@@ -3,6 +3,7 @@ Django==5.1
 djangorestframework==3.14.0
 gunicorn==21.2.0
 whitenoise==6.6.0
+drf-spectacular==0.27.0
 
 # Database
 psycopg[binary]==3.2.13

@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
 from django.db import connection
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from core.views import (
     login_view, logout_view, dashboard_view, profile_view,
@@ -81,4 +82,8 @@ urlpatterns = [
     # REST API
     path('api/leads/', include('leads.api_urls')),
     path('api/core/', include('core.api_urls')),
+
+    # API Documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]

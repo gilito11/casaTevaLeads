@@ -42,11 +42,16 @@ class BotasaurusBaseScraper:
     - Lead ID generation
     """
 
+    # Rate limiting defaults
+    DEFAULT_PAGE_DELAY = 2.0  # seconds between page loads
+    DEFAULT_REQUEST_DELAY = 0.5  # seconds between API requests
+
     def __init__(
         self,
         tenant_id: int = 1,
         postgres_config: Optional[Dict[str, str]] = None,
-        headless: bool = True
+        headless: bool = True,
+        page_delay: float = None,
     ):
         """
         Initialize the base scraper.
@@ -55,10 +60,12 @@ class BotasaurusBaseScraper:
             tenant_id: Tenant ID for multi-tenancy
             postgres_config: PostgreSQL connection config
             headless: Run browser in headless mode
+            page_delay: Delay between page loads in seconds (rate limiting)
         """
         self.tenant_id = tenant_id
         self.headless = headless
         self.postgres_conn = None
+        self.page_delay = page_delay or self.DEFAULT_PAGE_DELAY
 
         if postgres_config:
             self.postgres_conn = self._init_postgres(postgres_config)
@@ -71,7 +78,7 @@ class BotasaurusBaseScraper:
             'pages_scraped': 0,
         }
 
-        logger.info(f"BotasaurusBaseScraper initialized for tenant_id={tenant_id}")
+        logger.info(f"BotasaurusBaseScraper initialized for tenant_id={tenant_id}, page_delay={self.page_delay}s")
 
     def _init_postgres(self, config: Dict[str, str]):
         """Initialize PostgreSQL connection."""

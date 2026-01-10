@@ -127,12 +127,17 @@ class ScrapingBeeClient:
 
     SCRAPINGBEE_ENDPOINT = "https://app.scrapingbee.com/api/v1/"
 
+    # Rate limiting defaults
+    DEFAULT_REQUEST_DELAY = 1.0  # seconds between requests
+    MAX_REQUESTS_PER_MINUTE = 30
+
     def __init__(
         self,
         portal_name: str,
         tenant_id: int = 1,
         use_stealth: bool = True,
         postgres_config: Optional[Dict[str, str]] = None,
+        request_delay: float = None,
     ):
         """
         Initialize ScrapingBee client.
@@ -142,11 +147,14 @@ class ScrapingBeeClient:
             tenant_id: Tenant ID for multi-tenancy
             use_stealth: Use stealth proxy (75 credits) vs premium (25 credits)
             postgres_config: PostgreSQL connection config (auto-detected if None)
+            request_delay: Delay between requests in seconds (rate limiting)
         """
         self.portal_name = portal_name
         self.tenant_id = tenant_id
         self.use_stealth = use_stealth
         self.api_key = get_scrapingbee_api_key()
+        self.request_delay = request_delay or self.DEFAULT_REQUEST_DELAY
+        self._last_request_time = 0
 
         # Initialize PostgreSQL connection
         self.postgres_config = postgres_config or get_postgres_config()
@@ -189,6 +197,15 @@ class ScrapingBeeClient:
             logger.error(f"PostgreSQL connection error: {e}")
             raise
 
+    def _enforce_rate_limit(self):
+        """Enforce rate limiting between requests."""
+        elapsed = time.time() - self._last_request_time
+        if elapsed < self.request_delay:
+            sleep_time = self.request_delay - elapsed
+            logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s")
+            time.sleep(sleep_time)
+        self._last_request_time = time.time()
+
     def fetch_page(
         self,
         url: str,
@@ -197,7 +214,7 @@ class ScrapingBeeClient:
         js_scenario: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """
-        Fetch a page using ScrapingBee API with retry logic.
+        Fetch a page using ScrapingBee API with retry logic and rate limiting.
 
         Args:
             url: URL to fetch
@@ -208,6 +225,7 @@ class ScrapingBeeClient:
         Returns:
             HTML content or None if failed
         """
+        self._enforce_rate_limit()
         return self._fetch_page_with_retry(url, wait_for, custom_headers, js_scenario)
 
     def _fetch_page_with_retry(
