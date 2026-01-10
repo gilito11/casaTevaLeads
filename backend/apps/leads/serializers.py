@@ -49,5 +49,5 @@ class LeadUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lead
-        fields = ['estado', 'asignado_a', 'numero_intentos',
+        fields = ['estado', 'asignado_a_id', 'numero_intentos',
                   'fecha_primer_contacto', 'fecha_ultimo_contacto']
