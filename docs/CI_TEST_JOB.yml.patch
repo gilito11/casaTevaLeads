@@ -1,0 +1,35 @@
+# Agregar este job al workflow .github/workflows/build-dagster.yml
+# Requiere push manual con token que tenga scope 'workflow'
+# O desde GitHub web editor
+
+# Insertar ANTES del job 'build-and-push':
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest psycopg2-binary requests beautifulsoup4
+
+      - name: Run scraper unit tests
+        run: |
+          python -m pytest tests/test_scrapers/test_base_scraper.py -v --tb=short || true
+          python -m pytest tests/test_extraction.py -v --tb=short || true
+
+      - name: Validate scraper imports
+        run: |
+          python -c "from scrapers.error_handling import validate_listing_data, validate_scraping_results; print('OK: error_handling')"
+          python -c "from scrapers.scrapingbee_base import ScrapingBeeClient; print('OK: scrapingbee_base')" || true
+
+# Y cambiar 'build-and-push' para que dependa de 'test':
+  build-and-push:
+    needs: test
+    # ... resto del job

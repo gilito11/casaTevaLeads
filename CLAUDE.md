@@ -83,6 +83,10 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Logs Centralizados**: Azure Log Analytics (`casateva-logs`)
 - **Validacion Datos**: Precio (1K-10M), telefono (9 digitos), URL, metros
 - **Logging**: JSON estructurado en produccion
+- **Rate Limiting**: ScrapingBee 1s/req, Botasaurus 2s/page
+- **API Docs**: Swagger UI en `/api/docs/`
+- **Runbooks**: `docs/RUNBOOKS.md` con procedimientos de incidentes
+- **Key Vault**: `casateva-kv` para secrets (pendiente migracion)
 
 ## Comandos
 
