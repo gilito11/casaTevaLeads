@@ -28,6 +28,7 @@ from scrapers.error_handling import (
     send_alert,
     AlertSeverity,
     validate_scraping_results,
+    validate_listing_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -412,6 +413,11 @@ class ScrapingBeeClient:
         if not self.postgres_conn:
             logger.warning("PostgreSQL not configured")
             return False
+
+        # Validate listing data before saving
+        listing_data = validate_listing_data(listing_data)
+        if listing_data.get('_validation_errors'):
+            logger.debug(f"Validation warnings: {listing_data['_validation_errors']}")
 
         try:
             cursor = self.postgres_conn.cursor()

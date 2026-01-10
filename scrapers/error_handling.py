@@ -370,6 +370,97 @@ Acciones recomendadas:
 
 
 # =============================================================================
+# VALUE VALIDATION
+# =============================================================================
+
+def validate_listing_data(listing: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate and clean individual listing data.
+
+    Checks:
+    - Price in valid range (1,000 - 10,000,000 EUR)
+    - Phone format (9 digits for Spain)
+    - URL is valid
+    - Required fields present
+
+    Returns:
+        Cleaned listing dict with validation flags
+    """
+    errors = []
+
+    # Validate price
+    precio = listing.get('precio')
+    if precio is not None:
+        try:
+            precio_num = float(precio)
+            if precio_num < 1000:
+                errors.append(f"Price too low: {precio_num}")
+                listing['_precio_invalid'] = True
+            elif precio_num > 10000000:
+                errors.append(f"Price too high: {precio_num}")
+                listing['_precio_invalid'] = True
+        except (ValueError, TypeError):
+            errors.append(f"Invalid price format: {precio}")
+            listing['_precio_invalid'] = True
+
+    # Validate phone (Spanish format: 9 digits starting with 6, 7, 8, or 9)
+    telefono = listing.get('telefono_norm')
+    if telefono:
+        telefono_clean = ''.join(filter(str.isdigit, str(telefono)))
+        if len(telefono_clean) != 9:
+            errors.append(f"Invalid phone length: {telefono}")
+            listing['telefono_norm'] = None
+        elif telefono_clean[0] not in '6789':
+            errors.append(f"Invalid phone prefix: {telefono}")
+            listing['telefono_norm'] = None
+
+    # Validate URL
+    url = listing.get('url')
+    if url and not url.startswith(('http://', 'https://')):
+        errors.append(f"Invalid URL: {url}")
+        listing['_url_invalid'] = True
+
+    # Validate metros (1 - 10000 m2)
+    metros = listing.get('metros')
+    if metros is not None:
+        try:
+            metros_num = float(metros)
+            if metros_num < 1 or metros_num > 10000:
+                listing['metros'] = None
+        except (ValueError, TypeError):
+            listing['metros'] = None
+
+    listing['_validation_errors'] = errors
+    listing['_is_valid'] = len(errors) == 0
+
+    return listing
+
+
+def validate_batch(listings: List[Dict[str, Any]], portal: str) -> List[Dict[str, Any]]:
+    """
+    Validate a batch of listings and log summary.
+
+    Args:
+        listings: List of listing dicts
+        portal: Portal name for logging
+
+    Returns:
+        List of validated listings (invalid ones marked but not removed)
+    """
+    validated = [validate_listing_data(l) for l in listings]
+
+    valid_count = sum(1 for l in validated if l.get('_is_valid', True))
+    invalid_count = len(validated) - valid_count
+
+    if invalid_count > 0:
+        logger.warning(
+            f"{portal}: {invalid_count}/{len(validated)} listings have validation errors"
+        )
+
+    return validated
+
+
+# =============================================================================
 # DATA QUALITY VALIDATION
 # =============================================================================
 

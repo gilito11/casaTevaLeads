@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+from django.db import connection
 
 from core.views import (
     login_view, logout_view, dashboard_view, profile_view,
@@ -28,7 +29,22 @@ from core.views import (
 
 
 def health_check(request):
-    return JsonResponse({'status': 'ok'})
+    """Health check endpoint with database connectivity verification."""
+    health = {'status': 'ok', 'database': 'unknown'}
+    status_code = 200
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+        health['database'] = 'ok'
+    except Exception as e:
+        health['status'] = 'degraded'
+        health['database'] = 'error'
+        health['database_error'] = str(e)[:100]
+        status_code = 503
+
+    return JsonResponse(health, status=status_code)
 
 
 urlpatterns = [

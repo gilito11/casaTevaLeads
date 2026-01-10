@@ -21,6 +21,7 @@ import psycopg2
 from botasaurus.browser import browser, Driver
 
 from scrapers.utils.particular_filter import debe_scrapear, es_profesional
+from scrapers.error_handling import validate_listing_data
 
 # Configure logging
 logging.basicConfig(
@@ -187,6 +188,11 @@ class BotasaurusBaseScraper:
         if not self.postgres_conn:
             logger.warning("PostgreSQL not configured")
             return False
+
+        # Validate listing data before saving
+        listing_data = validate_listing_data(listing_data)
+        if listing_data.get('_validation_errors'):
+            logger.debug(f"Validation warnings: {listing_data['_validation_errors']}")
 
         try:
             cursor = self.postgres_conn.cursor()
