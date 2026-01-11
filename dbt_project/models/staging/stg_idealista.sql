@@ -224,6 +224,8 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
+        -- Filter for particular (non-agency) listings only
+        AND es_particular = TRUE
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
@@ -231,6 +233,15 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no agencia%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no inmobiliaria%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%sin intermediario%'
+        )
+        -- Filter out agency names in vendedor/anunciante field
+        AND NOT (
+            LOWER(COALESCE(vendedor, '')) LIKE '%inmobiliaria%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%agencia%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%agency%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%fincas%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%gestoria%'
+            OR vendedor = 'Profesional'
         )
 )
 
