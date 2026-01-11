@@ -600,49 +600,49 @@ def dbt_transform(
         dbt_base_cmd = [dbt_cmd] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main']
         context.log.info("Running dbt deps to install packages...")
         deps_result = subprocess.run(
-            dbt_base_cmd + ['deps', '--project-dir', dbt_project_dir, '--profiles-dir', dbt_project_dir],
+            dbt_base_cmd + ['deps', '--project-dir', dbt_project_dir, '--profiles-dir', dbt_project_dir, '--debug'],
             capture_output=True,
             text=True,
             timeout=300,
             env=dbt_env,
             cwd=dbt_project_dir,
         )
+        context.log.info(f"dbt deps returncode: {deps_result.returncode}")
+        if deps_result.stdout:
+            context.log.info(f"dbt deps stdout (last 500): {deps_result.stdout[-500:]}")
+        if deps_result.stderr:
+            context.log.info(f"dbt deps stderr (last 500): {deps_result.stderr[-500:]}")
         if deps_result.returncode != 0:
-            context.log.warning(f"dbt deps warning: {deps_result.stderr[:500] if deps_result.stderr else deps_result.stdout[:500]}")
+            context.log.error(f"dbt deps FAILED with code {deps_result.returncode}")
         else:
             context.log.info("dbt deps completed successfully")
+            # Check if dbt_packages was created
+            dbt_packages_dir = os.path.join(dbt_project_dir, 'dbt_packages')
+            context.log.info(f"dbt_packages exists after deps: {os.path.exists(dbt_packages_dir)}")
 
+        # Build dbt run command with debug flag
+        context.log.info(f"Using dbt command: {dbt_cmd if os.path.exists(dbt_cmd) else 'python -m dbt.cli.main'}")
         if not os.path.exists(dbt_cmd):
-            # Last resort: use python -m dbt.cli.main
-            context.log.info("Using python -m dbt.cli.main as fallback")
-            result = subprocess.run(
-                [
-                    sys.executable, '-m', 'dbt.cli.main', 'run',
-                    '--project-dir', dbt_project_dir,
-                    '--profiles-dir', dbt_project_dir,
-                    '--target', 'prod',
-                ],
-                capture_output=True,
-                text=True,
-                timeout=600,
-                env=dbt_env,
-                cwd=dbt_project_dir,
-            )
+            run_cmd = [sys.executable, '-m', 'dbt.cli.main', 'run']
         else:
-            context.log.info(f"Using dbt command: {dbt_cmd}")
-            result = subprocess.run(
-                [
-                    dbt_cmd, 'run',
-                    '--project-dir', dbt_project_dir,
-                    '--profiles-dir', dbt_project_dir,
-                    '--target', 'prod',
-                ],
-                capture_output=True,
-                text=True,
-                timeout=600,  # 10 minutos
-                env=dbt_env,
-                cwd=dbt_project_dir,
-            )
+            run_cmd = [dbt_cmd, 'run']
+
+        run_cmd.extend([
+            '--project-dir', dbt_project_dir,
+            '--profiles-dir', dbt_project_dir,
+            '--target', 'prod',
+            '--debug',  # Add debug flag for more output
+        ])
+        context.log.info(f"Running dbt with command: {' '.join(run_cmd)}")
+
+        result = subprocess.run(
+            run_cmd,
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 minutos
+            env=dbt_env,
+            cwd=dbt_project_dir,
+        )
 
         if result.returncode != 0:
             # Log both stderr and stdout as dbt may write errors to stdout
