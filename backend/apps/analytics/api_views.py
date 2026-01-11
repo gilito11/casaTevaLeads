@@ -60,7 +60,7 @@ def build_where_clause(request, table_alias='l'):
     # Portal filter
     portal = request.GET.get('portal')
     if portal and portal != 'todos':
-        conditions.append(f"{table_alias}.portal = %s")
+        conditions.append(f"{table_alias}.source_portal = %s")
         params.append(portal)
 
     # Zone filter
@@ -125,7 +125,7 @@ def api_kpis(request):
                 COUNT(*) FILTER (WHERE ultima_actualizacion >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
                 COUNT(*) FILTER (WHERE ultima_actualizacion >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes,
                 COALESCE(AVG(precio), 0) as precio_medio,
-                COUNT(DISTINCT portal) as portales_activos
+                COUNT(DISTINCT source_portal) as portales_activos
             FROM lead_con_estado
         """, params)
 
@@ -284,10 +284,10 @@ def api_comparativa_portales(request):
         cursor.execute(f"""
             WITH lead_con_estado AS (
                 SELECT
-                    l.portal as portal,
+                    l.source_portal as portal,
                     l.telefono_norm,
                     l.precio,
-                    l.metros,
+                    l.superficie_m2 as metros,
                     COALESCE(e.estado, 'NUEVO') as estado_real
                 FROM public_marts.dim_leads l
                 LEFT JOIN leads_lead_estado e ON l.lead_id::text = e.lead_id
@@ -330,7 +330,7 @@ def api_precios_por_zona(request):
                 l.zona_geografica,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l.precio), 0) as precio_mediana,
-                COALESCE(AVG(CASE WHEN l.metros > 0 THEN l.precio / l.metros ELSE NULL END), 0) as precio_m2_medio,
+                COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio,
                 COUNT(*) as total_inmuebles,
                 COALESCE(MIN(l.precio), 0) as precio_min,
                 COALESCE(MAX(l.precio), 0) as precio_max
@@ -369,7 +369,7 @@ def api_tipologia(request):
                     (SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1
                 ), 1) as porcentaje,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
-                COALESCE(AVG(CASE WHEN l.metros > 0 THEN l.precio / l.metros ELSE NULL END), 0) as precio_m2_medio
+                COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio
             FROM public_marts.dim_leads l
             WHERE {where_clause}
             GROUP BY l.tipo_inmueble
@@ -393,10 +393,10 @@ def api_filter_options(request):
     with connection.cursor() as cursor:
         # Get distinct portals
         cursor.execute("""
-            SELECT DISTINCT portal
+            SELECT DISTINCT source_portal as portal
             FROM public_marts.dim_leads
-            WHERE tenant_id = %s AND portal IS NOT NULL
-            ORDER BY portal
+            WHERE tenant_id = %s AND source_portal IS NOT NULL
+            ORDER BY source_portal
         """, [tenant_id])
         portales = [row[0] for row in cursor.fetchall()]
 
@@ -452,11 +452,11 @@ def api_export_csv(request):
                 l.telefono_norm,
                 l.email,
                 l.nombre,
-                l.portal,
+                l.source_portal as portal,
                 l.zona_geografica,
                 l.tipo_inmueble,
                 l.precio,
-                l.metros,
+                l.superficie_m2 as metros,
                 l.habitaciones,
                 COALESCE(e.estado, 'NUEVO') as estado,
                 l.ultima_actualizacion

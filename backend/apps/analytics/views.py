@@ -253,10 +253,10 @@ def analytics_dashboard_view(request):
             cursor.execute("""
                 WITH lead_con_estado AS (
                     SELECT
-                        l.portal,
+                        l.source_portal as portal,
                         l.telefono_norm,
                         l.precio,
-                        l.metros,
+                        l.superficie_m2 as metros,
                         COALESCE(e.estado, 'NUEVO') as estado_real
                     FROM public_marts.dim_leads l
                     LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
@@ -299,7 +299,7 @@ def analytics_dashboard_view(request):
                     zona_geografica as zona_clasificada,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
-                    COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio,
+                    COALESCE(AVG(CASE WHEN superficie_m2 > 0 THEN precio / superficie_m2 ELSE NULL END), 0) as precio_m2_medio,
                     COUNT(*) as total_inmuebles
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
@@ -327,7 +327,7 @@ def analytics_dashboard_view(request):
                     COUNT(*) as total,
                     ROUND(100.0 * COUNT(*) / GREATEST((SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1), 1) as porcentaje,
                     COALESCE(AVG(precio), 0) as precio_medio,
-                    COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio
+                    COALESCE(AVG(CASE WHEN superficie_m2 > 0 THEN precio / superficie_m2 ELSE NULL END), 0) as precio_m2_medio
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                 GROUP BY tipo_inmueble
@@ -440,14 +440,14 @@ def map_data_api(request):
             cursor.execute("""
                 SELECT
                     zona_geografica,
-                    portal,
+                    source_portal as portal,
                     COUNT(*) as total_leads,
                     COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND zona_geografica IS NOT NULL
                   AND zona_geografica != ''
-                GROUP BY zona_geografica, portal
+                GROUP BY zona_geografica, source_portal
                 ORDER BY zona_geografica, total_leads DESC
             """, [tenant_id])
             rows = dict_fetchall(cursor)
