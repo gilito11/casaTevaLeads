@@ -108,6 +108,10 @@ COPY --chown=casateva:casateva run_*_scraper.py /app/
 COPY --chown=casateva:casateva run_all_scrapers.py /app/
 COPY --chown=casateva:casateva scrapy.cfg /app/
 
+# Create dbt directories that need write access (logs, target, dbt_packages)
+RUN mkdir -p /app/dbt_project/logs /app/dbt_project/target /app/dbt_project/dbt_packages && \
+    chown -R casateva:casateva /app/dbt_project
+
 # Copiar dagster.yaml a DAGSTER_HOME para configuración de storage
 COPY --chown=casateva:casateva dagster/dagster.yaml /opt/dagster/dagster_home/
 
