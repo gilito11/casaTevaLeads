@@ -583,6 +583,24 @@ def dbt_transform(
 
         context.log.info(f"DEBUG: dbt_cmd = {dbt_cmd}, exists = {os.path.exists(dbt_cmd) if dbt_cmd else False}")
 
+        # Test dbt import and check versions
+        context.log.info("Testing dbt Python import...")
+        try:
+            import dbt
+            import dbt.version
+            context.log.info(f"dbt version: {dbt.version.get_installed_version()}")
+        except Exception as e:
+            context.log.error(f"dbt import failed: {e}")
+            import traceback
+            context.log.error(f"Traceback: {traceback.format_exc()}")
+
+        # Check protobuf version
+        try:
+            import google.protobuf
+            context.log.info(f"protobuf version: {google.protobuf.__version__}")
+        except Exception as e:
+            context.log.error(f"protobuf import failed: {e}")
+
         # First test dbt --version to see if it runs at all
         version_result = subprocess.run(
             [dbt_cmd, '--version'] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main', '--version'],
@@ -596,50 +614,89 @@ def dbt_transform(
         if version_result.returncode != 0:
             context.log.error(f"DEBUG: dbt --version stderr={version_result.stderr[:500] if version_result.stderr else 'none'}")
 
-        # Run dbt deps first to install packages (required for dbt_utils macros)
-        dbt_base_cmd = [dbt_cmd] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main']
-        context.log.info("Running dbt deps to install packages...")
-        deps_result = subprocess.run(
-            dbt_base_cmd + ['deps', '--project-dir', dbt_project_dir, '--profiles-dir', dbt_project_dir, '--debug'],
-            capture_output=True,
-            text=True,
-            timeout=300,
-            env=dbt_env,
-            cwd=dbt_project_dir,
-        )
-        context.log.info(f"dbt deps returncode: {deps_result.returncode}")
-        if deps_result.stdout:
-            context.log.info(f"dbt deps stdout (last 500): {deps_result.stdout[-500:]}")
-        if deps_result.stderr:
-            context.log.info(f"dbt deps stderr (last 500): {deps_result.stderr[-500:]}")
-        if deps_result.returncode != 0:
-            context.log.error(f"dbt deps FAILED with code {deps_result.returncode}")
-        else:
-            context.log.info("dbt deps completed successfully")
+        # Try using dbt Python API directly for better error handling
+        context.log.info("Attempting to run dbt via Python API...")
+        try:
+            from dbt.cli.main import dbtRunner, dbtRunnerResult
+            dbt_runner = dbtRunner()
+
+            # First run deps
+            context.log.info("Running dbt deps via Python API...")
+            os.chdir(dbt_project_dir)
+            deps_result: dbtRunnerResult = dbt_runner.invoke(['deps', '--profiles-dir', dbt_project_dir])
+            context.log.info(f"dbt deps success: {deps_result.success}")
+            if deps_result.exception:
+                context.log.error(f"dbt deps exception: {deps_result.exception}")
+                import traceback
+                context.log.error(f"Traceback: {''.join(traceback.format_exception(type(deps_result.exception), deps_result.exception, deps_result.exception.__traceback__))}")
+
             # Check if dbt_packages was created
             dbt_packages_dir = os.path.join(dbt_project_dir, 'dbt_packages')
             context.log.info(f"dbt_packages exists after deps: {os.path.exists(dbt_packages_dir)}")
+            if os.path.exists(dbt_packages_dir):
+                context.log.info(f"dbt_packages contents: {os.listdir(dbt_packages_dir)}")
 
-        # Build dbt run command with debug flag
-        context.log.info(f"Using dbt command: {dbt_cmd if os.path.exists(dbt_cmd) else 'python -m dbt.cli.main'}")
-        if not os.path.exists(dbt_cmd):
-            run_cmd = [sys.executable, '-m', 'dbt.cli.main', 'run']
-        else:
-            run_cmd = [dbt_cmd, 'run']
+            # Run dbt models
+            context.log.info("Running dbt run via Python API...")
+            run_result: dbtRunnerResult = dbt_runner.invoke(['run', '--profiles-dir', dbt_project_dir, '--target', 'prod'])
+            context.log.info(f"dbt run success: {run_result.success}")
+            if run_result.exception:
+                context.log.error(f"dbt run exception: {run_result.exception}")
+                import traceback
+                context.log.error(f"Traceback: {''.join(traceback.format_exception(type(run_result.exception), run_result.exception, run_result.exception.__traceback__))}")
 
-        run_cmd.extend([
-            '--project-dir', dbt_project_dir,
-            '--profiles-dir', dbt_project_dir,
-            '--target', 'prod',
-            '--debug',  # Add debug flag for more output
-        ])
-        context.log.info(f"Running dbt with command: {' '.join(run_cmd)}")
+            if run_result.success:
+                context.log.info("dbt run completado exitosamente via Python API")
+                return Output(
+                    value={'status': 'success', 'method': 'python_api'},
+                    metadata={'status': MetadataValue.text('SUCCESS')}
+                )
+            else:
+                # dbt failed but we got here, so it's a model error not a crash
+                error_msg = str(run_result.exception) if run_result.exception else "dbt run failed without exception"
+                context.log.error(f"dbt run failed: {error_msg}")
+                send_alert(
+                    title="dbt transformation failed",
+                    message=f"dbt run failed: {error_msg[:200]}",
+                    severity=AlertSeverity.ERROR,
+                    details={'error': error_msg[:500]},
+                )
+                return Output(
+                    value={'status': 'error', 'error': error_msg},
+                    metadata={'status': MetadataValue.text('ERROR')}
+                )
+
+        except ImportError as e:
+            context.log.warning(f"dbt Python API not available: {e}, falling back to subprocess")
+            # Fall back to subprocess method
+            pass
+        except Exception as e:
+            context.log.error(f"dbt Python API failed: {e}")
+            import traceback
+            context.log.error(f"Full traceback: {traceback.format_exc()}")
+            # Don't fall back, report the error
+            send_alert(
+                title="dbt transformation failed",
+                message=f"Python API error: {str(e)[:200]}",
+                severity=AlertSeverity.ERROR,
+                details={'error': str(e)[:500], 'traceback': traceback.format_exc()[-500:]},
+            )
+            return Output(
+                value={'status': 'error', 'error': str(e), 'traceback': traceback.format_exc()},
+                metadata={'status': MetadataValue.text('ERROR')}
+            )
+
+        # Fallback to subprocess only if Python API import fails
+        context.log.info("Falling back to subprocess method...")
+        dbt_base_cmd = [dbt_cmd] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main']
+        run_cmd = dbt_base_cmd + ['run', '--project-dir', dbt_project_dir, '--profiles-dir', dbt_project_dir, '--target', 'prod']
+        context.log.info(f"Running: {' '.join(run_cmd)}")
 
         result = subprocess.run(
             run_cmd,
             capture_output=True,
             text=True,
-            timeout=600,  # 10 minutos
+            timeout=600,
             env=dbt_env,
             cwd=dbt_project_dir,
         )
