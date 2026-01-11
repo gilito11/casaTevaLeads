@@ -557,6 +557,22 @@ def dbt_transform(
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     dbt_project_dir = os.path.join(project_root, 'dbt_project')
 
+    # Debug: Log paths and check if they exist
+    context.log.info(f"DEBUG: __file__ = {os.path.abspath(__file__)}")
+    context.log.info(f"DEBUG: project_root = {project_root}")
+    context.log.info(f"DEBUG: dbt_project_dir = {dbt_project_dir}")
+    context.log.info(f"DEBUG: dbt_project_dir exists = {os.path.exists(dbt_project_dir)}")
+
+    # Check for dbt_project.yml and profiles.yml
+    dbt_project_yml = os.path.join(dbt_project_dir, 'dbt_project.yml')
+    profiles_yml = os.path.join(dbt_project_dir, 'profiles.yml')
+    context.log.info(f"DEBUG: dbt_project.yml exists = {os.path.exists(dbt_project_yml)}")
+    context.log.info(f"DEBUG: profiles.yml exists = {os.path.exists(profiles_yml)}")
+
+    # List directory contents if it exists
+    if os.path.exists(dbt_project_dir):
+        context.log.info(f"DEBUG: Contents of dbt_project_dir: {os.listdir(dbt_project_dir)[:10]}")
+
     try:
         # Find dbt command - try multiple locations
         import shutil
@@ -564,6 +580,22 @@ def dbt_transform(
         if not dbt_cmd:
             # Fallback to same directory as python executable
             dbt_cmd = os.path.join(os.path.dirname(sys.executable), 'dbt')
+
+        context.log.info(f"DEBUG: dbt_cmd = {dbt_cmd}, exists = {os.path.exists(dbt_cmd) if dbt_cmd else False}")
+
+        # First test dbt --version to see if it runs at all
+        version_result = subprocess.run(
+            [dbt_cmd, '--version'] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=dbt_env,
+        )
+        context.log.info(f"DEBUG: dbt --version returncode={version_result.returncode}")
+        context.log.info(f"DEBUG: dbt --version stdout={version_result.stdout[:200] if version_result.stdout else 'none'}")
+        if version_result.returncode != 0:
+            context.log.error(f"DEBUG: dbt --version stderr={version_result.stderr[:500] if version_result.stderr else 'none'}")
+
         if not os.path.exists(dbt_cmd):
             # Last resort: use python -m dbt.cli.main
             context.log.info("Using python -m dbt.cli.main as fallback")
