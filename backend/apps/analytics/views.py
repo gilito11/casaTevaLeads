@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import unicodedata
@@ -296,17 +297,17 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    zona_geografica as zona_clasificada,
+                    zona_clasificada as zona_clasificada,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
                     COALESCE(AVG(CASE WHEN superficie_m2 > 0 THEN precio / superficie_m2 ELSE NULL END), 0) as precio_m2_medio,
                     COUNT(*) as total_inmuebles
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
-                  AND zona_geografica IS NOT NULL
-                  AND zona_geografica != ''
+                  AND zona_clasificada IS NOT NULL
+                  AND zona_clasificada != ''
                   AND precio > 0
-                GROUP BY zona_geografica
+                GROUP BY zona_clasificada
                 ORDER BY total_inmuebles DESC
                 LIMIT 15
             """, [tenant_id])
@@ -323,14 +324,14 @@ def analytics_dashboard_view(request):
         try:
             cursor.execute("""
                 SELECT
-                    COALESCE(tipo_inmueble, 'Sin especificar') as tipo_propiedad,
+                    COALESCE(tipo_propiedad, 'Sin especificar') as tipo_propiedad,
                     COUNT(*) as total,
                     ROUND(100.0 * COUNT(*) / GREATEST((SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1), 1) as porcentaje,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(AVG(CASE WHEN superficie_m2 > 0 THEN precio / superficie_m2 ELSE NULL END), 0) as precio_m2_medio
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
-                GROUP BY tipo_inmueble
+                GROUP BY tipo_propiedad
                 ORDER BY total DESC
             """, [tenant_id, tenant_id])
             rows = dict_fetchall(cursor)
@@ -357,14 +358,14 @@ def map_view(request):
     """Vista del mapa de leads por zona geográfica."""
     tenant_id = request.session.get('tenant_id', 1)
 
-    # Get leads grouped by zona_geografica
+    # Get leads grouped by zona_clasificada
     zones_data = []
 
     with connection.cursor() as cursor:
         try:
             cursor.execute("""
                 SELECT
-                    zona_geografica,
+                    zona_clasificada,
                     COUNT(*) as total_leads,
                     COUNT(*) FILTER (WHERE precio > 0) as con_precio,
                     COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio,
@@ -372,15 +373,15 @@ def map_view(request):
                     COALESCE(MAX(precio) FILTER (WHERE precio > 0), 0) as precio_max
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
-                  AND zona_geografica IS NOT NULL
-                  AND zona_geografica != ''
-                GROUP BY zona_geografica
+                  AND zona_clasificada IS NOT NULL
+                  AND zona_clasificada != ''
+                GROUP BY zona_clasificada
                 ORDER BY total_leads DESC
             """, [tenant_id])
             rows = dict_fetchall(cursor)
 
             for row in rows:
-                zona_nombre = row['zona_geografica']
+                zona_nombre = row['zona_clasificada']
 
                 # Try to find coordinates using improved matching
                 coords = find_zone_coords(zona_nombre)
@@ -439,23 +440,23 @@ def map_data_api(request):
         try:
             cursor.execute("""
                 SELECT
-                    zona_geografica,
+                    zona_clasificada,
                     source_portal as portal,
                     COUNT(*) as total_leads,
                     COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
-                  AND zona_geografica IS NOT NULL
-                  AND zona_geografica != ''
-                GROUP BY zona_geografica, source_portal
-                ORDER BY zona_geografica, total_leads DESC
+                  AND zona_clasificada IS NOT NULL
+                  AND zona_clasificada != ''
+                GROUP BY zona_clasificada, source_portal
+                ORDER BY zona_clasificada, total_leads DESC
             """, [tenant_id])
             rows = dict_fetchall(cursor)
 
             # Group by zone
             zones_dict = {}
             for row in rows:
-                zona = row['zona_geografica']
+                zona = row['zona_clasificada']
                 if zona not in zones_dict:
                     zones_dict[zona] = {
                         'nombre': zona,

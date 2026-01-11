@@ -5,7 +5,7 @@ All endpoints support the following query parameters:
 - fecha_inicio: Start date (YYYY-MM-DD)
 - fecha_fin: End date (YYYY-MM-DD)
 - portal: Filter by source portal (pisos, habitaclia, fotocasa, milanuncios, idealista)
-- zona: Filter by zona_geografica
+- zona: Filter by zona_clasificada
 - estado: Filter by lead estado
 """
 from django.http import JsonResponse
@@ -66,7 +66,7 @@ def build_where_clause(request, table_alias='l'):
     # Zone filter
     zona = request.GET.get('zona')
     if zona and zona != 'todas':
-        conditions.append(f"{table_alias}.zona_geografica = %s")
+        conditions.append(f"{table_alias}.zona_clasificada = %s")
         params.append(zona)
 
     # Estado filter (requires join with lead_estado)
@@ -327,7 +327,7 @@ def api_precios_por_zona(request):
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                l.zona_geografica,
+                l.zona_clasificada,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l.precio), 0) as precio_mediana,
                 COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio,
@@ -336,11 +336,11 @@ def api_precios_por_zona(request):
                 COALESCE(MAX(l.precio), 0) as precio_max
             FROM public_marts.dim_leads l
             WHERE {where_clause}
-              AND l.zona_geografica IS NOT NULL
-              AND l.zona_geografica != ''
-              AND l.zona_geografica != 'Otros'
+              AND l.zona_clasificada IS NOT NULL
+              AND l.zona_clasificada != ''
+              AND l.zona_clasificada != 'Otros'
               AND l.precio > 0
-            GROUP BY l.zona_geografica
+            GROUP BY l.zona_clasificada
             ORDER BY total_inmuebles DESC
             LIMIT 20
         """, params)
@@ -363,7 +363,7 @@ def api_tipologia(request):
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                COALESCE(l.tipo_inmueble, 'Sin especificar') as tipo_inmueble,
+                COALESCE(l.tipo_propiedad, 'Sin especificar') as tipo_propiedad,
                 COUNT(*) as total,
                 ROUND(100.0 * COUNT(*) / GREATEST(
                     (SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1
@@ -372,7 +372,7 @@ def api_tipologia(request):
                 COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio
             FROM public_marts.dim_leads l
             WHERE {where_clause}
-            GROUP BY l.tipo_inmueble
+            GROUP BY l.tipo_propiedad
             ORDER BY total DESC
         """, [tenant_id] + params)
 
@@ -402,13 +402,13 @@ def api_filter_options(request):
 
         # Get distinct zones
         cursor.execute("""
-            SELECT DISTINCT zona_geografica
+            SELECT DISTINCT zona_clasificada
             FROM public_marts.dim_leads
             WHERE tenant_id = %s
-              AND zona_geografica IS NOT NULL
-              AND zona_geografica != ''
-              AND zona_geografica != 'Otros'
-            ORDER BY zona_geografica
+              AND zona_clasificada IS NOT NULL
+              AND zona_clasificada != ''
+              AND zona_clasificada != 'Otros'
+            ORDER BY zona_clasificada
         """, [tenant_id])
         zonas = [row[0] for row in cursor.fetchall()]
 
@@ -453,8 +453,8 @@ def api_export_csv(request):
                 l.email,
                 l.nombre,
                 l.source_portal as portal,
-                l.zona_geografica,
-                l.tipo_inmueble,
+                l.zona_clasificada,
+                l.tipo_propiedad,
                 l.precio,
                 l.superficie_m2 as metros,
                 l.habitaciones,
