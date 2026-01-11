@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 10 January 2026 (Production reliability improvements)
+> **Last Updated**: 11 January 2026 (Analytics SQL column name fixes)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -135,6 +135,22 @@ raw.raw_listings (JSONB) -> public_staging.stg_* -> public_marts.dim_leads
 ### Django Lead model
 El modelo Lead apunta a `public_marts.dim_leads` (vista de solo lectura de dbt).
 Los estados CRM se guardan en `leads_lead_estado` (tabla gestionada por Django).
+
+### Column Name Mapping (Django → dbt)
+**IMPORTANTE**: En raw SQL queries usar nombres de columna dbt, no Django:
+
+| Django Field | dbt Column | Uso |
+|--------------|------------|-----|
+| `updated_at` | `ultima_actualizacion` | Fecha última actualización |
+| `fecha_scraping` | `fecha_primera_captura` | Fecha primer scrape |
+| `portal` | `source_portal` | Portal de origen |
+| `url_anuncio` | `listing_url` | URL del anuncio |
+| `metros` | `superficie_m2` | Superficie en m² |
+| `nombre` | `nombre_contacto` | Nombre del contacto |
+| `direccion` | `ubicacion` | Ubicación/dirección |
+| `zona_geografica` | `zona_clasificada` | Zona geográfica |
+| `tipo_inmueble` | `tipo_propiedad` | Tipo de propiedad |
+| `anuncio_id` | `source_listing_id` | ID original del anuncio |
 
 ### Ejecutar dbt
 ```bash
