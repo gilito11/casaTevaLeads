@@ -557,218 +557,56 @@ def dbt_transform(
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     dbt_project_dir = os.path.join(project_root, 'dbt_project')
 
-    # Debug: Log paths and check if they exist
-    context.log.info(f"DEBUG: __file__ = {os.path.abspath(__file__)}")
-    context.log.info(f"DEBUG: project_root = {project_root}")
-    context.log.info(f"DEBUG: dbt_project_dir = {dbt_project_dir}")
-    context.log.info(f"DEBUG: dbt_project_dir exists = {os.path.exists(dbt_project_dir)}")
-
-    # Check for dbt_project.yml and profiles.yml
-    dbt_project_yml = os.path.join(dbt_project_dir, 'dbt_project.yml')
-    profiles_yml = os.path.join(dbt_project_dir, 'profiles.yml')
-    context.log.info(f"DEBUG: dbt_project.yml exists = {os.path.exists(dbt_project_yml)}")
-    context.log.info(f"DEBUG: profiles.yml exists = {os.path.exists(profiles_yml)}")
-
-    # List directory contents if it exists
-    if os.path.exists(dbt_project_dir):
-        context.log.info(f"DEBUG: Contents of dbt_project_dir: {os.listdir(dbt_project_dir)[:10]}")
-
     try:
-        # Find dbt command - try multiple locations
-        import shutil
-        dbt_cmd = shutil.which('dbt')
-        if not dbt_cmd:
-            # Fallback to same directory as python executable
-            dbt_cmd = os.path.join(os.path.dirname(sys.executable), 'dbt')
+        # Use dbt Python API for better error handling
+        from dbt.cli.main import dbtRunner, dbtRunnerResult
+        dbt_runner = dbtRunner()
 
-        context.log.info(f"DEBUG: dbt_cmd = {dbt_cmd}, exists = {os.path.exists(dbt_cmd) if dbt_cmd else False}")
+        os.chdir(dbt_project_dir)
+        context.log.info("Ejecutando dbt run...")
+        run_result: dbtRunnerResult = dbt_runner.invoke(['run', '--profiles-dir', dbt_project_dir, '--target', 'prod'])
 
-        # Test dbt import and check versions
-        context.log.info("Testing dbt Python import...")
-        try:
-            import dbt
-            import dbt.version
-            context.log.info(f"dbt version: {dbt.version.get_installed_version()}")
-        except Exception as e:
-            context.log.error(f"dbt import failed: {e}")
-            import traceback
-            context.log.error(f"Traceback: {traceback.format_exc()}")
-
-        # Check protobuf version
-        try:
-            import google.protobuf
-            context.log.info(f"protobuf version: {google.protobuf.__version__}")
-        except Exception as e:
-            context.log.error(f"protobuf import failed: {e}")
-
-        # First test dbt --version to see if it runs at all
-        version_result = subprocess.run(
-            [dbt_cmd, '--version'] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main', '--version'],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=dbt_env,
-        )
-        context.log.info(f"DEBUG: dbt --version returncode={version_result.returncode}")
-        context.log.info(f"DEBUG: dbt --version stdout={version_result.stdout[:200] if version_result.stdout else 'none'}")
-        if version_result.returncode != 0:
-            context.log.error(f"DEBUG: dbt --version stderr={version_result.stderr[:500] if version_result.stderr else 'none'}")
-
-        # Try using dbt Python API directly for better error handling
-        context.log.info("Attempting to run dbt via Python API...")
-        try:
-            from dbt.cli.main import dbtRunner, dbtRunnerResult
-            dbt_runner = dbtRunner()
-
-            # First run deps
-            context.log.info("Running dbt deps via Python API...")
-            os.chdir(dbt_project_dir)
-            deps_result: dbtRunnerResult = dbt_runner.invoke(['deps', '--profiles-dir', dbt_project_dir])
-            context.log.info(f"dbt deps success: {deps_result.success}")
-            if deps_result.exception:
-                context.log.error(f"dbt deps exception: {deps_result.exception}")
-                import traceback
-                context.log.error(f"Traceback: {''.join(traceback.format_exception(type(deps_result.exception), deps_result.exception, deps_result.exception.__traceback__))}")
-
-            # Check if dbt_packages was created
-            dbt_packages_dir = os.path.join(dbt_project_dir, 'dbt_packages')
-            context.log.info(f"dbt_packages exists after deps: {os.path.exists(dbt_packages_dir)}")
-            if os.path.exists(dbt_packages_dir):
-                context.log.info(f"dbt_packages contents: {os.listdir(dbt_packages_dir)}")
-
-            # Run dbt models
-            context.log.info("Running dbt run via Python API...")
-            run_result: dbtRunnerResult = dbt_runner.invoke(['run', '--profiles-dir', dbt_project_dir, '--target', 'prod'])
-            context.log.info(f"dbt run success: {run_result.success}")
-            if run_result.exception:
-                context.log.error(f"dbt run exception: {run_result.exception}")
-                import traceback
-                context.log.error(f"Traceback: {''.join(traceback.format_exception(type(run_result.exception), run_result.exception, run_result.exception.__traceback__))}")
-
-            if run_result.success:
-                context.log.info("dbt run completado exitosamente via Python API")
-                return Output(
-                    value={'status': 'success', 'method': 'python_api'},
-                    metadata={'status': MetadataValue.text('SUCCESS')}
-                )
-            else:
-                # dbt failed but we got here, so it's a model error not a crash
-                error_msg = str(run_result.exception) if run_result.exception else "dbt run failed without exception"
-                context.log.error(f"dbt run failed: {error_msg}")
-                send_alert(
-                    title="dbt transformation failed",
-                    message=f"dbt run failed: {error_msg[:200]}",
-                    severity=AlertSeverity.ERROR,
-                    details={'error': error_msg[:500]},
-                )
-                return Output(
-                    value={'status': 'error', 'error': error_msg},
-                    metadata={'status': MetadataValue.text('ERROR')}
-                )
-
-        except ImportError as e:
-            context.log.warning(f"dbt Python API not available: {e}, falling back to subprocess")
-            # Fall back to subprocess method
-            pass
-        except Exception as e:
-            context.log.error(f"dbt Python API failed: {e}")
-            import traceback
-            context.log.error(f"Full traceback: {traceback.format_exc()}")
-            # Don't fall back, report the error
+        if run_result.success:
+            context.log.info("dbt run completado exitosamente")
+            return Output(
+                value={'status': 'success'},
+                metadata={'status': MetadataValue.text('SUCCESS')}
+            )
+        else:
+            error_msg = str(run_result.exception) if run_result.exception else "dbt run failed"
+            context.log.error(f"dbt run failed: {error_msg}")
             send_alert(
                 title="dbt transformation failed",
-                message=f"Python API error: {str(e)[:200]}",
+                message=f"dbt run failed: {error_msg[:200]}",
                 severity=AlertSeverity.ERROR,
-                details={'error': str(e)[:500], 'traceback': traceback.format_exc()[-500:]},
+                details={'error': error_msg[:500]},
             )
             return Output(
-                value={'status': 'error', 'error': str(e), 'traceback': traceback.format_exc()},
+                value={'status': 'error', 'error': error_msg},
                 metadata={'status': MetadataValue.text('ERROR')}
             )
 
-        # Fallback to subprocess only if Python API import fails
-        context.log.info("Falling back to subprocess method...")
-        dbt_base_cmd = [dbt_cmd] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main']
-        run_cmd = dbt_base_cmd + ['run', '--project-dir', dbt_project_dir, '--profiles-dir', dbt_project_dir, '--target', 'prod']
-        context.log.info(f"Running: {' '.join(run_cmd)}")
-
-        result = subprocess.run(
-            run_cmd,
-            capture_output=True,
-            text=True,
-            timeout=600,
-            env=dbt_env,
-            cwd=dbt_project_dir,
-        )
-
-        if result.returncode != 0:
-            # Log both stderr and stdout as dbt may write errors to stdout
-            error_output = result.stderr[-1000:] if result.stderr else ''
-            stdout_output = result.stdout[-1000:] if result.stdout else ''
-            context.log.error(f"dbt run falló (returncode={result.returncode})")
-            context.log.error(f"STDERR: {error_output}")
-            context.log.error(f"STDOUT: {stdout_output}")
-            send_alert(
-                title="dbt transformation failed",
-                message=f"dbt run failed with returncode {result.returncode}",
-                severity=AlertSeverity.ERROR,
-                details={
-                    'error': error_output[-300:] if error_output else 'No stderr',
-                    'stdout': stdout_output[-300:] if stdout_output else 'No stdout',
-                },
-            )
-            return Output(
-                value={
-                    'status': 'error',
-                    'error': error_output,
-                    'stdout': stdout_output,
-                },
-                metadata={
-                    'status': MetadataValue.text('ERROR'),
-                }
-            )
-
-        context.log.info("dbt run completado exitosamente")
-        context.log.info(result.stdout[-1000:] if result.stdout else "No output")
-
-        return Output(
-            value={
-                'status': 'success',
-                'output': result.stdout[-1000:] if result.stdout else '',
-            },
-            metadata={
-                'status': MetadataValue.text('SUCCESS'),
-            }
-        )
-
-    except subprocess.TimeoutExpired:
-        context.log.error("dbt run excedió el timeout")
-        send_alert(
-            title="dbt transformation timeout",
-            message="dbt run exceeded 10 minute timeout",
-            severity=AlertSeverity.ERROR,
-        )
-        return Output(
-            value={'status': 'timeout'},
-            metadata={'status': MetadataValue.text('TIMEOUT')}
-        )
     except Exception as e:
-        context.log.error(f"Error ejecutando dbt: {e}")
+        import traceback
+        error_msg = str(e)
+        context.log.error(f"dbt run failed: {error_msg}")
+        context.log.error(f"Traceback: {traceback.format_exc()}")
         send_alert(
-            title="dbt transformation error",
-            message=str(e),
+            title="dbt transformation failed",
+            message=f"dbt error: {error_msg[:200]}",
             severity=AlertSeverity.ERROR,
+            details={'error': error_msg[:500]},
         )
         return Output(
-            value={'status': 'error', 'error': str(e)},
+            value={'status': 'error', 'error': error_msg},
             metadata={'status': MetadataValue.text('ERROR')}
         )
 
 
 @asset(
-    description="Estadísticas del último scraping",
+    description="Estadísticas de scraping para monitoreo",
     compute_kind="python",
-    group_name="reporting",
+    group_name="monitoring",
     deps=["dbt_transform"],
 )
 def scraping_stats(
@@ -776,20 +614,61 @@ def scraping_stats(
     postgres: PostgresResource,
 ) -> Output[Dict[str, Any]]:
     """
-    Genera estadísticas después del scraping.
+    Genera estadísticas del último scraping para monitoreo.
     """
     context.log.info("Generando estadísticas de scraping...")
 
-    stats = postgres.get_scraping_stats()
+    stats = {
+        'timestamp': datetime.now().isoformat(),
+        'leads_by_portal': {},
+        'leads_by_zone': {},
+        'total_leads': 0,
+        'new_leads_today': 0,
+    }
 
-    context.log.info(f"Total leads en BD: {stats['total_leads']}")
-    context.log.info(f"Último scraping: {stats['ultimo_scraping']}")
+    try:
+        with postgres.get_connection() as conn:
+            with conn.cursor() as cur:
+                # Total leads by portal
+                cur.execute("""
+                    SELECT source_portal, COUNT(*)
+                    FROM public_marts.dim_leads
+                    GROUP BY source_portal
+                """)
+                for row in cur.fetchall():
+                    stats['leads_by_portal'][row[0]] = row[1]
+                    stats['total_leads'] += row[1]
+
+                # Total leads by zone
+                cur.execute("""
+                    SELECT zona_clasificada, COUNT(*)
+                    FROM public_marts.dim_leads
+                    GROUP BY zona_clasificada
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 10
+                """)
+                for row in cur.fetchall():
+                    stats['leads_by_zone'][row[0]] = row[1]
+
+                # New leads today
+                cur.execute("""
+                    SELECT COUNT(*)
+                    FROM public_marts.dim_leads
+                    WHERE created_at >= CURRENT_DATE
+                """)
+                stats['new_leads_today'] = cur.fetchone()[0]
+
+    except Exception as e:
+        context.log.error(f"Error generando estadísticas: {e}")
+        stats['error'] = str(e)
+
+    context.log.info(f"Estadísticas: {stats['total_leads']} leads totales, {stats['new_leads_today']} nuevos hoy")
 
     return Output(
         value=stats,
         metadata={
             'total_leads': MetadataValue.int(stats['total_leads']),
-            'portales_activos': MetadataValue.int(stats['portales_activos']),
-            'ultimo_scraping': MetadataValue.text(stats['ultimo_scraping'] or 'N/A'),
+            'new_leads_today': MetadataValue.int(stats['new_leads_today']),
+            'leads_by_portal': MetadataValue.json(stats['leads_by_portal']),
         }
     )
