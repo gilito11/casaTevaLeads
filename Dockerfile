@@ -114,6 +114,9 @@ COPY --chown=casateva:casateva dagster/dagster.yaml /opt/dagster/dagster_home/
 # Cambiar a usuario no-root
 USER casateva
 
+# Pre-install dbt packages during build (as casateva user)
+RUN cd /app/dbt_project && dbt deps --profiles-dir . && echo "dbt deps installed successfully" || echo "dbt deps warning (will retry at runtime)"
+
 # Descargar browser de Camoufox como usuario casateva
 # (IMPORTANTE: debe ejecutarse como casateva para que guarde en ~/.cache/camoufox/)
 RUN camoufox fetch
