@@ -558,9 +558,11 @@ def dbt_transform(
     dbt_project_dir = os.path.join(project_root, 'dbt_project')
 
     try:
+        # Use dbt CLI directly instead of python -m dbt (fixes dbt 1.8+ compatibility)
+        dbt_cmd = os.path.join(os.path.dirname(sys.executable), 'dbt')
         result = subprocess.run(
             [
-                sys.executable, '-m', 'dbt', 'run',
+                dbt_cmd, 'run',
                 '--project-dir', dbt_project_dir,
                 '--profiles-dir', dbt_project_dir,
                 '--target', 'prod',
