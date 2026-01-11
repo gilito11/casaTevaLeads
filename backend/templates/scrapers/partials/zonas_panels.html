@@ -31,10 +31,36 @@
                                 </select>
                             </span>
                             <span class="text-gray-400">|</span>
-                            {% if zona.scrapear_milanuncios %}MA{% endif %}
-                            {% if zona.scrapear_fotocasa %}FC{% endif %}
-                            {% if zona.scrapear_habitaclia %}HA{% endif %}
-                            {% if zona.scrapear_idealista %}ID{% endif %}
+                            <span class="flex gap-1">
+                                <button hx-post="{% url 'toggle_zona_portal' zona.id 'milanuncios' %}"
+                                        hx-target="#zonas-panels-container"
+                                        hx-swap="outerHTML"
+                                        class="px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer transition-colors
+                                        {% if zona.scrapear_milanuncios %}bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300{% else %}bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500{% endif %}">
+                                    MA
+                                </button>
+                                <button hx-post="{% url 'toggle_zona_portal' zona.id 'fotocasa' %}"
+                                        hx-target="#zonas-panels-container"
+                                        hx-swap="outerHTML"
+                                        class="px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer transition-colors
+                                        {% if zona.scrapear_fotocasa %}bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300{% else %}bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500{% endif %}">
+                                    FC
+                                </button>
+                                <button hx-post="{% url 'toggle_zona_portal' zona.id 'habitaclia' %}"
+                                        hx-target="#zonas-panels-container"
+                                        hx-swap="outerHTML"
+                                        class="px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer transition-colors
+                                        {% if zona.scrapear_habitaclia %}bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300{% else %}bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500{% endif %}">
+                                    HA
+                                </button>
+                                <button hx-post="{% url 'toggle_zona_portal' zona.id 'idealista' %}"
+                                        hx-target="#zonas-panels-container"
+                                        hx-swap="outerHTML"
+                                        class="px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer transition-colors
+                                        {% if zona.scrapear_idealista %}bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300{% else %}bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500{% endif %}">
+                                    ID
+                                </button>
+                            </span>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">

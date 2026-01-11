@@ -25,7 +25,7 @@ from core.views import (
     scrapers_view, add_zona_view, remove_zona_view, run_scraper_view, scraper_status_view,
     run_all_scrapers_view, scraper_status_partial_view,
     run_botasaurus_view, scraping_jobs_partial_view, scraping_job_detail_view,
-    clear_scraping_jobs_view, update_zona_radio_view
+    clear_scraping_jobs_view, update_zona_radio_view, toggle_zona_portal_view
 )
 
 
@@ -70,6 +70,7 @@ urlpatterns = [
     path('scrapers/add-zona/', add_zona_view, name='add_zona'),
     path('scrapers/remove-zona/<int:zona_id>/', remove_zona_view, name='remove_zona'),
     path('scrapers/zona/<int:zona_id>/radio/', update_zona_radio_view, name='update_zona_radio'),
+    path('scrapers/zona/<int:zona_id>/portal/<str:portal>/', toggle_zona_portal_view, name='toggle_zona_portal'),
     path('scrapers/run/', run_scraper_view, name='run_scraper'),
     path('scrapers/run-all/', run_all_scrapers_view, name='run_all_scrapers'),
     path('scrapers/status/', scraper_status_view, name='scraper_status'),

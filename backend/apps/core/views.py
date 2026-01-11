@@ -832,3 +832,58 @@ def update_zona_radio_view(request, zona_id):
     # HTMX swap=none, just return 200
     from django.http import HttpResponse
     return HttpResponse(status=200)
+
+
+@login_required
+def toggle_zona_portal_view(request, zona_id, portal):
+    """Toggle un portal para una zona (HTMX)."""
+    from django.http import HttpResponse
+
+    portales_validos = ['milanuncios', 'fotocasa', 'habitaclia', 'idealista']
+    if portal not in portales_validos:
+        return HttpResponse(status=400)
+
+    if request.method == 'POST':
+        tenant_id = request.session.get('tenant_id')
+        if tenant_id:
+            zona = get_object_or_404(ZonaGeografica, id=zona_id, tenant_id=tenant_id)
+            campo = f'scrapear_{portal}'
+            valor_actual = getattr(zona, campo)
+            setattr(zona, campo, not valor_actual)
+            zona.save(update_fields=[campo])
+
+            # Devolver el partial actualizado
+            return _render_zonas_panels(request, tenant_id)
+
+    return HttpResponse(status=400)
+
+
+def _render_zonas_panels(request, tenant_id):
+    """Helper para renderizar el partial de zonas."""
+    from core.models import ZONAS_PREESTABLECIDAS, REGIONES_ZONAS
+
+    zonas = ZonaGeografica.objects.filter(tenant_id=tenant_id, activa=True).order_by('nombre')
+    zonas_activas_slugs = set(zonas.values_list('slug', flat=True))
+
+    zonas_por_region = []
+    for region_nombre, zona_slugs in REGIONES_ZONAS.items():
+        zonas_region = []
+        for slug in zona_slugs:
+            if slug in ZONAS_PREESTABLECIDAS:
+                zona_data = ZONAS_PREESTABLECIDAS[slug]
+                zonas_region.append({
+                    'slug': slug,
+                    'nombre': zona_data['nombre'],
+                    'radio_default': zona_data.get('radio_default', 20),
+                    'activa': slug in zonas_activas_slugs
+                })
+        if zonas_region:
+            zonas_por_region.append({
+                'nombre': region_nombre,
+                'zonas': zonas_region
+            })
+
+    return render(request, 'scrapers/partials/zonas_panels.html', {
+        'zonas': zonas,
+        'zonas_por_region': zonas_por_region,
+    })
