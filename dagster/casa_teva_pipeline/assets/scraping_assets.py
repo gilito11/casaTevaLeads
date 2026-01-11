@@ -596,6 +596,22 @@ def dbt_transform(
         if version_result.returncode != 0:
             context.log.error(f"DEBUG: dbt --version stderr={version_result.stderr[:500] if version_result.stderr else 'none'}")
 
+        # Run dbt deps first to install packages (required for dbt_utils macros)
+        dbt_base_cmd = [dbt_cmd] if os.path.exists(dbt_cmd) else [sys.executable, '-m', 'dbt.cli.main']
+        context.log.info("Running dbt deps to install packages...")
+        deps_result = subprocess.run(
+            dbt_base_cmd + ['deps', '--project-dir', dbt_project_dir, '--profiles-dir', dbt_project_dir],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=dbt_env,
+            cwd=dbt_project_dir,
+        )
+        if deps_result.returncode != 0:
+            context.log.warning(f"dbt deps warning: {deps_result.stderr[:500] if deps_result.stderr else deps_result.stdout[:500]}")
+        else:
+            context.log.info("dbt deps completed successfully")
+
         if not os.path.exists(dbt_cmd):
             # Last resort: use python -m dbt.cli.main
             context.log.info("Using python -m dbt.cli.main as fallback")
