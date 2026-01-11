@@ -558,35 +558,65 @@ def dbt_transform(
     dbt_project_dir = os.path.join(project_root, 'dbt_project')
 
     try:
-        # Use dbt CLI directly instead of python -m dbt (fixes dbt 1.8+ compatibility)
-        dbt_cmd = os.path.join(os.path.dirname(sys.executable), 'dbt')
-        result = subprocess.run(
-            [
-                dbt_cmd, 'run',
-                '--project-dir', dbt_project_dir,
-                '--profiles-dir', dbt_project_dir,
-                '--target', 'prod',
-            ],
-            capture_output=True,
-            text=True,
-            timeout=600,  # 10 minutos
-            env=dbt_env,
-            cwd=dbt_project_dir,
-        )
+        # Find dbt command - try multiple locations
+        import shutil
+        dbt_cmd = shutil.which('dbt')
+        if not dbt_cmd:
+            # Fallback to same directory as python executable
+            dbt_cmd = os.path.join(os.path.dirname(sys.executable), 'dbt')
+        if not os.path.exists(dbt_cmd):
+            # Last resort: use python -m dbt.cli.main
+            context.log.info("Using python -m dbt.cli.main as fallback")
+            result = subprocess.run(
+                [
+                    sys.executable, '-m', 'dbt.cli.main', 'run',
+                    '--project-dir', dbt_project_dir,
+                    '--profiles-dir', dbt_project_dir,
+                    '--target', 'prod',
+                ],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                env=dbt_env,
+                cwd=dbt_project_dir,
+            )
+        else:
+            context.log.info(f"Using dbt command: {dbt_cmd}")
+            result = subprocess.run(
+                [
+                    dbt_cmd, 'run',
+                    '--project-dir', dbt_project_dir,
+                    '--profiles-dir', dbt_project_dir,
+                    '--target', 'prod',
+                ],
+                capture_output=True,
+                text=True,
+                timeout=600,  # 10 minutos
+                env=dbt_env,
+                cwd=dbt_project_dir,
+            )
 
         if result.returncode != 0:
-            context.log.error(f"dbt run falló: {result.stderr[-1000:]}")
+            # Log both stderr and stdout as dbt may write errors to stdout
+            error_output = result.stderr[-1000:] if result.stderr else ''
+            stdout_output = result.stdout[-1000:] if result.stdout else ''
+            context.log.error(f"dbt run falló (returncode={result.returncode})")
+            context.log.error(f"STDERR: {error_output}")
+            context.log.error(f"STDOUT: {stdout_output}")
             send_alert(
                 title="dbt transformation failed",
                 message=f"dbt run failed with returncode {result.returncode}",
                 severity=AlertSeverity.ERROR,
-                details={'error': result.stderr[-300:] if result.stderr else 'No stderr'},
+                details={
+                    'error': error_output[-300:] if error_output else 'No stderr',
+                    'stdout': stdout_output[-300:] if stdout_output else 'No stdout',
+                },
             )
             return Output(
                 value={
                     'status': 'error',
-                    'error': result.stderr[-500:],
-                    'stdout': result.stdout[-500:],
+                    'error': error_output,
+                    'stdout': stdout_output,
                 },
                 metadata={
                     'status': MetadataValue.text('ERROR'),
