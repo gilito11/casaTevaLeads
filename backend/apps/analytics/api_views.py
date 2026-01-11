@@ -51,10 +51,10 @@ def build_where_clause(request, table_alias='l'):
     fecha_fin = request.GET.get('fecha_fin')
 
     if fecha_inicio:
-        conditions.append(f"DATE({table_alias}.updated_at) >= %s")
+        conditions.append(f"DATE({table_alias}.ultima_actualizacion) >= %s")
         params.append(fecha_inicio)
     if fecha_fin:
-        conditions.append(f"DATE({table_alias}.updated_at) <= %s")
+        conditions.append(f"DATE({table_alias}.ultima_actualizacion) <= %s")
         params.append(fecha_fin)
 
     # Portal filter
@@ -122,8 +122,8 @@ def api_kpis(request):
                     ELSE 0 END, 1
                 ) as tasa_conversion,
                 COALESCE(SUM(precio) FILTER (WHERE estado_real NOT IN ('NO_INTERESADO', 'NO_CONTACTAR', 'YA_VENDIDO')), 0) as valor_pipeline,
-                COUNT(*) FILTER (WHERE updated_at >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
-                COUNT(*) FILTER (WHERE updated_at >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes,
+                COUNT(*) FILTER (WHERE ultima_actualizacion >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
+                COUNT(*) FILTER (WHERE ultima_actualizacion >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes,
                 COALESCE(AVG(precio), 0) as precio_medio,
                 COUNT(DISTINCT portal) as portales_activos
             FROM lead_con_estado
@@ -200,7 +200,7 @@ def api_leads_por_dia(request):
 
     # Default to last 30 days if no date range specified
     if not request.GET.get('fecha_inicio'):
-        where_clause += " AND l.updated_at >= CURRENT_DATE - INTERVAL '30 days'"
+        where_clause += " AND l.ultima_actualizacion >= CURRENT_DATE - INTERVAL '30 days'"
 
     with connection.cursor() as cursor:
         estado_join = ""
@@ -212,14 +212,14 @@ def api_leads_por_dia(request):
 
         cursor.execute(f"""
             SELECT
-                DATE(l.updated_at) as fecha,
+                DATE(l.ultima_actualizacion) as fecha,
                 COUNT(*) as leads_captados,
                 COUNT(DISTINCT l.telefono_norm) as leads_unicos,
                 COALESCE(AVG(l.precio), 0) as precio_medio
             FROM public_marts.dim_leads l
             {estado_join}
             WHERE {where_clause} {estado_condition}
-            GROUP BY DATE(l.updated_at)
+            GROUP BY DATE(l.ultima_actualizacion)
             ORDER BY fecha
         """, params)
 
@@ -241,12 +241,12 @@ def api_evolucion_precios(request):
 
     # Default to last 12 weeks if no date range specified
     if not request.GET.get('fecha_inicio'):
-        where_clause += " AND l.updated_at >= CURRENT_DATE - INTERVAL '12 weeks'"
+        where_clause += " AND l.ultima_actualizacion >= CURRENT_DATE - INTERVAL '12 weeks'"
 
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                DATE_TRUNC('week', l.updated_at)::date as semana,
+                DATE_TRUNC('week', l.ultima_actualizacion)::date as semana,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l.precio), 0) as precio_mediana,
                 COALESCE(MIN(l.precio), 0) as min_precio,
@@ -254,7 +254,7 @@ def api_evolucion_precios(request):
                 COUNT(*) as total_inmuebles
             FROM public_marts.dim_leads l
             WHERE {where_clause} AND l.precio > 0
-            GROUP BY DATE_TRUNC('week', l.updated_at)
+            GROUP BY DATE_TRUNC('week', l.ultima_actualizacion)
             ORDER BY semana
         """, params)
 
@@ -459,11 +459,11 @@ def api_export_csv(request):
                 l.metros,
                 l.habitaciones,
                 COALESCE(e.estado, 'NUEVO') as estado,
-                l.updated_at
+                l.ultima_actualizacion
             FROM public_marts.dim_leads l
             {estado_join}
             WHERE {where_clause} {estado_condition}
-            ORDER BY l.updated_at DESC
+            ORDER BY l.ultima_actualizacion DESC
             LIMIT 10000
         """, params)
 
