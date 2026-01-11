@@ -327,8 +327,12 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             return listing
 
         # Check if agency listing (skip if only_particulares)
+        # Look for specific professional/agency markers, NOT generic "inmobiliaria" mentions
         is_agency = bool(re.search(
-            r'class="[^"]*professional[^"]*"|class="[^"]*agency[^"]*"|inmobiliaria',
+            r'class="[^"]*professional-info[^"]*"'  # Agency info section
+            r'|class="[^"]*logo-profesional[^"]*"'  # Agency logo
+            r'|data-seller-type=["\']?professional'  # Seller type attribute
+            r'|class="[^"]*advertiser-name-container[^"]*professional',  # Professional advertiser
             html, re.IGNORECASE
         ))
 
