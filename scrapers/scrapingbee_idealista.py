@@ -345,25 +345,32 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
         listing['es_particular'] = not is_agency
         listing['vendedor'] = 'Particular' if not is_agency else 'Profesional'
 
-        # Extract title
-        title_match = re.search(r'<h1[^>]*class="[^"]*main-info__title[^"]*"[^>]*>([^<]+)</h1>', html)
+        # Extract title - look for span with main-info__title-main class
+        title_match = re.search(
+            r'<span[^>]*class="[^"]*main-info__title-main[^"]*"[^>]*>([^<]+)</span>',
+            html
+        )
         if not title_match:
+            # Fallback to h1
             title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
         if title_match:
             listing['titulo'] = title_match.group(1).strip()
 
-        # Extract description
+        # Extract description - look for adCommentsLanguage div (actual description content)
         desc_match = re.search(
-            r'class="[^"]*comment[^"]*"[^>]*>(.*?)</div>',
+            r'<div[^>]*class="[^"]*adCommentsLanguage[^"]*"[^>]*>(.*?)</div>',
             html, re.DOTALL
         )
         if not desc_match:
+            # Fallback to comment div
             desc_match = re.search(
-                r'class="[^"]*description[^"]*"[^>]*>(.*?)</div>',
+                r'<div[^>]*class="[^"]*comment[^"]*"[^>]*>(.*?)</div>',
                 html, re.DOTALL
             )
         if desc_match:
-            desc_text = re.sub(r'<[^>]+>', '', desc_match.group(1))
+            # Remove HTML tags and clean up
+            desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
+            desc_text = re.sub(r'\s+', ' ', desc_text)  # Normalize whitespace
             listing['descripcion'] = desc_text.strip()[:2000]
 
         # Extract price

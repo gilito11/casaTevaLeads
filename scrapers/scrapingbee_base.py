@@ -50,17 +50,21 @@ def fix_encoding(text: str) -> str:
     """
     Fix common encoding issues in scraped text.
     Handles cases where UTF-8 text was incorrectly decoded as Latin-1.
+    Only applies fix when double-encoding is detected (e.g., Ã¡ instead of á).
     """
     if not text:
         return text
 
     # Try to fix UTF-8 double encoding (most common issue)
+    # Double encoding produces specific patterns like: Ã¡ Ã© Ã­ Ã³ Ãº Ã± Ã€ Ã¨
+    # These are UTF-8 bytes interpreted as Latin-1
     try:
-        # If text contains high bytes, try to fix double-encoding
-        if any(ord(c) > 127 for c in text):
-            # Try to decode as Latin-1 and re-encode as UTF-8
+        # Only try to fix if we see double-encoding markers (Ã followed by certain chars)
+        # This indicates UTF-8 bytes were wrongly decoded as Latin-1
+        double_encode_markers = ['Ã¡', 'Ã©', 'Ã­', 'Ã³', 'Ãº', 'Ã±', 'Ã ', 'Ã¨', 'Ã¬', 'Ã²', 'Ã¹']
+        if any(marker in text for marker in double_encode_markers):
             fixed = text.encode('latin-1', errors='ignore').decode('utf-8', errors='ignore')
-            if fixed and len(fixed) >= len(text) * 0.8:  # Sanity check
+            if fixed and len(fixed) >= len(text) * 0.5:  # Sanity check
                 return fixed
     except (UnicodeDecodeError, UnicodeEncodeError):
         pass
