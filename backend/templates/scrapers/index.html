@@ -12,18 +12,9 @@
                 Configura las zonas y ejecuta los scrapers de portales inmobiliarios
             </p>
         </div>
-        <!-- Scraping automático gestionado por Dagster -->
-        <a href="https://dagster-scrapers.happysky-957a1351.spaincentral.azurecontainerapps.io"
-           target="_blank"
-           class="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors shadow-sm">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-            </svg>
-            Dagster UI
-        </a>
     </div>
 
-    <!-- Info: Scraping gestionado por Dagster -->
+    <!-- Info: Scraping automatico -->
     <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
         <div class="flex items-start space-x-3">
             <svg class="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -31,7 +22,7 @@
             </svg>
             <div>
                 <p class="font-medium text-green-800 dark:text-green-300">Scraping automatico activo</p>
-                <p class="text-sm text-green-700 dark:text-green-400">Dagster ejecuta el scraping automaticamente a las 12:00 y 18:00 (hora Espana). Para ejecutar manualmente o ver logs, accede a Dagster UI.</p>
+                <p class="text-sm text-green-700 dark:text-green-400">El scraping se ejecuta automaticamente a las 12:00 y 18:00 (hora Espana).</p>
             </div>
         </div>
     </div>
@@ -85,11 +76,11 @@
         <h3 class="font-medium text-blue-800 dark:text-blue-400 mb-2">Como usar</h3>
         <ol class="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
             <li>Anade las zonas geograficas que quieres scrapear desde "Zonas Disponibles"</li>
-            <li>Dagster ejecutara el scraping automaticamente segun el horario configurado</li>
+            <li>El scraping se ejecutara automaticamente a las 12:00 y 18:00</li>
             <li>Los leads encontrados apareceran automaticamente en la seccion de Leads</li>
         </ol>
         <p class="mt-3 text-xs text-blue-600 dark:text-blue-400">
-            <strong>Nota:</strong> Para ejecutar scraping manual o ver el estado de los jobs, accede a Dagster UI.
+            <strong>Nota:</strong> Los nuevos leads pueden tardar unos minutos en aparecer tras el scraping.
         </p>
     </div>
 </div>
