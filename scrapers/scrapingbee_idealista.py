@@ -221,11 +221,13 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
         if not zona:
             raise ValueError(f"Zone not found: {zona_key}")
 
-        # Idealista URL format: /venta-viviendas/zona/
-        # Note: Idealista doesn't have a public URL filter for particulares
-        # Agency filtering is done programmatically in _scrape_detail_page()
         url_path = zona['url_path']
-        base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
+
+        # Use Idealista's URL filter for particulares (more reliable than HTML detection)
+        if self.only_particulares:
+            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/con-publicado_solo-particulares/"
+        else:
+            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
 
         if page > 1:
             base_url += f'pagina-{page}.htm'
