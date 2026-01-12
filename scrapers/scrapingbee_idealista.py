@@ -556,8 +556,10 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             self.stats['pages_scraped'] += 1
 
             # Scrape each detail page (skip if already in DB)
+            # Limit to 3 detail pages per search page to avoid timeout
+            # (each detail page takes ~60-120s with stealth proxy)
             skipped = 0
-            for i, listing in enumerate(basic_listings[:10]):  # Limit per page
+            for i, listing in enumerate(basic_listings[:3]):  # Reduced from 10 to avoid timeout
                 url = listing.get('detail_url') or listing.get('url_anuncio')
 
                 # Skip if URL already exists in database
