@@ -482,12 +482,14 @@ def scraping_all_portals(
                 'failed_scrapers': ', '.join(failed_scrapers) if failed_scrapers else 'None',
             },
         )
-    elif total_leads == 0:
+    elif total_leads == 0 and completed < len(all_results):
+        # Only alert if some scrapers failed - 0 leads with all success
+        # usually means duplicates (which is fine, dbt will dedupe)
         send_alert(
             title="Scraping sin resultados",
             message="No se encontraron leads en ningún portal",
             severity=AlertSeverity.WARNING,
-            details={'zonas_activas': len(zones)},
+            details={'zonas_activas': len(zones), 'completed': completed},
         )
     elif total_leads > 0:
         # Only send success alert if configured (optional)
