@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 11 January 2026 (Analytics SQL column name fixes)
+> **Last Updated**: 12 January 2026 (ScrapingBee timeout fix + alert improvements)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -32,6 +32,19 @@ Los scrapers extraen datos de elementos HTML especificos para evitar valores inc
 | idealista | `info-data-price` class | `info-features` section | `info-features` section |
 | milanuncios | JSON-LD / data attributes | Generic (detail page only) | Generic (detail page only) |
 
+### Idealista Particulares (Fixed 11 Jan 2026)
+El scraper de Idealista filtra agencias via patrones HTML especificos:
+- `class="professional-info"` - Seccion info de agencia
+- `class="logo-profesional"` - Logo de agencia
+- `data-seller-type="professional"` - Atributo vendedor
+- **Selectores de extraccion**:
+  - Titulo: `<span class="main-info__title-main">`
+  - Descripcion: `<div class="adCommentsLanguage">`
+
+### Encoding Fix (11 Jan 2026)
+`fix_encoding()` solo corrige texto doblemente codificado (marcadores como `Ã¡`).
+Preserva UTF-8 correcto (ej: `Tàrrega` no se corrompe a `Trrega`).
+
 ### Extraccion de telefonos
 - **Milanuncios/Idealista**: Busqueda en descripcion (regex)
 - **Habitaclia/Fotocasa**: Busqueda de patrones en descripcion del anuncio (regex)
@@ -53,10 +66,14 @@ Los modelos dbt filtran automaticamente anuncios con frases como:
 - **Tarragona**: Tarragona, Reus, Valls, Montblanc
 - **Terres de l'Ebre**: Tortosa, Amposta, Deltebre, L'Ametlla de Mar
 
+**Portales por defecto**: Al agregar una zona, los 4 portales (MA+FC+HA+ID) se habilitan automaticamente.
+
 ### ScrapingBee
 - API Key: configurada en Azure Container Apps y GitHub Secrets
 - Plan: 50eur/mes = 250,000 credits = ~3,333 requests
 - Stealth proxy: GeeTest (Milanuncios), DataDome (Idealista)
+- **Timeout**: 120s por request (aumentado de 60s para stealth proxy)
+- **Idealista detail pages**: 3 por pagina busqueda (reducido de 10 para evitar timeout 45min)
 
 ### Schedule Optimizado (Enero 2026)
 Basado en analisis de 220 anuncios de Milanuncios:
@@ -73,9 +90,10 @@ Basado en analisis de 220 anuncios de Milanuncios:
 ### Alertas Discord (Enero 2026)
 Sistema de alertas via webhook para detectar problemas de scraping:
 - **Variable de entorno**: `ALERT_WEBHOOK_URL`
-- **Deteccion de bloqueos**: Alerta si 0 resultados (posible bloqueo del portal)
+- **Deteccion de bloqueos**: Alerta si 0 resultados Y algun scraper fallo (evita falsos positivos por duplicados)
 - **Deteccion de cambios HTML**: Alerta si >50% de anuncios sin titulo/precio (estructura HTML cambiada)
 - **Reintentos automaticos**: 3 intentos con backoff exponencial antes de alertar
+- **Duracion job**: ~25 min (4 scrapers + dbt)
 
 ### Fiabilidad Produccion (Enero 2026)
 - **Backup PostgreSQL**: 35 dias retencion (Azure)
