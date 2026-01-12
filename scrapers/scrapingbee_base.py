@@ -268,7 +268,7 @@ class ScrapingBeeClient:
             response = requests.get(
                 self.SCRAPINGBEE_ENDPOINT,
                 params=params,
-                timeout=60,
+                timeout=120,  # Increased for stealth proxy (DataDome/GeeTest bypass)
             )
 
             # Track credits used
