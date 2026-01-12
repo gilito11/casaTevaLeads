@@ -222,12 +222,7 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             raise ValueError(f"Zone not found: {zona_key}")
 
         url_path = zona['url_path']
-
-        # Use Idealista's URL filter for particulares (more reliable than HTML detection)
-        if self.only_particulares:
-            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/con-publicado_solo-particulares/"
-        else:
-            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
+        base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
 
         if page > 1:
             base_url += f'pagina-{page}.htm'
@@ -288,10 +283,10 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
             # Pre-detect agency from search results HTML (look for agency markers near the listing)
-            # Search for agency indicators within ~800 chars around the listing URL
+            # Search for agency indicators within ~1000 chars around the listing URL
             url_pos = html.find(path)
             if url_pos > 0:
-                context = html[max(0, url_pos-400):url_pos+800]
+                context = html[max(0, url_pos-500):url_pos+1000]
                 # Expanded agency detection patterns for search results
                 agency_search_patterns = [
                     r'professional-name',
@@ -300,7 +295,12 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
                     r'advertiser-professional',
                     r'professional-logo',
                     r'data-is-professional',
+                    r'profesional',  # Generic match
+                    r'item-highlight.*inmobiliaria',
+                    r'item-highlight.*agencia',
                     r'<span[^>]*class="[^"]*item-highlight-phrase[^"]*"[^>]*>\s*(?:inmobiliaria|agencia)',
+                    r'<img[^>]*class="[^"]*logo[^"]*"',  # Logo image = agency
+                    r'src="[^"]*logo[^"]*inmobiliaria',  # Logo URL
                 ]
                 is_likely_agency = any(re.search(p, context, re.IGNORECASE) for p in agency_search_patterns)
                 if is_likely_agency and self.only_particulares:
@@ -338,24 +338,33 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
         # Check if agency listing (skip if only_particulares)
         # Comprehensive agency detection patterns for Idealista
         agency_patterns = [
-            # CSS classes and attributes
+            # CSS classes and attributes - Professional/Agency markers
             r'class="[^"]*professional-info[^"]*"',  # Agency info section
             r'class="[^"]*logo-profesional[^"]*"',  # Agency logo
-            r'data-seller-type=["\']?professional',  # Seller type attribute
-            r'class="[^"]*advertiser-name-container[^"]*professional',  # Professional advertiser
-            r'class="[^"]*advertiser-professional[^"]*"',  # Professional advertiser alternate
             r'class="[^"]*professional-logo[^"]*"',  # Professional logo
+            r'class="[^"]*advertiser-professional[^"]*"',  # Professional advertiser
             r'class="[^"]*contact-request-profe[^"]*"',  # Professional contact section
-            # Agency/inmobiliaria name patterns (only in specific contact sections)
-            r'<div[^>]*class="[^"]*advertiser-name[^"]*"[^>]*>(?:inmobiliaria|agency|agencia|finca|gestoria)',
+            r'class="[^"]*profesional[^"]*"',  # Any class containing "profesional"
+            r'class="[^"]*agency[^"]*"',  # Any class containing "agency"
+            # Data attributes
+            r'data-seller-type=["\']?professional',  # Seller type attribute
+            r'data-advertiser-type=["\']?professional',
+            r'data-is-professional=["\']?true',
+            # Agency image/logo detection
+            r'<img[^>]*alt="[^"]*(?:inmobiliaria|logo|agencia)[^"]*"',
+            r'<img[^>]*class="[^"]*logo[^"]*"[^>]*>',
+            # Text patterns in advertiser section
+            r'<[^>]*class="[^"]*advertiser[^"]*"[^>]*>.*?(?:inmobiliaria|agencia|fincas|gestora|real\s*estate)',
             # JSON-LD data
             r'"@type"\s*:\s*"RealEstateAgent"',
             r'"seller"\s*:\s*\{[^}]*"@type"\s*:\s*"Organization"',
-            # Advertiser type in data attributes
-            r'data-advertiser-type=["\']?professional',
-            r'data-is-professional=["\']?true',
+            # Phone number patterns typical of agencies (multiple lines, etc)
+            r'ver\s+tel[eé]fonos?\s+de\s+la\s+inmobiliaria',
+            # Contact form for professionals
+            r'contactar\s+(?:con\s+)?(?:el\s+)?anunciante\s+profesional',
+            r'formulario\s+de\s+contacto.*profesional',
         ]
-        is_agency = any(re.search(pattern, html, re.IGNORECASE) for pattern in agency_patterns)
+        is_agency = any(re.search(pattern, html, re.IGNORECASE | re.DOTALL) for pattern in agency_patterns)
 
         if is_agency and self.only_particulares:
             logger.info(f"Skipping agency listing: {listing['anuncio_id']}")
