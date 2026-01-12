@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 12 January 2026 (ScrapingBee timeout fix + alert improvements)
+> **Last Updated**: 12 January 2026 (Idealista agency detection improved)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -32,14 +32,24 @@ Los scrapers extraen datos de elementos HTML especificos para evitar valores inc
 | idealista | `info-data-price` class | `info-features` section | `info-features` section |
 | milanuncios | JSON-LD / data attributes | Generic (detail page only) | Generic (detail page only) |
 
-### Idealista Particulares (Fixed 11 Jan 2026)
-El scraper de Idealista filtra agencias via patrones HTML especificos:
+### Idealista Particulares (Updated 12 Jan 2026)
+**IMPORTANTE**: Idealista NO tiene filtro URL publico para particulares (solo herramientas de pago).
+El scraper filtra agencias via deteccion HTML en dos niveles:
+
+**Nivel 1 - Pagina de busqueda** (pre-filtro, ahorra creditos):
+- `professional-name`, `logo-profesional`, `item-link-professional`
+- Logos de inmobiliarias en resultados
+
+**Nivel 2 - Pagina de detalle** (filtro completo):
 - `class="professional-info"` - Seccion info de agencia
 - `class="logo-profesional"` - Logo de agencia
 - `data-seller-type="professional"` - Atributo vendedor
-- **Selectores de extraccion**:
-  - Titulo: `<span class="main-info__title-main">`
-  - Descripcion: `<div class="adCommentsLanguage">`
+- JSON-LD: `"@type": "RealEstateAgent"` o `"Organization"`
+- Formularios de contacto profesional
+
+**Selectores de extraccion**:
+- Titulo: `<span class="main-info__title-main">`
+- Descripcion: `<div class="adCommentsLanguage">`
 
 ### Encoding Fix (11 Jan 2026)
 `fix_encoding()` solo corrige texto doblemente codificado (marcadores como `Ã¡`).
