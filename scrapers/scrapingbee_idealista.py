@@ -86,6 +86,31 @@ ZONAS_GEOGRAFICAS = {
         'url_path': 'tarrega-lleida',
         'url_code': 'tarrega-lleida',
     },
+    'alpicat': {
+        'nombre': 'Alpicat',
+        'url_path': 'alpicat-lleida',
+        'url_code': 'alpicat-lleida',
+    },
+    'torrefarrera': {
+        'nombre': 'Torrefarrera',
+        'url_path': 'torrefarrera-lleida',
+        'url_code': 'torrefarrera-lleida',
+    },
+    'alcarras': {
+        'nombre': 'Alcarràs',
+        'url_path': 'alcarras-lleida',
+        'url_code': 'alcarras-lleida',
+    },
+    'alcoletge': {
+        'nombre': 'Alcoletge',
+        'url_path': 'alcoletge-lleida',
+        'url_code': 'alcoletge-lleida',
+    },
+    'rossello': {
+        'nombre': 'Rosselló',
+        'url_path': 'rossello-lleida',
+        'url_code': 'rossello-lleida',
+    },
 
     # =============================================================
     # CITIES - Tarragona

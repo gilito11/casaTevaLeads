@@ -225,7 +225,9 @@ final AS (
     WHERE
         precio > 5000  -- Filter out rentals
         -- Filter for particular (non-agency) listings only
-        AND es_particular = TRUE
+        -- Note: Use COALESCE to treat NULL as TRUE (assume particular if not specified)
+        -- The scraper already filters agencies, this is a backup
+        AND COALESCE(es_particular, TRUE) = TRUE
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
