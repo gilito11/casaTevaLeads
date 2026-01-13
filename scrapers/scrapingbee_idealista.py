@@ -520,17 +520,35 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
                 listing['banos'] = int(banos_fallback.group(1))
 
         # Extract photos (Idealista CDN: img3.idealista.com)
+        # ISSUE: Same image appears with different size prefixes:
+        #   WEB_LISTING, WEB_DETAIL, WEB_DETAIL_LARGE, etc.
+        # FIX: Extract unique image ID ignoring size prefix
         photos = re.findall(
             r'(https://img\d*\.idealista\.com/[^"\'<>\s]+\.(?:jpg|jpeg|png|webp))',
             html, re.IGNORECASE
         )
         unique_photos = []
-        seen = set()
+        seen_ids = set()
         for photo in photos:
-            photo_clean = re.sub(r'\?.*$', '', photo)
-            if photo_clean not in seen and 'logo' not in photo.lower():
-                unique_photos.append(photo)
-                seen.add(photo_clean)
+            if 'logo' in photo.lower():
+                continue
+            # Extract unique image ID by removing size prefix
+            # Pattern: /blur/WEB_DETAIL_LARGE/0/id123456.jpg -> id123456.jpg
+            # Also handles: /pictures/id123456.jpg
+            id_match = re.search(r'/([^/]+\.(?:jpg|jpeg|png|webp))(?:\?.*)?$', photo, re.IGNORECASE)
+            if id_match:
+                image_id = id_match.group(1).lower()
+                if image_id not in seen_ids:
+                    seen_ids.add(image_id)
+                    # Prefer larger version - replace size prefix with WEB_DETAIL_LARGE
+                    large_url = re.sub(
+                        r'/blur/[^/]+/',
+                        '/blur/WEB_DETAIL_LARGE/',
+                        photo
+                    )
+                    # Remove query params for cleaner URL
+                    large_url = re.sub(r'\?.*$', '', large_url)
+                    unique_photos.append(large_url)
         listing['fotos'] = unique_photos[:10]
 
         # Extract energy certificate

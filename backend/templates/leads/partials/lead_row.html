@@ -51,22 +51,28 @@
         </div>
     </td>
     <td class="px-6 py-4">
-        <p class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs" title="{{ lead.titulo|default:lead.direccion }}">
-            {% if lead.direccion and lead.direccion != 'Sin dirección' %}
-                {{ lead.direccion|truncatechars:40 }}
-            {% elif lead.titulo %}
-                {{ lead.titulo|truncatechars:40 }}
+        <p class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs" title="{{ lead.titulo|default_if_none:''|default:lead.direccion|default_if_none:'' }}">
+            {% with dir=lead.direccion|default_if_none:'' tit=lead.titulo|default_if_none:'' zona=lead.zona_geografica|default_if_none:'' %}
+            {% if dir and dir != 'Sin dirección' and dir != 'None' %}
+                {{ dir|truncatechars:40 }}
+            {% elif tit and tit != 'None' %}
+                {{ tit|truncatechars:40 }}
+            {% elif zona %}
+                {{ zona }}
             {% else %}
-                {{ lead.zona_geografica|default:"Sin ubicación" }}
-            {% endif %}
-        </p>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {% if lead.zona_geografica %}{{ lead.zona_geografica }}{% endif %}
-            {% if lead.habitaciones and lead.habitaciones > 0 %}{% if lead.zona_geografica %} | {% endif %}{{ lead.habitaciones }} hab{% endif %}
-            {% if lead.metros and lead.metros > 0 %}{% if lead.zona_geografica or lead.habitaciones %} | {% endif %}{{ lead.metros|floatformat:0 }}m²{% endif %}
-            {% if not lead.zona_geografica and not lead.habitaciones and not lead.metros %}
                 {{ lead.portal|title }}
             {% endif %}
+            {% endwith %}
+        </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {% with zona=lead.zona_geografica|default_if_none:'' hab=lead.habitaciones|default_if_none:0 met=lead.metros|default_if_none:0 %}
+            {% if zona %}{{ zona }}{% endif %}
+            {% if hab and hab > 0 %}{% if zona %} | {% endif %}{{ hab }} hab{% endif %}
+            {% if met and met > 0 %}{% if zona or hab %} | {% endif %}{{ met|floatformat:0 }}m²{% endif %}
+            {% if not zona and not hab and not met %}
+                {{ lead.portal|title }}
+            {% endif %}
+            {% endwith %}
         </p>
     </td>
     <td class="px-6 py-4 whitespace-nowrap">

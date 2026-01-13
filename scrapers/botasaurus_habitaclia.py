@@ -483,38 +483,45 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                     # Extract photos - Habitaclia uses images.habimg.com/imgh/ structure
                     # Pattern: //images.habimg.com/imgh/XXX-XXXXXXX/filename.jpg
                     # Photos come in multiple sizes: _XXL.jpg, _XL.jpg, _L.jpg, etc.
-                    # We want to keep only one version per unique image (preferably large)
+                    # ISSUE: First photo appears multiple times (og:image, thumbnail, carousel)
+                    # FIX: Extract unique image ID from path, not just filename
                     anuncio_id = listing.get('anuncio_id', '')
-                    # Extract the numeric part for matching (e.g., "500006030072" -> "6030072")
                     id_for_match = anuncio_id[-7:] if len(anuncio_id) > 7 else anuncio_id
 
+                    # Match all habimg.com URLs (imgh/, thumb/, etc.)
                     photos = re.findall(
-                        r'(?:https?:)?//images\.habimg\.com/imgh/[^"\'<>\s]+\.(?:jpg|jpeg|png|webp)',
+                        r'(?:https?:)?//images\.habimg\.com/[^"\'<>\s]+\.(?:jpg|jpeg|png|webp)',
                         html, re.IGNORECASE
                     )
 
-                    # Deduplicate by base filename (removing size suffixes like _XXL, _XL, _L, _M, _S)
+                    # Deduplicate by unique image identifier
+                    # Extract: directory/filename without size suffix
+                    # Example: /imgh/500-6030072/foto1_XXL.jpg -> "500-6030072/foto1"
                     unique_photos = []
-                    seen_bases = set()
+                    seen_ids = set()
                     for photo in photos:
-                        # Ensure https://
                         if photo.startswith('//'):
                             photo = 'https:' + photo
-                        # Skip logos and non-listing photos
                         if 'logo' in photo.lower():
                             continue
-                        # Only keep photos that contain this listing's ID in the path
                         if id_for_match and id_for_match not in photo:
                             continue
-                        # Extract base filename without size suffix
-                        # Example: image_XXL.jpg -> image, image_L.jpg -> image
-                        base_match = re.search(r'/([^/]+?)(?:_(?:XXL|XL|L|M|S|T))?\.(?:jpg|jpeg|png|webp)$', photo, re.IGNORECASE)
-                        if base_match:
-                            base_name = base_match.group(1)
-                            if base_name not in seen_bases:
-                                seen_bases.add(base_name)
-                                # Prefer larger versions - try to get XXL or XL
-                                large_url = re.sub(r'_(?:L|M|S|T)\.', '_XXL.', photo)
+
+                        # Extract unique ID: path after domain + filename without size
+                        # Pattern: /imgh/XXX-YYYYYYY/filename_SIZE.jpg
+                        id_match = re.search(
+                            r'/(?:imgh|thumb)/(\d+-\d+)/([^/]+?)(?:_(?:XXL|XL|L|M|S|T))?\.(?:jpg|jpeg|png|webp)$',
+                            photo, re.IGNORECASE
+                        )
+                        if id_match:
+                            # Unique key = directory + base filename
+                            unique_id = f"{id_match.group(1)}/{id_match.group(2)}"
+                            if unique_id not in seen_ids:
+                                seen_ids.add(unique_id)
+                                # Build XXL URL for best quality
+                                base_filename = id_match.group(2)
+                                directory = id_match.group(1)
+                                large_url = f"https://images.habimg.com/imgh/{directory}/{base_filename}_XXL.jpg"
                                 unique_photos.append(large_url)
 
                     listing['fotos'] = unique_photos[:10]
