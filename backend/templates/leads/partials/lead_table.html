@@ -170,13 +170,13 @@
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <p class="text-sm text-gray-900 dark:text-white truncate max-w-xs" title="{{ lead.direccion }}">
-                            {{ lead.direccion|truncatechars:35 }}
-                        </p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ lead.zona_geografica }}
-                            {% if lead.habitaciones %}| {{ lead.habitaciones }} hab{% endif %}
-                            {% if lead.metros %}| {{ lead.metros }}m²{% endif %}
+                        <p class="text-base font-semibold text-gray-900 dark:text-white">
+                            {% with zona=lead.zona_geografica|default_if_none:'' hab=lead.habitaciones|default_if_none:0 met=lead.metros|default_if_none:0 %}
+                            {% if zona %}{{ zona }}{% endif %}
+                            {% if hab and hab > 0 %}{% if zona %} | {% endif %}{{ hab }} hab{% endif %}
+                            {% if met and met > 0 %}{% if zona or hab %} | {% endif %}{{ met|floatformat:0 }}m²{% endif %}
+                            {% if not zona and not hab and not met %}{{ lead.portal|title }}{% endif %}
+                            {% endwith %}
                         </p>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">

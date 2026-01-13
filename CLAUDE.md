@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 12 January 2026 (Idealista agency detection improved)
+> **Last Updated**: 13 January 2026 (KEDA scale-to-zero configurado)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -97,6 +97,33 @@ Basado en analisis de 220 anuncios de Milanuncios:
 - **Ahorro**: 67% creditos (de 6 a 2 scrapes/dia)
 - **Status**: Funcionando en produccion
 
+### KEDA Scale-to-Zero (Enero 2026)
+Container Apps configurado con KEDA cron scaler para reducir costes:
+- **minReplicas**: 0 (se apaga fuera de horario)
+- **maxReplicas**: 1
+- **Timezone**: Europe/Madrid (ajusta DST automaticamente)
+
+| Regla | Horario España | Descripción |
+|-------|----------------|-------------|
+| scraping-12h | 12:00-13:00 | Captura pico mañana |
+| scraping-18h | 18:00-19:00 | Captura pico tarde |
+
+**Ahorro**: ~35€/mes (de ~40€ a ~5€ en Container Apps)
+
+### Costes Azure (Enero 2026)
+Suscripción: **Azure for Students** ($100 crédito/12 meses)
+
+| Servicio | SKU | Coste/mes |
+|----------|-----|-----------|
+| PostgreSQL Flexible | B1ms (1vCPU, 2GB, 32GB) | ~$17 |
+| Web App | B1 Linux | ~$13 |
+| Container Apps | Consumption (KEDA) | ~$5 |
+| ACR | Basic | ~$5 |
+| Log Analytics | Mínimo | ~$2 |
+| **Total Azure** | | **~$42/mes** |
+| ScrapingBee | 250K credits | 50€/mes |
+| **TOTAL** | | **~90€/mes** |
+
 ### Alertas Discord (Enero 2026)
 Sistema de alertas via webhook para detectar problemas de scraping:
 - **Variable de entorno**: `ALERT_WEBHOOK_URL`
@@ -125,6 +152,10 @@ python run_all_scrapers.py --portals milanuncios idealista --zones salou --postg
 
 # === AZURE LOGS ===
 az containerapp logs show -n dagster-scrapers -g inmoleads-crm --type console --tail 100
+
+# === KEDA / SCALING ===
+az containerapp show -g inmoleads-crm -n dagster-scrapers --query "properties.template.scale" -o json
+az containerapp replica list -g inmoleads-crm -n dagster-scrapers -o table
 ```
 
 ## Entornos
