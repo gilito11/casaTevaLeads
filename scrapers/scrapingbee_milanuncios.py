@@ -88,6 +88,27 @@ ZONAS_GEOGRAFICAS = {
         'geoProvinceId': 25,
         'geolocationTerm': 'Tarrega, Lerida',
     },
+    'alpicat': {
+        'nombre': 'Alpicat',
+        'latitude': 41.6667,
+        'longitude': 0.5500,
+        'geoProvinceId': 25,
+        'geolocationTerm': 'Alpicat, Lerida',
+    },
+    'alcarras': {
+        'nombre': 'Alcarràs',
+        'latitude': 41.5667,
+        'longitude': 0.5167,
+        'geoProvinceId': 25,
+        'geolocationTerm': 'Alcarras, Lerida',
+    },
+    'alamus': {
+        'nombre': 'Alamús',
+        'latitude': 41.5833,
+        'longitude': 0.7833,
+        'geoProvinceId': 25,
+        'geolocationTerm': 'Alamus, Lerida',
+    },
 
     # TARRAGONA
     'tarragona_ciudad': {
@@ -137,6 +158,13 @@ ZONAS_GEOGRAFICAS = {
         'longitude': 1.1416,
         'geoProvinceId': 43,
         'geolocationTerm': 'Salou, Tarragona',
+    },
+    'la_pineda': {
+        'nombre': 'La Pineda',
+        'latitude': 41.0833,
+        'longitude': 1.1667,
+        'geoProvinceId': 43,
+        'geolocationTerm': 'La Pineda, Tarragona',
     },
     'cambrils': {
         'nombre': 'Cambrils',

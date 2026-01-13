@@ -48,6 +48,9 @@ ZONA_MAPPING_MILANUNCIOS = {
     'mollerussa': 'mollerussa',
     'tremp': 'tremp',
     'tarrega': 'tarrega',
+    'alpicat': 'alpicat',
+    'alcarras': 'alcarras',
+    'alamus': 'alamus',
     # Tarragona
     'tarragona_ciudad': 'tarragona_ciudad',
     'tarragona_20km': 'tarragona_20km',
@@ -56,6 +59,7 @@ ZONA_MAPPING_MILANUNCIOS = {
     'tarragona_50km': 'tarragona_50km',
     # Costa Daurada - Costeros
     'salou': 'salou',
+    'la_pineda': 'la_pineda',
     'cambrils': 'cambrils',
     'reus': 'reus',
     'vendrell': 'vendrell',
@@ -88,6 +92,8 @@ ZONA_MAPPING_HABITACLIA = {
     'balaguer': 'balaguer',
     'mollerussa': 'mollerussa',
     'tarrega': 'tarrega',
+    'alpicat': 'alpicat',
+    'alcarras': 'alcarras',
     # Tarragona
     'tarragona_ciudad': 'tarragona',
     'tarragona_20km': 'tarragona_provincia',
@@ -162,6 +168,8 @@ ZONA_MAPPING_IDEALISTA = {
     'mollerussa': 'mollerussa',
     'tarrega': 'tarrega',
     'tremp': 'tremp',
+    'alpicat': 'alpicat',
+    'alcarras': 'alcarras',
     # Tarragona
     'tarragona_ciudad': 'tarragona',
     'tarragona_20km': 'tarragona_provincia',
