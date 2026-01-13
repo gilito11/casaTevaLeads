@@ -51,7 +51,7 @@
         </div>
     </td>
     <td class="px-6 py-4">
-        <p class="text-sm font-medium text-gray-900 dark:text-white">
+        <p class="text-base font-semibold text-gray-900 dark:text-white">
             {% with zona=lead.zona_geografica|default_if_none:'' hab=lead.habitaciones|default_if_none:0 met=lead.metros|default_if_none:0 %}
             {% if zona %}{{ zona }}{% endif %}
             {% if hab and hab > 0 %}{% if zona %} | {% endif %}{{ hab }} hab{% endif %}
