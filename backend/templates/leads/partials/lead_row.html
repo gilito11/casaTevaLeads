@@ -51,13 +51,22 @@
         </div>
     </td>
     <td class="px-6 py-4">
-        <p class="text-sm text-gray-900 dark:text-white truncate max-w-xs" title="{{ lead.direccion }}">
-            {{ lead.direccion|truncatechars:35 }}
+        <p class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs" title="{{ lead.titulo|default:lead.direccion }}">
+            {% if lead.direccion and lead.direccion != 'Sin dirección' %}
+                {{ lead.direccion|truncatechars:40 }}
+            {% elif lead.titulo %}
+                {{ lead.titulo|truncatechars:40 }}
+            {% else %}
+                {{ lead.zona_geografica|default:"Sin ubicación" }}
+            {% endif %}
         </p>
-        <p class="text-xs text-gray-500 dark:text-gray-400">
-            {{ lead.zona_geografica }}
-            {% if lead.habitaciones %}| {{ lead.habitaciones }} hab{% endif %}
-            {% if lead.metros %}| {{ lead.metros }}m²{% endif %}
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {% if lead.zona_geografica %}{{ lead.zona_geografica }}{% endif %}
+            {% if lead.habitaciones and lead.habitaciones > 0 %}{% if lead.zona_geografica %} | {% endif %}{{ lead.habitaciones }} hab{% endif %}
+            {% if lead.metros and lead.metros > 0 %}{% if lead.zona_geografica or lead.habitaciones %} | {% endif %}{{ lead.metros|floatformat:0 }}m²{% endif %}
+            {% if not lead.zona_geografica and not lead.habitaciones and not lead.metros %}
+                {{ lead.portal|title }}
+            {% endif %}
         </p>
     </td>
     <td class="px-6 py-4 whitespace-nowrap">
