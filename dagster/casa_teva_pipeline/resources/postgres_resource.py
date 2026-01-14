@@ -331,9 +331,20 @@ class PostgresResource(ConfigurableResource):
         Returns:
             Lista de zonas con slug, nombre, tenant_id y portales habilitados
         """
+        # Build portales array from individual boolean fields
+        portales_sql = """
+            ARRAY_REMOVE(ARRAY[
+                CASE WHEN z.scrapear_milanuncios THEN 'milanuncios' END,
+                CASE WHEN z.scrapear_fotocasa THEN 'fotocasa' END,
+                CASE WHEN z.scrapear_habitaclia THEN 'habitaclia' END,
+                CASE WHEN z.scrapear_idealista THEN 'idealista' END
+            ], NULL) as portales
+        """
+
         if tenant_id:
-            query = """
-                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre, z.portales
+            query = f"""
+                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre,
+                       {portales_sql}
                 FROM zonas_geograficas z
                 JOIN tenants t ON z.tenant_id = t.tenant_id
                 WHERE z.activa = true AND z.tenant_id = %s
@@ -341,8 +352,9 @@ class PostgresResource(ConfigurableResource):
             """
             params = (tenant_id,)
         else:
-            query = """
-                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre, z.portales
+            query = f"""
+                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre,
+                       {portales_sql}
                 FROM zonas_geograficas z
                 JOIN tenants t ON z.tenant_id = t.tenant_id
                 WHERE z.activa = true

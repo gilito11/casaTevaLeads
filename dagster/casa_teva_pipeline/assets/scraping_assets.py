@@ -79,6 +79,8 @@ ZONA_MAPPING_MILANUNCIOS = {
     'deltebre': 'deltebre',
     'ametlla_mar': 'ametlla_mar',
     'sant_carles_rapita': 'sant_carles_rapita',
+    # Mont-roig del Camp
+    'mont_roig': 'mont_roig',
 }
 
 # Mapping para Habitaclia (Botasaurus)
@@ -115,6 +117,10 @@ ZONA_MAPPING_HABITACLIA = {
     # Terres de l'Ebre
     'tortosa': 'tortosa',
     'amposta': 'amposta',
+    'deltebre': 'deltebre',
+    'ametlla_mar': 'l-ametlla-de-mar',
+    'hospitalet_infant': 'l-hospitalet-de-l-infant',
+    'mont_roig': 'mont-roig-del-camp',
     'sant_carles_rapita': 'sant_carles_de_la_rapita',
 }
 
@@ -152,8 +158,10 @@ ZONA_MAPPING_FOTOCASA = {
     'tortosa': 'tortosa',
     'amposta': 'amposta',
     'deltebre': 'deltebre',
-    'ametlla_mar': 'ametlla_mar',
-    'sant_carles_rapita': 'sant_carles_rapita',
+    'ametlla_mar': 'l-ametlla-de-mar',
+    'hospitalet_infant': 'l-hospitalet-de-l-infant',
+    'mont_roig': 'mont-roig-del-camp',
+    'sant_carles_rapita': 'sant-carles-de-la-rapita',
 }
 
 # Mapping para Idealista (ScrapingBee - stealth proxy)
@@ -192,7 +200,10 @@ ZONA_MAPPING_IDEALISTA = {
     'tortosa': 'tortosa',
     'amposta': 'amposta',
     'deltebre': 'deltebre',
-    'sant_carles_rapita': 'sant_carles_rapita',
+    'ametlla_mar': 'l-ametlla-de-mar',
+    'hospitalet_infant': 'l-hospitalet-de-l-infant',
+    'mont_roig': 'mont-roig-del-camp',
+    'sant_carles_rapita': 'sant-carles-de-la-rapita',
 }
 
 def get_project_root() -> str:
