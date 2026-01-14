@@ -80,8 +80,8 @@ ZONA_MAPPING_MILANUNCIOS = {
     'ametlla_mar': 'ametlla_mar',
     'sant_carles_rapita': 'sant_carles_rapita',
     # Mont-roig del Camp
-    'mont_roig': 'mont_roig',
-    'montroig_camp': 'mont_roig',
+    'mont_roig': 'montroig_camp',
+    'montroig_camp': 'montroig_camp',
 }
 
 # Mapping para Habitaclia (Botasaurus)
@@ -119,10 +119,10 @@ ZONA_MAPPING_HABITACLIA = {
     'tortosa': 'tortosa',
     'amposta': 'amposta',
     'deltebre': 'deltebre',
-    'ametlla_mar': 'l-ametlla-de-mar',
-    'hospitalet_infant': 'l-hospitalet-de-l-infant',
-    'mont_roig': 'mont-roig-del-camp',
-    'montroig_camp': 'mont-roig-del-camp',
+    'ametlla_mar': 'ametlla_mar',
+    'hospitalet_infant': 'hospitalet_infant',
+    'mont_roig': 'montroig_camp',
+    'montroig_camp': 'montroig_camp',
     'sant_carles_rapita': 'sant_carles_de_la_rapita',
 }
 
@@ -160,11 +160,11 @@ ZONA_MAPPING_FOTOCASA = {
     'tortosa': 'tortosa',
     'amposta': 'amposta',
     'deltebre': 'deltebre',
-    'ametlla_mar': 'l-ametlla-de-mar',
-    'hospitalet_infant': 'l-hospitalet-de-l-infant',
-    'mont_roig': 'mont-roig-del-camp',
-    'montroig_camp': 'mont-roig-del-camp',
-    'sant_carles_rapita': 'sant-carles-de-la-rapita',
+    'ametlla_mar': 'ametlla_mar',
+    'hospitalet_infant': 'hospitalet_infant',
+    'mont_roig': 'montroig_camp',
+    'montroig_camp': 'montroig_camp',
+    'sant_carles_rapita': 'sant_carles_rapita',
 }
 
 # Mapping para Idealista (ScrapingBee - stealth proxy)
@@ -203,11 +203,11 @@ ZONA_MAPPING_IDEALISTA = {
     'tortosa': 'tortosa',
     'amposta': 'amposta',
     'deltebre': 'deltebre',
-    'ametlla_mar': 'l-ametlla-de-mar',
-    'hospitalet_infant': 'l-hospitalet-de-l-infant',
-    'mont_roig': 'mont-roig-del-camp',
-    'montroig_camp': 'mont-roig-del-camp',
-    'sant_carles_rapita': 'sant-carles-de-la-rapita',
+    'ametlla_mar': 'ametlla_mar',
+    'hospitalet_infant': 'hospitalet_infant',
+    'mont_roig': 'montroig_camp',
+    'montroig_camp': 'montroig_camp',
+    'sant_carles_rapita': 'sant_carles_rapita',
 }
 
 def get_project_root() -> str:
