@@ -81,6 +81,7 @@ ZONA_MAPPING_MILANUNCIOS = {
     'sant_carles_rapita': 'sant_carles_rapita',
     # Mont-roig del Camp
     'mont_roig': 'mont_roig',
+    'montroig_camp': 'mont_roig',
 }
 
 # Mapping para Habitaclia (Botasaurus)
@@ -121,6 +122,7 @@ ZONA_MAPPING_HABITACLIA = {
     'ametlla_mar': 'l-ametlla-de-mar',
     'hospitalet_infant': 'l-hospitalet-de-l-infant',
     'mont_roig': 'mont-roig-del-camp',
+    'montroig_camp': 'mont-roig-del-camp',
     'sant_carles_rapita': 'sant_carles_de_la_rapita',
 }
 
@@ -161,6 +163,7 @@ ZONA_MAPPING_FOTOCASA = {
     'ametlla_mar': 'l-ametlla-de-mar',
     'hospitalet_infant': 'l-hospitalet-de-l-infant',
     'mont_roig': 'mont-roig-del-camp',
+    'montroig_camp': 'mont-roig-del-camp',
     'sant_carles_rapita': 'sant-carles-de-la-rapita',
 }
 
@@ -203,6 +206,7 @@ ZONA_MAPPING_IDEALISTA = {
     'ametlla_mar': 'l-ametlla-de-mar',
     'hospitalet_infant': 'l-hospitalet-de-l-infant',
     'mont_roig': 'mont-roig-del-camp',
+    'montroig_camp': 'mont-roig-del-camp',
     'sant_carles_rapita': 'sant-carles-de-la-rapita',
 }
 
