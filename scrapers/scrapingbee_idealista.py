@@ -111,6 +111,11 @@ ZONAS_GEOGRAFICAS = {
         'url_path': 'rossello-lleida',
         'url_code': 'rossello-lleida',
     },
+    'alamus': {
+        'nombre': 'Alamús',
+        'url_path': 'els-alamus-lleida',
+        'url_code': 'els-alamus-lleida',
+    },
 
     # =============================================================
     # CITIES - Tarragona
@@ -175,6 +180,26 @@ ZONAS_GEOGRAFICAS = {
         'url_path': 'montblanc-tarragona',
         'url_code': 'montblanc-tarragona',
     },
+    'hospitalet_infant': {
+        'nombre': "L'Hospitalet de l'Infant",
+        'url_path': 'l-hospitalet-de-l-infant-tarragona',
+        'url_code': 'l-hospitalet-de-l-infant-tarragona',
+    },
+    'coma_ruga': {
+        'nombre': 'Coma-ruga',
+        'url_path': 'coma-ruga-tarragona',
+        'url_code': 'coma-ruga-tarragona',
+    },
+    'la_pineda': {
+        'nombre': 'La Pineda',
+        'url_path': 'la-pineda-tarragona',
+        'url_code': 'la-pineda-tarragona',
+    },
+    'montroig_camp': {
+        'nombre': 'Mont-roig del Camp',
+        'url_path': 'mont-roig-del-camp-tarragona',
+        'url_code': 'mont-roig-del-camp-tarragona',
+    },
 
     # Terres de l'Ebre
     'tortosa': {
@@ -196,6 +221,11 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Sant Carles de la Ràpita',
         'url_path': 'sant-carles-de-la-rapita-tarragona',
         'url_code': 'sant-carles-de-la-rapita-tarragona',
+    },
+    'ametlla_mar': {
+        'nombre': "L'Ametlla de Mar",
+        'url_path': 'l-ametlla-de-mar-tarragona',
+        'url_code': 'l-ametlla-de-mar-tarragona',
     },
 }
 

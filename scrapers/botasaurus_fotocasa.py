@@ -100,6 +100,11 @@ ZONAS_GEOGRAFICAS = {
     'mollerussa': {'nombre': 'Mollerussa', 'url_path': 'mollerussa/todas-las-zonas'},
     'tremp': {'nombre': 'Tremp', 'url_path': 'tremp/todas-las-zonas'},
     'tarrega': {'nombre': 'Tàrrega', 'url_path': 'tarrega/todas-las-zonas'},
+    'alpicat': {'nombre': 'Alpicat', 'url_path': 'alpicat/todas-las-zonas'},
+    'alcarras': {'nombre': 'Alcarràs', 'url_path': 'alcarras/todas-las-zonas'},
+    'torrefarrera': {'nombre': 'Torrefarrera', 'url_path': 'torrefarrera/todas-las-zonas'},
+    'alcoletge': {'nombre': 'Alcoletge', 'url_path': 'alcoletge/todas-las-zonas'},
+    'rossello': {'nombre': 'Rosselló', 'url_path': 'rossello/todas-las-zonas'},
 
     # -- TARRAGONA CITIES --
     'tarragona': {'nombre': 'Tarragona', 'url_path': 'tarragona-capital/todas-las-zonas'},
@@ -121,6 +126,8 @@ ZONAS_GEOGRAFICAS = {
     'deltebre': {'nombre': 'Deltebre', 'url_path': 'deltebre/todas-las-zonas'},
     'ametlla_mar': {'nombre': "L'Ametlla de Mar", 'url_path': 'l-ametlla-de-mar/todas-las-zonas'},
     'sant_carles_rapita': {'nombre': 'Sant Carles de la Ràpita', 'url_path': 'sant-carles-de-la-rapita/todas-las-zonas'},
+    'la_pineda': {'nombre': 'La Pineda', 'url_path': 'la-pineda/todas-las-zonas'},
+    'montroig_camp': {'nombre': 'Mont-roig del Camp', 'url_path': 'mont-roig-del-camp/todas-las-zonas'},
 }
 
 

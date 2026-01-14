@@ -136,10 +136,14 @@ ZONAS_GEOGRAFICAS = {
     'lleida': {'nombre': 'Lleida', 'url_slug': 'lleida'},
     'balaguer': {'nombre': 'Balaguer', 'url_slug': 'balaguer'},
     'mollerussa': {'nombre': 'Mollerussa', 'url_slug': 'mollerussa'},
+    'tremp': {'nombre': 'Tremp', 'url_slug': 'tremp'},
     'tarrega': {'nombre': 'Tàrrega', 'url_slug': 'tarrega'},
     'alcarras': {'nombre': 'Alcarràs', 'url_slug': 'alcarras'},
     'almacelles': {'nombre': 'Almacelles', 'url_slug': 'almacelles'},
     'alpicat': {'nombre': 'Alpicat', 'url_slug': 'alpicat'},
+    'torrefarrera': {'nombre': 'Torrefarrera', 'url_slug': 'torrefarrera'},
+    'alcoletge': {'nombre': 'Alcoletge', 'url_slug': 'alcoletge'},
+    'rossello': {'nombre': 'Rosselló', 'url_slug': 'rossello'},
     'artesa_de_segre': {'nombre': 'Artesa de Segre', 'url_slug': 'artesa_de_segre'},
     'ponts': {'nombre': 'Ponts', 'url_slug': 'ponts'},
     'bellpuig': {'nombre': 'Bellpuig', 'url_slug': 'bellpuig'},
@@ -147,6 +151,17 @@ ZONAS_GEOGRAFICAS = {
     'agramunt': {'nombre': 'Agramunt', 'url_slug': 'agramunt'},
     'les_borges_blanques': {'nombre': 'Les Borges Blanques', 'url_slug': 'les_borges_blanques'},
     'juneda': {'nombre': 'Juneda', 'url_slug': 'juneda'},
+
+    # -- Costa Daurada adicionales --
+    'hospitalet_infant': {'nombre': "L'Hospitalet de l'Infant", 'url_slug': 'l_hospitalet_de_l_infant'},
+    'coma_ruga': {'nombre': 'Coma-ruga', 'url_slug': 'coma-ruga'},
+    'la_pineda': {'nombre': 'La Pineda', 'url_slug': 'la_pineda'},
+    'montroig_camp': {'nombre': 'Mont-roig del Camp', 'url_slug': 'mont-roig_del_camp'},
+
+    # -- Aliases for zone compatibility --
+    'vila_seca': {'nombre': 'Vila-seca', 'url_slug': 'vila-seca'},
+    'ametlla_mar': {'nombre': "L'Ametlla de Mar", 'url_slug': 'l_ametlla_de_mar'},
+    'sant_carles_rapita': {'nombre': 'Sant Carles de la Ràpita', 'url_slug': 'sant_carles_de_la_rapita'},
 }
 
 

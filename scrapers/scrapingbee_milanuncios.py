@@ -21,6 +21,13 @@ logger = logging.getLogger(__name__)
 # Geographic zones configuration (same as Botasaurus scraper)
 ZONAS_GEOGRAFICAS = {
     # LLEIDA
+    'lleida': {
+        'nombre': 'Lleida',
+        'latitude': 41.6175899,
+        'longitude': 0.6200146,
+        'geoProvinceId': 25,
+        'geolocationTerm': 'Lleida, Lerida',
+    },
     'lleida_ciudad': {
         'nombre': 'Lleida Ciudad',
         'latitude': 41.6175899,
@@ -109,8 +116,36 @@ ZONAS_GEOGRAFICAS = {
         'geoProvinceId': 25,
         'geolocationTerm': 'Alamus, Lerida',
     },
+    'torrefarrera': {
+        'nombre': 'Torrefarrera',
+        'latitude': 41.6667,
+        'longitude': 0.5833,
+        'geoProvinceId': 25,
+        'geolocationTerm': 'Torrefarrera, Lerida',
+    },
+    'alcoletge': {
+        'nombre': 'Alcoletge',
+        'latitude': 41.6417,
+        'longitude': 0.6833,
+        'geoProvinceId': 25,
+        'geolocationTerm': 'Alcoletge, Lerida',
+    },
+    'rossello': {
+        'nombre': 'Rosselló',
+        'latitude': 41.6667,
+        'longitude': 0.7000,
+        'geoProvinceId': 25,
+        'geolocationTerm': 'Rossello, Lerida',
+    },
 
     # TARRAGONA
+    'tarragona': {
+        'nombre': 'Tarragona',
+        'latitude': 41.1188827,
+        'longitude': 1.2444909,
+        'geoProvinceId': 43,
+        'geolocationTerm': 'Tarragona, Tarragona',
+    },
     'tarragona_ciudad': {
         'nombre': 'Tarragona Ciudad',
         'latitude': 41.1188827,
@@ -249,6 +284,13 @@ ZONAS_GEOGRAFICAS = {
         'longitude': 1.1450,
         'geoProvinceId': 43,
         'geolocationTerm': 'Vila-seca, Tarragona',
+    },
+    'montroig_camp': {
+        'nombre': 'Mont-roig del Camp',
+        'latitude': 41.0833,
+        'longitude': 0.9500,
+        'geoProvinceId': 43,
+        'geolocationTerm': 'Mont-roig del Camp, Tarragona',
     },
 
     # TERRES DE L'EBRE
