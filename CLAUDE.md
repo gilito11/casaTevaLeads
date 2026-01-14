@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 13 January 2026 (KEDA scale-to-zero configurado)
+> **Last Updated**: 14 January 2026 (KEDA eliminado, filtro agencias Idealista arreglado)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -32,7 +32,7 @@ Los scrapers extraen datos de elementos HTML especificos para evitar valores inc
 | idealista | `info-data-price` class | `info-features` section | `info-features` section |
 | milanuncios | JSON-LD / data attributes | Generic (detail page only) | Generic (detail page only) |
 
-### Idealista Particulares (Updated 12 Jan 2026)
+### Idealista Particulares (Fixed 14 Jan 2026)
 **IMPORTANTE**: Idealista NO tiene filtro URL publico para particulares (solo herramientas de pago).
 El scraper filtra agencias via deteccion HTML en dos niveles:
 
@@ -40,12 +40,15 @@ El scraper filtra agencias via deteccion HTML en dos niveles:
 - `professional-name`, `logo-profesional`, `item-link-professional`
 - Logos de inmobiliarias en resultados
 
-**Nivel 2 - Pagina de detalle** (filtro completo):
-- `class="professional-info"` - Seccion info de agencia
-- `class="logo-profesional"` - Logo de agencia
-- `data-seller-type="professional"` - Atributo vendedor
-- JSON-LD: `"@type": "RealEstateAgent"` o `"Organization"`
-- Formularios de contacto profesional
+**Nivel 2 - Pagina de detalle** (filtro mas especifico):
+- `data-seller-type="professional"` - Atributo vendedor (exacto)
+- `advertiser-name` con texto "inmobiliaria/agencia/fincas"
+- `professional-info` con contenido de agencia
+- JSON-LD: seller con nombre de inmobiliaria
+- Texto "contactar con la inmobiliaria"
+
+**Bug arreglado 14 Jan 2026**: Patrones anteriores eran demasiado amplios (detectaban
+logos de Idealista como agencias). Ahora solo patrones especificos con contenido real.
 
 **Selectores de extraccion**:
 - Titulo: `<span class="main-info__title-main">`
@@ -97,18 +100,14 @@ Basado en analisis de 220 anuncios de Milanuncios:
 - **Ahorro**: 67% creditos (de 6 a 2 scrapes/dia)
 - **Status**: Funcionando en produccion
 
-### KEDA Scale-to-Zero (Enero 2026)
-Container Apps configurado con KEDA cron scaler para reducir costes:
-- **minReplicas**: 0 (se apaga fuera de horario)
-- **maxReplicas**: 1
-- **Timezone**: Europe/Madrid (ajusta DST automaticamente)
+### KEDA Scale-to-Zero (ELIMINADO Enero 2026)
+~~Container Apps con KEDA cron scaler~~ - **Eliminado** porque Container Apps ya tiene
+scale-to-zero nativo sin necesidad de KEDA.
 
-| Regla | Horario España | Descripción |
-|-------|----------------|-------------|
-| scraping-12h | 12:00-13:00 | Captura pico mañana |
-| scraping-18h | 18:00-19:00 | Captura pico tarde |
-
-**Ahorro**: ~35€/mes (de ~40€ a ~5€ en Container Apps)
+**Configuracion actual**:
+- minReplicas: 1, maxReplicas: 1
+- Scale rules: ninguna (siempre 1 replica activa)
+- Container Apps cobra por uso, no por tiempo activo
 
 ### Costes Azure (Enero 2026)
 Suscripción: **Azure for Students** ($100 crédito/12 meses)
@@ -117,12 +116,12 @@ Suscripción: **Azure for Students** ($100 crédito/12 meses)
 |----------|-----|-----------|
 | PostgreSQL Flexible | B1ms (1vCPU, 2GB, 32GB) | ~$17 |
 | Web App | B1 Linux | ~$13 |
-| Container Apps | Consumption (KEDA) | ~$5 |
+| Container Apps | Consumption | ~$10-15 |
 | ACR | Basic | ~$5 |
 | Log Analytics | Mínimo | ~$2 |
-| **Total Azure** | | **~$42/mes** |
+| **Total Azure** | | **~$47-52/mes** |
 | ScrapingBee | 250K credits | 50€/mes |
-| **TOTAL** | | **~90€/mes** |
+| **TOTAL** | | **~$95-100/mes** |
 
 ### Alertas Discord (Enero 2026)
 Sistema de alertas via webhook para detectar problemas de scraping:

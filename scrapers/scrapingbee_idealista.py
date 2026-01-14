@@ -391,33 +391,23 @@ class ScrapingBeeIdealista(ScrapingBeeClient):
             return listing
 
         # Check if agency listing (skip if only_particulares)
-        # Comprehensive agency detection patterns for Idealista
+        # FIXED Jan 2026: Previous patterns were too aggressive (false positives on all listings)
+        # Now using more specific patterns that only match clear agency indicators
         agency_patterns = [
-            # CSS classes and attributes - Professional/Agency markers
-            r'class="[^"]*professional-info[^"]*"',  # Agency info section
-            r'class="[^"]*logo-profesional[^"]*"',  # Agency logo
-            r'class="[^"]*professional-logo[^"]*"',  # Professional logo
-            r'class="[^"]*advertiser-professional[^"]*"',  # Professional advertiser
-            r'class="[^"]*contact-request-profe[^"]*"',  # Professional contact section
-            r'class="[^"]*profesional[^"]*"',  # Any class containing "profesional"
-            r'class="[^"]*agency[^"]*"',  # Any class containing "agency"
-            # Data attributes
-            r'data-seller-type=["\']?professional',  # Seller type attribute
-            r'data-advertiser-type=["\']?professional',
-            r'data-is-professional=["\']?true',
-            # Agency image/logo detection
-            r'<img[^>]*alt="[^"]*(?:inmobiliaria|logo|agencia)[^"]*"',
-            r'<img[^>]*class="[^"]*logo[^"]*"[^>]*>',
-            # Text patterns in advertiser section
-            r'<[^>]*class="[^"]*advertiser[^"]*"[^>]*>.*?(?:inmobiliaria|agencia|fincas|gestora|real\s*estate)',
-            # JSON-LD data
-            r'"@type"\s*:\s*"RealEstateAgent"',
-            r'"seller"\s*:\s*\{[^}]*"@type"\s*:\s*"Organization"',
-            # Phone number patterns typical of agencies (multiple lines, etc)
+            # Specific agency sections (not generic CSS classes)
+            r'class="[^"]*professional-info[^"]*"[^>]*>.*?(?:inmobiliaria|agencia)',  # Agency info with content
+            r'class="[^"]*advertiser-name[^"]*"[^>]*>.*?(?:inmobiliaria|agencia|fincas|gestora)',  # Agency name
+            # Data attributes (most reliable)
+            r'data-seller-type=["\']professional["\']',  # Exact match only
+            r'data-advertiser-type=["\']professional["\']',
+            # JSON-LD - only match if seller is Organization (not generic Organization in page)
+            r'"seller"\s*:\s*\{[^}]*"@type"\s*:\s*"(?:RealEstateAgent|Organization)"[^}]*"name"\s*:\s*"[^"]*(?:inmobiliaria|agencia|fincas)',
+            # Clear text indicators for professional contact
             r'ver\s+tel[eé]fonos?\s+de\s+la\s+inmobiliaria',
-            # Contact form for professionals
-            r'contactar\s+(?:con\s+)?(?:el\s+)?anunciante\s+profesional',
-            r'formulario\s+de\s+contacto.*profesional',
+            r'contactar\s+con\s+(?:la\s+)?(?:inmobiliaria|agencia)',
+            # Agency logo with specific agency marker (not generic logo)
+            r'<img[^>]*alt="[^"]*(?:inmobiliaria|agencia)[^"]*"[^>]*class="[^"]*logo',
+            r'<img[^>]*class="[^"]*logo-profesional[^"]*"',  # Specific class
         ]
         is_agency = any(re.search(pattern, html, re.IGNORECASE | re.DOTALL) for pattern in agency_patterns)
 
