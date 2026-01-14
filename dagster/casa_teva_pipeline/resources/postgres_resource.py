@@ -329,11 +329,11 @@ class PostgresResource(ConfigurableResource):
             tenant_id: ID del tenant (opcional, si None obtiene todas)
 
         Returns:
-            Lista de zonas con slug, nombre y tenant_id
+            Lista de zonas con slug, nombre, tenant_id y portales habilitados
         """
         if tenant_id:
             query = """
-                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre
+                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre, z.portales
                 FROM zonas_geograficas z
                 JOIN tenants t ON z.tenant_id = t.tenant_id
                 WHERE z.activa = true AND z.tenant_id = %s
@@ -342,7 +342,7 @@ class PostgresResource(ConfigurableResource):
             params = (tenant_id,)
         else:
             query = """
-                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre
+                SELECT z.slug, z.nombre, z.tenant_id, t.nombre as tenant_nombre, z.portales
                 FROM zonas_geograficas z
                 JOIN tenants t ON z.tenant_id = t.tenant_id
                 WHERE z.activa = true
@@ -360,6 +360,7 @@ class PostgresResource(ConfigurableResource):
                     'nombre': row[1],
                     'tenant_id': row[2],
                     'tenant_nombre': row[3],
+                    'portales': row[4] if row[4] else [],
                 })
 
         return zones

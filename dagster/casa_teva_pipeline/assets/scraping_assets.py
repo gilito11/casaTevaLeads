@@ -378,74 +378,84 @@ def scraping_all_portals(
     for zone in zones:
         context.log.info(f"  - {zone['nombre']} ({zone['slug']}) - Tenant: {zone['tenant_nombre']}")
 
-    # Agrupar zonas por tenant
+    # Agrupar zonas por tenant (mantener info completa incluyendo portales)
     zones_by_tenant = {}
     for zone in zones:
         tid = zone['tenant_id']
         if tid not in zones_by_tenant:
             zones_by_tenant[tid] = []
-        zones_by_tenant[tid].append(zone['slug'])
+        zones_by_tenant[tid].append(zone)
 
     # Ejecutar scrapers para cada tenant
     all_results = []
     total_leads = 0
 
-    for tenant_id, zone_slugs in zones_by_tenant.items():
-        context.log.info(f"Procesando tenant {tenant_id} con {len(zone_slugs)} zonas")
+    for tenant_id, tenant_zones in zones_by_tenant.items():
+        context.log.info(f"Procesando tenant {tenant_id} con {len(tenant_zones)} zonas")
 
-        # Mapear zonas para Milanuncios
+        # Mapear zonas para Milanuncios (solo si portal habilitado)
         milanuncios_zones = []
-        for slug in zone_slugs:
-            if slug in ZONA_MAPPING_MILANUNCIOS:
+        for zone in tenant_zones:
+            slug = zone['slug']
+            portales = zone.get('portales', [])
+            if 'milanuncios' in portales and slug in ZONA_MAPPING_MILANUNCIOS:
                 mapped = ZONA_MAPPING_MILANUNCIOS[slug]
                 if mapped not in milanuncios_zones:
                     milanuncios_zones.append(mapped)
 
         # === Milanuncios with ScrapingBee (paid - bypasses GeeTest via stealth proxy) ===
         if milanuncios_zones:
-            context.log.info("Running Milanuncios with ScrapingBee (stealth proxy)")
+            context.log.info(f"Running Milanuncios with ScrapingBee (stealth proxy) - {len(milanuncios_zones)} zones")
             result = run_scraper(context, 'scrapingbee_milanuncios', milanuncios_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
-        # Mapear zonas para Habitaclia (Botasaurus)
+        # Mapear zonas para Habitaclia (solo si portal habilitado)
         habitaclia_zones = []
-        for slug in zone_slugs:
-            if slug in ZONA_MAPPING_HABITACLIA:
+        for zone in tenant_zones:
+            slug = zone['slug']
+            portales = zone.get('portales', [])
+            if 'habitaclia' in portales and slug in ZONA_MAPPING_HABITACLIA:
                 mapped = ZONA_MAPPING_HABITACLIA[slug]
                 if mapped not in habitaclia_zones:
                     habitaclia_zones.append(mapped)
 
         # Ejecutar Habitaclia
         if habitaclia_zones:
+            context.log.info(f"Running Habitaclia - {len(habitaclia_zones)} zones")
             result = run_scraper(context, 'habitaclia', habitaclia_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
-        # Mapear zonas para Fotocasa (Botasaurus)
+        # Mapear zonas para Fotocasa (solo si portal habilitado)
         fotocasa_zones = []
-        for slug in zone_slugs:
-            if slug in ZONA_MAPPING_FOTOCASA:
+        for zone in tenant_zones:
+            slug = zone['slug']
+            portales = zone.get('portales', [])
+            if 'fotocasa' in portales and slug in ZONA_MAPPING_FOTOCASA:
                 mapped = ZONA_MAPPING_FOTOCASA[slug]
                 if mapped not in fotocasa_zones:
                     fotocasa_zones.append(mapped)
 
         # Ejecutar Fotocasa
         if fotocasa_zones:
+            context.log.info(f"Running Fotocasa - {len(fotocasa_zones)} zones")
             result = run_scraper(context, 'fotocasa', fotocasa_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
         # === Idealista with ScrapingBee (paid - bypasses DataDome via stealth proxy) ===
         idealista_zones = []
-        for slug in zone_slugs:
-            if slug in ZONA_MAPPING_IDEALISTA:
+        for zone in tenant_zones:
+            slug = zone['slug']
+            portales = zone.get('portales', [])
+            if 'idealista' in portales and slug in ZONA_MAPPING_IDEALISTA:
                 mapped = ZONA_MAPPING_IDEALISTA[slug]
                 if mapped not in idealista_zones:
                     idealista_zones.append(mapped)
 
         if idealista_zones:
-            context.log.info("Running Idealista with ScrapingBee (stealth proxy)")
+            context.log.info(f"Running Idealista with ScrapingBee (stealth proxy) - {len(idealista_zones)} zones")
             result = run_scraper(context, 'scrapingbee_idealista', idealista_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
