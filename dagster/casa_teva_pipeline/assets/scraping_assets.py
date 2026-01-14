@@ -34,6 +34,17 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Zonas pequeñas donde Idealista NO se ejecuta (mayoría de anuncios son de agencias)
+# En estas zonas, el filtro only_particulares=True devuelve 0 resultados consistentemente
+IDEALISTA_SKIP_ZONES = {
+    'amposta',
+    'deltebre',
+    'ametlla_mar',
+    'hospitalet_infant',
+    'montroig_camp',
+    'sant_carles_rapita',
+}
+
 # Mapeo de zonas de BD a zonas de cada scraper
 # Todas las zonas disponibles en el scraper de Milanuncios
 ZONA_MAPPING_MILANUNCIOS = {
@@ -460,14 +471,21 @@ def scraping_all_portals(
             total_leads += result.get('leads_found', 0)
 
         # === Idealista with ScrapingBee (paid - bypasses DataDome via stealth proxy) ===
+        # Skip small zones where most listings are from agencies (0 results expected)
         idealista_zones = []
+        skipped_idealista_zones = []
         for zone in tenant_zones:
             slug = zone['slug']
             portales = zone.get('portales', [])
             if 'idealista' in portales and slug in ZONA_MAPPING_IDEALISTA:
                 mapped = ZONA_MAPPING_IDEALISTA[slug]
-                if mapped not in idealista_zones:
+                if mapped in IDEALISTA_SKIP_ZONES:
+                    skipped_idealista_zones.append(mapped)
+                elif mapped not in idealista_zones:
                     idealista_zones.append(mapped)
+
+        if skipped_idealista_zones:
+            context.log.info(f"Skipping Idealista for small zones (agencies dominate): {skipped_idealista_zones}")
 
         if idealista_zones:
             context.log.info(f"Running Idealista with ScrapingBee (stealth proxy) - {len(idealista_zones)} zones")

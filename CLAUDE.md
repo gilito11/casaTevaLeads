@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 14 January 2026 (KEDA eliminado, filtro agencias Idealista arreglado)
+> **Last Updated**: 14 January 2026 (Idealista desactivado para zonas pequeñas Terres de l'Ebre)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -87,6 +87,18 @@ Los modelos dbt filtran automaticamente anuncios con frases como:
 - Stealth proxy: GeeTest (Milanuncios), DataDome (Idealista)
 - **Timeout**: 120s por request (aumentado de 60s para stealth proxy)
 - **Idealista detail pages**: 3 por pagina busqueda (reducido de 10 para evitar timeout 45min)
+
+### Idealista - Zonas pequeñas (14 Enero 2026)
+**DECISION**: Idealista desactivado para zonas pequeñas de Terres de l'Ebre.
+
+En zonas pequeñas (< 20K habitantes), el 95%+ de anuncios en Idealista son de agencias
+inmobiliarias. El filtro `only_particulares=True` devuelve 0 resultados consistentemente,
+gastando credits de ScrapingBee sin beneficio.
+
+**Zonas excluidas** (definidas en `IDEALISTA_SKIP_ZONES` en `scraping_assets.py`):
+- amposta, deltebre, ametlla_mar, hospitalet_infant, montroig_camp, sant_carles_rapita
+
+**NO reactivar Idealista para estas zonas** - simplemente no hay particulares vendiendo.
 
 ### Schedule Optimizado (Enero 2026)
 Basado en analisis de 220 anuncios de Milanuncios:
