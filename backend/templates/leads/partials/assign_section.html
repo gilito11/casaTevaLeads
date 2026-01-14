@@ -1,0 +1,27 @@
+<!-- Seccion de asignacion de lead -->
+<div id="assignment-section">
+    <div class="flex items-center justify-between mb-2">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Asignado a</p>
+    </div>
+    <form hx-post="{% url 'leads:assign' lead.lead_id %}"
+          hx-target="#assignment-section"
+          hx-swap="innerHTML">
+        {% csrf_token %}
+        <select name="user_id"
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                onchange="this.form.requestSubmit()">
+            <option value="">Sin asignar</option>
+            {% for user in team_users %}
+            <option value="{{ user.id }}"
+                    {% if lead_estado and lead_estado.asignado_a_id == user.id %}selected{% endif %}>
+                {{ user.get_full_name|default:user.username }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+    {% if lead_estado and lead_estado.asignado_a %}
+    <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Asignado a {{ lead_estado.asignado_a.get_full_name|default:lead_estado.asignado_a.username }}
+    </p>
+    {% endif %}
+</div>

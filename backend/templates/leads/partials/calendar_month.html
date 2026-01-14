@@ -1,0 +1,56 @@
+<!-- Vista Mensual del Calendario -->
+<div class="overflow-x-auto">
+    <div class="min-w-[700px]">
+        <!-- Header con dias de la semana -->
+        <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
+            {% for day_name in "Lun,Mar,Mie,Jue,Vie,Sab,Dom"|make_list %}
+            {% endfor %}
+            <div class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Lun</div>
+            <div class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Mar</div>
+            <div class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Mie</div>
+            <div class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Jue</div>
+            <div class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vie</div>
+            <div class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sab</div>
+            <div class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Dom</div>
+        </div>
+
+        <!-- Semanas del mes -->
+        {% for week in calendar.weeks %}
+        <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+            {% for day in week %}
+            <div class="min-h-[100px] border-r border-gray-200 dark:border-gray-700 last:border-r-0 p-1
+                        {% if day.is_today %}bg-primary-50 dark:bg-primary-900/20{% endif %}
+                        {% if not day.is_current_month %}bg-gray-50 dark:bg-gray-800/50{% endif %}">
+                <!-- Numero del dia -->
+                <div class="flex items-center justify-between px-1 mb-1">
+                    <span class="text-sm {% if day.is_today %}font-bold text-primary-600 dark:text-primary-400{% elif not day.is_current_month %}text-gray-400 dark:text-gray-600{% else %}text-gray-700 dark:text-gray-300{% endif %}">
+                        {{ day.day }}
+                    </span>
+                    {% if day.visitas|length > 0 %}
+                    <span class="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                        {{ day.visitas|length }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Visitas del dia -->
+                <div class="space-y-1">
+                    {% for visita in day.visitas|slice:":3" %}
+                    <a href="{% url 'leads:contact_detail' visita.contact.id %}"
+                       class="block px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/50 rounded text-xs hover:bg-purple-200 dark:hover:bg-purple-900/70 transition-colors">
+                        <span class="font-medium text-purple-700 dark:text-purple-300">{{ visita.fecha|time:"H:i" }}</span>
+                        <span class="text-gray-700 dark:text-gray-300 truncate ml-1">{{ visita.contact.nombre|default:visita.contact.telefono|truncatechars:10 }}</span>
+                    </a>
+                    {% endfor %}
+                    {% if day.visitas|length > 3 %}
+                    <span class="block px-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        +{{ day.visitas|length|add:"-3" }} mas
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>

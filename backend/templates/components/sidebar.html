@@ -78,6 +78,23 @@
                 </a>
             </li>
 
+            <!-- Calendario -->
+            <li>
+                <a href="{% url 'leads:calendar' %}"
+                   class="flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors
+                   {% if 'calendar' in request.path %}
+                   bg-primary-50 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400
+                   {% else %}
+                   text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+                   {% endif %}">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <span x-show="open" x-transition class="font-medium">Calendario</span>
+                </a>
+            </li>
+
             <!-- Scrapers -->
             <li>
                 <a href="{% url 'scrapers' %}"
@@ -211,6 +228,7 @@
                     <li><a href="{% url 'dashboard' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Dashboard</a></li>
                     <li><a href="{% url 'leads:list' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Propiedades</a></li>
                     <li><a href="{% url 'leads:contact_list' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Contactos</a></li>
+                    <li><a href="{% url 'leads:calendar' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Calendario</a></li>
                     <li><a href="{% url 'scrapers' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Scrapers</a></li>
                     <li><a href="{% url 'analytics:dashboard' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Analytics</a></li>
                     <li><a href="{% url 'profile' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Mi Perfil</a></li>

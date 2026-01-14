@@ -79,6 +79,13 @@
         <!-- Quick Filters -->
         <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <span class="text-sm text-gray-500 dark:text-gray-400 mr-2">Filtros rapidos:</span>
+            <a href="{% url 'leads:list' %}?asignado=me"
+               class="px-3 py-1 text-xs rounded-full {% if request.GET.asignado == 'me' %}bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity flex items-center">
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                Mis Leads
+            </a>
             <a href="{% url 'leads:list' %}?orden=-lead_score"
                class="px-3 py-1 text-xs rounded-full {% if request.GET.orden == '-lead_score' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity flex items-center">
                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">

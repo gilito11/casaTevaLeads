@@ -47,6 +47,7 @@ def lead_list_view(request):
     estado = request.GET.get('estado', '')
     portal = request.GET.get('portal', '')
     zona = request.GET.get('zona', '')
+    asignado = request.GET.get('asignado', '')  # 'me' para mis leads, user_id, o '' para todos
 
     if q:
         leads_qs = leads_qs.filter(
@@ -86,6 +87,27 @@ def lead_list_view(request):
             # Para otros estados: solo los que tienen ese estado en LeadEstado
             leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_with_estado])
 
+    # Filtrar por asignacion
+    if asignado:
+        if asignado == 'me':
+            # Mis leads (asignados al usuario actual)
+            lead_ids_asignados = LeadEstado.objects.filter(
+                asignado_a=request.user
+            ).values_list('lead_id', flat=True)
+            leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_asignados])
+        elif asignado == 'unassigned':
+            # Leads sin asignar
+            lead_ids_asignados = LeadEstado.objects.exclude(
+                asignado_a__isnull=True
+            ).values_list('lead_id', flat=True)
+            leads_qs = leads_qs.exclude(lead_id__in=[lid for lid in lead_ids_asignados])
+        else:
+            # Leads asignados a un usuario especifico
+            lead_ids_asignados = LeadEstado.objects.filter(
+                asignado_a_id=asignado
+            ).values_list('lead_id', flat=True)
+            leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_asignados])
+
     # Ordenar por defecto si no hay orden especificado
     if not orden:
         leads_qs = leads_qs.order_by('-fecha_scraping')
@@ -102,9 +124,31 @@ def lead_list_view(request):
         for le in LeadEstado.objects.filter(lead_id__in=lead_ids)
     }
 
-    # Añadir estado_actual a cada lead
+    # Obtener nombres de Contact editados por el usuario
+    telefono_list = [lead.telefono_norm for lead in leads if lead.telefono_norm]
+    contact_nombres = {
+        c.telefono: c.nombre
+        for c in Contact.objects.filter(tenant_id=tenant_id, telefono__in=telefono_list)
+        if c.nombre  # Solo si tiene nombre editado
+    }
+
+    # Obtener asignaciones de LeadEstado
+    lead_asignaciones = {
+        le.lead_id: le.asignado_a
+        for le in LeadEstado.objects.filter(lead_id__in=lead_ids).select_related('asignado_a')
+    }
+
+    # Añadir estado_actual, nombre de contacto y asignado_a a cada lead
     for lead in leads:
         lead.estado_actual = lead_estados.get(str(lead.lead_id), lead.estado)
+        lead.asignado_a_user = lead_asignaciones.get(str(lead.lead_id))
+        # Usar nombre de Contact si está editado, sino el original
+        contact_nombre = contact_nombres.get(lead.telefono_norm)
+        if contact_nombre:
+            lead.nombre = contact_nombre
+
+    # Obtener usuarios del tenant para dropdown de asignacion
+    team_users = get_tenant_users(tenant_id)
 
     # Zonas para filtro - obtener zonas únicas no vacías
     zonas = (Lead.objects
@@ -119,6 +163,7 @@ def lead_list_view(request):
         'total_leads': paginator.count,
         'estados': Lead.ESTADO_CHOICES,
         'zonas': list(zonas),
+        'team_users': team_users,
     }
 
     # Si es peticion HTMX, devolver solo la tabla
@@ -146,12 +191,24 @@ def lead_detail_view(request, lead_id):
     lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()
     estado_actual = lead_estado.estado if lead_estado else lead.estado
 
+    # Obtener nombre de Contact si está editado
+    contact = Contact.objects.filter(
+        tenant_id=tenant_id,
+        telefono=lead.telefono_norm
+    ).first()
+    if contact and contact.nombre:
+        lead.nombre = contact.nombre
+
+    # Obtener usuarios del tenant para dropdown de asignacion
+    team_users = get_tenant_users(tenant_id)
+
     context = {
         'lead': lead,
         'notas': notas,
         'estados': Lead.ESTADO_CHOICES,
         'estado_actual': estado_actual,
         'lead_estado': lead_estado,
+        'team_users': team_users,
     }
 
     return render(request, 'leads/detail.html', context)
@@ -205,6 +262,14 @@ def change_status_view(request, lead_id):
     # Obtener estado actual de LeadEstado
     lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()
     current_estado = lead_estado.estado if lead_estado else lead.estado
+
+    # Obtener nombre de Contact si está editado
+    contact = Contact.objects.filter(
+        tenant_id=tenant_id,
+        telefono=lead.telefono_norm
+    ).first()
+    if contact and contact.nombre:
+        lead.nombre = contact.nombre
 
     # Si viene de la tabla, devolver solo la fila actualizada
     context = {
@@ -602,3 +667,241 @@ def delete_interaction_view(request, interaction_id):
         return HttpResponse('')
 
     return redirect('leads:contact_detail', contact_id=interaction.contact_id)
+
+
+# ============================================================
+# LEAD ASSIGNMENT VIEWS
+# ============================================================
+
+def get_tenant_users(tenant_id):
+    """Obtiene los usuarios del tenant para asignacion"""
+    from django.contrib.auth.models import User
+    user_ids = TenantUser.objects.filter(
+        tenant_id=tenant_id
+    ).values_list('user_id', flat=True)
+    return User.objects.filter(id__in=user_ids).order_by('first_name', 'username')
+
+
+@login_required
+@require_POST
+def assign_lead_view(request, lead_id):
+    """Asignar un lead a un usuario del tenant (HTMX)"""
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    if tenant_id and lead.tenant_id != tenant_id:
+        return HttpResponse(status=403)
+
+    user_id = request.POST.get('user_id')
+
+    # Obtener o crear LeadEstado
+    lead_estado, created = LeadEstado.objects.get_or_create(
+        lead_id=str(lead.lead_id),
+        defaults={
+            'tenant_id': lead.tenant_id,
+            'telefono_norm': lead.telefono_norm,
+            'estado': 'NUEVO',
+        }
+    )
+
+    # Asignar usuario (o None si se deselecciona)
+    from django.contrib.auth.models import User
+    if user_id:
+        lead_estado.asignado_a = User.objects.filter(id=user_id).first()
+    else:
+        lead_estado.asignado_a = None
+    lead_estado.save()
+
+    # Si es HTMX, devolver partial actualizado
+    if request.headers.get('HX-Request'):
+        team_users = get_tenant_users(tenant_id)
+        context = {
+            'lead': lead,
+            'lead_estado': lead_estado,
+            'team_users': team_users,
+        }
+        return render(request, 'leads/partials/assign_section.html', context)
+
+    return redirect('leads:detail', lead_id=lead_id)
+
+
+@login_required
+@require_POST
+def bulk_assign_view(request):
+    """Asignar multiples leads a un usuario"""
+    try:
+        data = json.loads(request.body)
+        lead_ids = data.get('lead_ids', [])
+        user_id = data.get('user_id')  # None para desasignar
+
+        if not lead_ids:
+            return JsonResponse({'error': 'No se especificaron leads'}, status=400)
+
+        tenant_id = get_user_tenant(request)
+        from django.contrib.auth.models import User
+        assigned_user = User.objects.filter(id=user_id).first() if user_id else None
+
+        updated_count = 0
+        for lead_id in lead_ids:
+            try:
+                lead = Lead.objects.get(lead_id=lead_id)
+                if tenant_id and lead.tenant_id != tenant_id:
+                    continue
+
+                lead_estado, created = LeadEstado.objects.get_or_create(
+                    lead_id=str(lead.lead_id),
+                    defaults={
+                        'tenant_id': lead.tenant_id,
+                        'telefono_norm': lead.telefono_norm,
+                        'estado': 'NUEVO',
+                    }
+                )
+                lead_estado.asignado_a = assigned_user
+                lead_estado.save()
+                updated_count += 1
+            except Lead.DoesNotExist:
+                continue
+
+        return JsonResponse({'updated': updated_count})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON invalido'}, status=400)
+
+
+# ============================================================
+# CALENDAR VIEWS
+# ============================================================
+
+@login_required
+def calendar_view(request):
+    """Vista de calendario con visitas programadas"""
+    from datetime import datetime, timedelta
+    import calendar as cal
+
+    tenant_id = get_user_tenant(request)
+    view_type = request.GET.get('view', 'week')  # week o month
+
+    # Fecha actual o navegada
+    year = int(request.GET.get('year', datetime.now().year))
+    month = int(request.GET.get('month', datetime.now().month))
+    week = int(request.GET.get('week', datetime.now().isocalendar()[1]))
+
+    today = datetime.now().date()
+
+    if view_type == 'month':
+        # Vista mensual
+        first_day = datetime(year, month, 1)
+        if month == 12:
+            last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+
+        # Ajustar para incluir dias de semanas completas
+        start_weekday = first_day.weekday()  # 0=Lunes
+        start_date = first_day - timedelta(days=start_weekday)
+        end_weekday = last_day.weekday()
+        end_date = last_day + timedelta(days=6 - end_weekday)
+
+        # Navegacion
+        prev_month = month - 1 if month > 1 else 12
+        prev_year = year if month > 1 else year - 1
+        next_month = month + 1 if month < 12 else 1
+        next_year = year if month < 12 else year + 1
+
+        nav_context = {
+            'prev_url': f'?view=month&year={prev_year}&month={prev_month}',
+            'next_url': f'?view=month&year={next_year}&month={next_month}',
+            'title': f'{cal.month_name[month]} {year}',
+        }
+    else:
+        # Vista semanal
+        # Encontrar lunes de la semana
+        iso_year, iso_week, _ = today.isocalendar()
+        if request.GET.get('week'):
+            iso_week = week
+        if request.GET.get('year'):
+            iso_year = year
+
+        # Calcular fecha del lunes de esa semana ISO
+        jan4 = datetime(iso_year, 1, 4)
+        start_of_week1 = jan4 - timedelta(days=jan4.weekday())
+        start_date = start_of_week1 + timedelta(weeks=iso_week - 1)
+        end_date = start_date + timedelta(days=6)
+
+        # Navegacion
+        prev_week = iso_week - 1 if iso_week > 1 else 52
+        prev_year = iso_year if iso_week > 1 else iso_year - 1
+        next_week = iso_week + 1 if iso_week < 52 else 1
+        next_year = iso_year if iso_week < 52 else iso_year + 1
+
+        nav_context = {
+            'prev_url': f'?view=week&year={prev_year}&week={prev_week}',
+            'next_url': f'?view=week&year={next_year}&week={next_week}',
+            'title': f'Semana {iso_week}, {iso_year}',
+        }
+
+    # Obtener visitas del rango
+    visitas = Interaction.objects.filter(
+        contact__tenant_id=tenant_id,
+        tipo='visita',
+        fecha__date__gte=start_date.date() if hasattr(start_date, 'date') else start_date,
+        fecha__date__lte=end_date.date() if hasattr(end_date, 'date') else end_date,
+    ).select_related('contact', 'usuario').order_by('fecha')
+
+    # Agrupar visitas por dia
+    visitas_por_dia = {}
+    for visita in visitas:
+        dia = visita.fecha.date()
+        if dia not in visitas_por_dia:
+            visitas_por_dia[dia] = []
+        visitas_por_dia[dia].append(visita)
+
+    # Generar dias del calendario
+    if view_type == 'month':
+        # Generar semanas del mes
+        weeks = []
+        current = start_date if isinstance(start_date, datetime) else datetime.combine(start_date, datetime.min.time())
+        while current.date() <= (end_date.date() if hasattr(end_date, 'date') else end_date):
+            week_days = []
+            for _ in range(7):
+                day_date = current.date()
+                week_days.append({
+                    'date': day_date,
+                    'day': day_date.day,
+                    'is_today': day_date == today,
+                    'is_current_month': day_date.month == month,
+                    'visitas': visitas_por_dia.get(day_date, []),
+                })
+                current += timedelta(days=1)
+            weeks.append(week_days)
+        calendar_data = {'weeks': weeks}
+    else:
+        # Generar dias de la semana
+        days = []
+        current = start_date if isinstance(start_date, datetime) else datetime.combine(start_date, datetime.min.time())
+        day_names = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
+        for i in range(7):
+            day_date = current.date()
+            days.append({
+                'date': day_date,
+                'name': day_names[i],
+                'day': day_date.day,
+                'is_today': day_date == today,
+                'visitas': visitas_por_dia.get(day_date, []),
+            })
+            current += timedelta(days=1)
+        calendar_data = {'days': days}
+
+    context = {
+        'view_type': view_type,
+        'nav': nav_context,
+        'calendar': calendar_data,
+        'today': today,
+    }
+
+    # Si es HTMX, devolver solo el partial del calendario
+    if request.headers.get('HX-Request'):
+        template = f'leads/partials/calendar_{view_type}.html'
+        return render(request, template, context)
+
+    return render(request, 'leads/calendar.html', context)

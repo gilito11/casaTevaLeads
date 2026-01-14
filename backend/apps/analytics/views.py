@@ -343,6 +343,22 @@ def analytics_dashboard_view(request):
         except Exception as e:
             logger.error(f"Error fetching tipologia: {e}")
 
+    # Proximas visitas (del usuario actual, próximos 7 días)
+    from leads.models import Interaction
+    try:
+        from django.utils import timezone
+        from datetime import timedelta
+        proximas_visitas = Interaction.objects.filter(
+            contact__tenant_id=tenant_id,
+            tipo='visita',
+            fecha__gte=timezone.now(),
+            fecha__lte=timezone.now() + timedelta(days=7)
+        ).select_related('contact').order_by('fecha')[:5]
+        context['proximas_visitas'] = proximas_visitas
+    except Exception as e:
+        logger.error(f"Error fetching proximas visitas: {e}")
+        context['proximas_visitas'] = []
+
     # Convert lists to JSON for JavaScript
     context['leads_por_dia_json'] = json.dumps(context['leads_por_dia'])
     context['evolucion_precios_json'] = json.dumps(context['evolucion_precios'])

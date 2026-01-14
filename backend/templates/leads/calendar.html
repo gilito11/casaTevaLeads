@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Calendario - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Calendario de Visitas</h1>
+            <p class="text-gray-600 dark:text-gray-400">{{ nav.title }}</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <!-- View Toggle -->
+            <div class="bg-gray-100 dark:bg-gray-700 rounded-lg p-1 flex">
+                <a href="?view=week{% if request.GET.year %}&year={{ request.GET.year }}{% endif %}"
+                   class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+                          {% if view_type == 'week' %}bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white{% endif %}">
+                    Semana
+                </a>
+                <a href="?view=month{% if request.GET.year %}&year={{ request.GET.year }}{% endif %}{% if request.GET.month %}&month={{ request.GET.month }}{% endif %}"
+                   class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+                          {% if view_type == 'month' %}bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white{% endif %}">
+                    Mes
+                </a>
+            </div>
+
+            <!-- Navigation -->
+            <div class="flex items-center space-x-1">
+                <a href="{{ nav.prev_url }}"
+                   hx-get="{% url 'leads:calendar' %}{{ nav.prev_url }}"
+                   hx-target="#calendar-container"
+                   hx-push-url="true"
+                   class="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <a href="{% url 'leads:calendar' %}?view={{ view_type }}"
+                   hx-get="{% url 'leads:calendar' %}?view={{ view_type }}"
+                   hx-target="#calendar-container"
+                   hx-push-url="true"
+                   class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    Hoy
+                </a>
+                <a href="{{ nav.next_url }}"
+                   hx-get="{% url 'leads:calendar' %}{{ nav.next_url }}"
+                   hx-target="#calendar-container"
+                   hx-push-url="true"
+                   class="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Container -->
+    <div id="calendar-container" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {% if view_type == 'week' %}
+            {% include 'leads/partials/calendar_week.html' %}
+        {% else %}
+            {% include 'leads/partials/calendar_month.html' %}
+        {% endif %}
+    </div>
+
+    <!-- Legend -->
+    <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+        <div class="flex items-center">
+            <div class="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+            <span>Visita programada</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

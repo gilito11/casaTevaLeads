@@ -277,6 +277,11 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">Intentos de contacto</p>
                         <p class="font-medium text-gray-900 dark:text-white">{{ lead_estado.numero_intentos|default:lead.numero_intentos }}</p>
                     </div>
+
+                    <!-- Asignacion -->
+                    <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                        {% include 'leads/partials/assign_section.html' %}
+                    </div>
                 </div>
             </div>
 
