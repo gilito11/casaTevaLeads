@@ -14,6 +14,7 @@ from typing import Dict, Any, List, Optional
 from urllib.parse import urlencode, quote
 
 from scrapers.scrapingbee_base import ScrapingBeeClient
+from scrapers.watermark_detector import has_watermark
 
 logger = logging.getLogger(__name__)
 
@@ -350,6 +351,7 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         postgres_config: Optional[Dict[str, str]] = None,
         use_stealth: bool = True,
         max_pages_per_zone: int = 3,
+        filter_watermarks: bool = True,
     ):
         """
         Initialize Milanuncios scraper.
@@ -360,6 +362,7 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
             postgres_config: PostgreSQL config (auto-detected if None)
             use_stealth: Use stealth proxy (recommended for Milanuncios)
             max_pages_per_zone: Maximum pages to scrape per zone (budget control)
+            filter_watermarks: Filter out listings with watermarked images (agencies)
         """
         super().__init__(
             portal_name=self.PORTAL_NAME,
@@ -369,6 +372,7 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
         )
         self.zones = zones or ['salou']
         self.max_pages_per_zone = max_pages_per_zone
+        self.filter_watermarks = filter_watermarks
 
     def build_search_url(self, zona_key: str, page: int = 1) -> str:
         """Build Milanuncios search URL for a zone."""
@@ -634,6 +638,15 @@ class ScrapingBeeMilanuncios(ScrapingBeeClient):
                 logger.info(f"Detail page {i+1}/{len(basic_listings[:15])} (skipped {skipped})")
 
                 enriched = self._scrape_detail_page(listing)
+
+                # Check for watermark in first image (agency filter)
+                if self.filter_watermarks and enriched.get('fotos'):
+                    first_photo = enriched['fotos'][0]
+                    if has_watermark(first_photo):
+                        logger.info(f"Skipping listing with watermark: {enriched.get('anuncio_id')}")
+                        self.stats['listings_watermarked'] = self.stats.get('listings_watermarked', 0) + 1
+                        continue
+
                 self.stats['listings_found'] += 1
                 all_listings.append(enriched)
 

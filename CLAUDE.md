@@ -100,6 +100,20 @@ gastando credits de ScrapingBee sin beneficio.
 
 **NO reactivar Idealista para estas zonas** - simplemente no hay particulares vendiendo.
 
+### Milanuncios - Filtro de watermarks (14 Enero 2026)
+**DECISION**: Filtrar anuncios con marca de agua en la primera imagen.
+
+Las agencias inmobiliarias añaden watermarks (logo/texto) en la parte inferior de las fotos.
+El scraper ahora descarga la primera imagen y analiza si tiene watermark usando detección de bordes.
+
+**Implementación** (en `scrapers/watermark_detector.py`):
+- Descarga primera imagen del anuncio
+- Analiza el 15% inferior (donde se colocan watermarks)
+- Detecta alta densidad de bordes (indicador de texto/logos)
+- Si detecta watermark → descarta el anuncio
+
+**Parámetro**: `filter_watermarks=True` (por defecto activo en `ScrapingBeeMilanuncios`)
+
 ### Schedule Optimizado (Enero 2026)
 Basado en analisis de 220 anuncios de Milanuncios:
 - **Pico manana**: 9:00-11:00 (26 anuncios a las 9:00)
