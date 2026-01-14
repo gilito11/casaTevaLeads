@@ -244,3 +244,6 @@ docs/TFG_*.md
 
 # Analysis graphs
 publication_hours_analysis.png
+
+# Claude Code temp directories
+tmpclaude-*
