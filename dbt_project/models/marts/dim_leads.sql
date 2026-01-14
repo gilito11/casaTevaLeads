@@ -186,58 +186,66 @@ enriched AS (
 final AS (
     SELECT
         -- Primary key
-        lead_id,
-        lead_unique_key,
-        tenant_id,
+        e.lead_id,
+        e.lead_unique_key,
+        e.tenant_id,
 
         -- Source tracking
-        source_listing_id,
-        source_portal,
-        data_lake_path,
+        e.source_listing_id,
+        e.source_portal,
+        e.data_lake_path,
 
         -- Contact information (PII)
-        telefono_norm,
-        telefono_raw,
-        email,
-        nombre_contacto,
-        anunciante,
+        e.telefono_norm,
+        e.telefono_raw,
+        e.email,
+        e.nombre_contacto,
+        e.anunciante,
 
         -- Property interest
-        titulo,
-        descripcion,
-        listing_url,
-        ubicacion,
-        zona_clasificada,
-        tipo_propiedad,
-        superficie_m2,
-        habitaciones,
-        banos,
-        precio,
-        precio_por_m2,
-        fotos_json,
+        e.titulo,
+        e.descripcion,
+        e.listing_url,
+        e.ubicacion,
+        e.zona_clasificada,
+        e.tipo_propiedad,
+        e.superficie_m2,
+        e.habitaciones,
+        e.banos,
+        e.precio,
+        e.precio_por_m2,
+        e.fotos_json,
 
         -- Lead metadata
-        es_particular,
-        permite_inmobiliarias,
-        lead_score,
+        e.es_particular,
+        e.permite_inmobiliarias,
+        e.lead_score,
+
+        -- Image analysis score (0-30 from Ollama Vision, NULL if not analyzed)
+        lis.image_score,
+        lis.images_analyzed,
+
+        -- Combined score: lead_score + image_score (max 130 = 100 + 30)
+        e.lead_score + COALESCE(lis.image_score, 0) AS lead_score_total,
 
         -- CRM workflow fields
-        estado,
-        asignado_a,
-        fecha_asignacion,
-        fecha_primer_contacto,
-        fecha_ultimo_contacto,
-        num_contactos,
-        notas,
-        motivo_descarte,
+        e.estado,
+        e.asignado_a,
+        e.fecha_asignacion,
+        e.fecha_primer_contacto,
+        e.fecha_ultimo_contacto,
+        e.num_contactos,
+        e.notas,
+        e.motivo_descarte,
 
         -- Timestamps
-        fecha_publicacion,
-        fecha_primera_captura,
-        ultima_actualizacion,
-        created_at_marts
+        e.fecha_publicacion,
+        e.fecha_primera_captura,
+        e.ultima_actualizacion,
+        e.created_at_marts
 
-    FROM enriched
+    FROM enriched e
+    LEFT JOIN public.lead_image_scores lis ON e.lead_id = lis.lead_id
 )
 
 SELECT * FROM final

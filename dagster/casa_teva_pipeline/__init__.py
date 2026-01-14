@@ -18,12 +18,12 @@ from dagster import (
     DefaultScheduleStatus,
 )
 
-from casa_teva_pipeline.assets import scraping_assets
+from casa_teva_pipeline.assets import scraping_assets, image_assets
 from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 
 
-# Cargar todos los assets del módulo scraping_assets
-all_assets = load_assets_from_modules([scraping_assets])
+# Cargar todos los assets de los módulos
+all_assets = load_assets_from_modules([scraping_assets, image_assets])
 
 # Job principal de scraping
 scraping_job = define_asset_job(
