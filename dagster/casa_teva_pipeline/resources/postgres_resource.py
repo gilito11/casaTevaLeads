@@ -55,7 +55,7 @@ class PostgresResource(ConfigurableResource):
     )
 
     def _get_connection(self) -> psycopg2.extensions.connection:
-        """Crea y retorna una conexión a PostgreSQL"""
+        """Crea y retorna una conexión a PostgreSQL (internal)"""
         conn_params = {
             'host': self.host,
             'port': self.port,
@@ -68,6 +68,10 @@ class PostgresResource(ConfigurableResource):
             conn_params['sslmode'] = self.sslmode
 
         return psycopg2.connect(**conn_params)
+
+    def get_connection(self) -> psycopg2.extensions.connection:
+        """Crea y retorna una conexión a PostgreSQL (public, for use with context manager)"""
+        return self._get_connection()
 
     def execute_query(
         self,
