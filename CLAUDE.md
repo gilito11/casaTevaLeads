@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 15 January 2026 (Fixes: DATABASE_URL parsing, dbt pre-hook)
+> **Last Updated**: 15 January 2026 (Listing checker, agency filter, hide admin users)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -71,6 +71,8 @@ Los modelos dbt filtran automaticamente anuncios con frases como:
 - "abstenerse agencias/inmobiliarias"
 - "no agencias/no inmobiliarias"
 - "sin intermediarios"
+- "sin comisiones de agencia" (agencias disfrazadas de particulares)
+- "0% comision" / "cero comision"
 
 ### Zonas disponibles
 20+ zonas preconfiguradas en `backend/apps/core/models.py`:
@@ -194,6 +196,32 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - Otras zonas pequeñas: Skip automatico via `IDEALISTA_SKIP_ZONES`
 - **No es bug del codigo** - es proteccion anti-bot de Idealista
 - ScrapingBee stealth proxy funciona ~70% del tiempo
+
+### Verificador de ofertas eliminadas (15 Enero 2026)
+Script para detectar anuncios que ya no existen en los portales.
+
+**Archivo**: `scrapers/listing_checker.py`
+
+**Deteccion**:
+- HTTP 404/410
+- Redireccion a homepage
+- Texto "anuncio no disponible/eliminado" en HTML
+
+**Uso**:
+```bash
+# Django management command
+python manage.py check_removed_listings --limit 50 --dry-run
+python manage.py check_removed_listings --portal habitaclia
+
+# Script directo
+python scrapers/listing_checker.py --limit 100
+```
+
+**Accion**: Marca leads eliminados como `YA_VENDIDO` automaticamente.
+
+### CRM - Asignatarios (15 Enero 2026)
+Los usuarios admin (`is_superuser=True` o `is_staff=True`) ya no aparecen
+en el dropdown de asignatarios. Solo usuarios normales del tenant.
 
 ## Comandos
 
