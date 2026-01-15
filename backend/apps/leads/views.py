@@ -674,12 +674,16 @@ def delete_interaction_view(request, interaction_id):
 # ============================================================
 
 def get_tenant_users(tenant_id):
-    """Obtiene los usuarios del tenant para asignacion"""
+    """Obtiene los usuarios del tenant para asignacion (excluye admins)"""
     from django.contrib.auth.models import User
     user_ids = TenantUser.objects.filter(
         tenant_id=tenant_id
     ).values_list('user_id', flat=True)
-    return User.objects.filter(id__in=user_ids).order_by('first_name', 'username')
+    return User.objects.filter(id__in=user_ids).exclude(
+        is_superuser=True
+    ).exclude(
+        is_staff=True
+    ).order_by('first_name', 'username')
 
 
 @login_required
