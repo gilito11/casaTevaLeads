@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 14 January 2026 (Idealista desactivado para zonas pequeñas Terres de l'Ebre)
+> **Last Updated**: 15 January 2026 (Fixes: DATABASE_URL parsing, dbt pre-hook)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -167,6 +167,33 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **API Docs**: Swagger UI en `/api/docs/`
 - **Runbooks**: `docs/RUNBOOKS.md` con procedimientos de incidentes
 - **Key Vault**: `casateva-kv` para secrets (pendiente migracion)
+
+### Bugs Arreglados (15 Enero 2026)
+
+**1. DATABASE_URL parsing en runners Botasaurus**
+- **Problema**: Habitaclia/Fotocasa guardaban 0 leads en Azure (20-50 encontrados, 0 saved)
+- **Causa**: `if 'azure' in db_url` no detectaba hostname `inmoleads-db.postgres.database.azure.com`
+- **Fix**: Cambio a `if parsed.hostname and 'azure' in parsed.hostname.lower()`
+- **Archivos**: `run_habitaclia_scraper.py`, `run_fotocasa_scraper.py`
+
+**2. scraping_stats columna inexistente**
+- **Problema**: Error `column "created_at" does not exist` en asset scraping_stats
+- **Causa**: dbt usa `fecha_primera_captura`, no `created_at`
+- **Fix**: Cambiar query a usar `fecha_primera_captura`
+- **Archivo**: `dagster/casa_teva_pipeline/assets/scraping_assets.py`
+
+**3. dbt dim_leads falla por tabla inexistente**
+- **Problema**: dbt fallaba con error de tabla `public.lead_image_scores` no existe
+- **Causa**: La tabla se crea en asset `image_analysis` que corre DESPUES de dbt
+- **Fix**: Nuevo modelo `stg_lead_image_scores.sql` con pre_hook que crea la tabla
+- **Archivo**: `dbt_project/models/staging/stg_lead_image_scores.sql`
+
+### Idealista - Estado actual (15 Enero 2026)
+**⚠️ Idealista sigue con bloqueos intermitentes de DataDome** en algunas zonas.
+- Zona `vendrell`: Bloqueado consistentemente (3 requests, 0 pages scraped)
+- Otras zonas pequeñas: Skip automatico via `IDEALISTA_SKIP_ZONES`
+- **No es bug del codigo** - es proteccion anti-bot de Idealista
+- ScrapingBee stealth proxy funciona ~70% del tiempo
 
 ## Comandos
 
