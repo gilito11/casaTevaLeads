@@ -570,13 +570,19 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
     def scrape_and_save(self) -> Dict[str, int]:
         """Scrape all zones and save to PostgreSQL."""
         listings = self.scrape()
+        duplicates = 0
 
         for listing in listings:
             self.stats['total_listings'] += 1
             # No filtering - save all listings
             if self.save_to_postgres(listing, self.PORTAL_NAME):
                 self.stats['saved'] += 1
+            else:
+                duplicates += 1
 
+        self.stats['duplicates'] = duplicates
+        if duplicates > 0:
+            logger.info(f"Skipped {duplicates} duplicate listings (already in DB)")
         logger.info(f"Stats: {self.stats}")
         return self.stats
 

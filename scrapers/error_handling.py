@@ -14,8 +14,17 @@ import time
 from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, TypeVar
+from zoneinfo import ZoneInfo
 
 import requests
+
+# Timezone for alerts (Spain/Madrid)
+MADRID_TZ = ZoneInfo('Europe/Madrid')
+
+
+def get_madrid_time() -> datetime:
+    """Get current time in Madrid timezone."""
+    return datetime.now(MADRID_TZ)
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +161,7 @@ def send_alert(
     }
     emoji = emoji_map.get(severity, "📋")
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = get_madrid_time().strftime("%Y-%m-%d %H:%M:%S")
 
     # Build message content
     content_parts = [
@@ -283,7 +292,7 @@ def send_email_alert(
     full_body = f"""{body}
 
 ---
-Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Timestamp: {get_madrid_time().strftime('%Y-%m-%d %H:%M:%S')} (Europe/Madrid)
 Environment: {'Azure' if os.environ.get('WEBSITE_INSTANCE_ID') else 'Local'}
 """
 
@@ -652,7 +661,7 @@ def generate_scraping_report(
             portals_with_errors.append(f"{portal} ({errors})")
 
     report = {
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': get_madrid_time().isoformat(),
         'total_leads': total_leads,
         'total_errors': total_errors,
         'portals_processed': len(portal_results),

@@ -19,12 +19,15 @@ from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 # Import alerting utilities (with fallback if not available)
 try:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-    from scrapers.error_handling import send_alert, AlertSeverity
+    from scrapers.error_handling import send_alert, AlertSeverity, get_madrid_time
     ALERTING_AVAILABLE = True
 except ImportError:
     ALERTING_AVAILABLE = False
+    from zoneinfo import ZoneInfo
     def send_alert(*args, **kwargs):
         pass
+    def get_madrid_time():
+        return datetime.now(ZoneInfo('Europe/Madrid'))
     class AlertSeverity:
         INFO = "info"
         WARNING = "warning"
@@ -381,7 +384,7 @@ def scraping_all_portals(
     4. Retorna estadísticas
     """
     context.log.info("Iniciando scraping de todos los portales...")
-    fecha = datetime.now().strftime('%Y-%m-%d %H:%M')
+    fecha = get_madrid_time().strftime('%Y-%m-%d %H:%M')
 
     # Obtener zonas activas de la BD
     zones = postgres.get_active_zones()
@@ -672,7 +675,7 @@ def scraping_stats(
     context.log.info("Generando estadísticas de scraping...")
 
     stats = {
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': get_madrid_time().isoformat(),
         'leads_by_portal': {},
         'leads_by_zone': {},
         'total_leads': 0,

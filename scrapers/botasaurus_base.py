@@ -261,7 +261,9 @@ class BotasaurusBaseScraper:
             if rows_affected > 0:
                 logger.info(f"Lead saved: {portal} - {anuncio_id}")
                 return True
-            return False
+            else:
+                logger.debug(f"Duplicate skipped: {portal} - {anuncio_id}")
+                return False
 
         except Exception as e:
             logger.error(f"Error saving to PostgreSQL: {e}")
