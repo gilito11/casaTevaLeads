@@ -97,21 +97,22 @@ def main():
     postgres_config = None
     if args.postgres:
         db_url = os.environ.get('DATABASE_URL', '')
-        if db_url and 'azure' in db_url:
+        if db_url:
             from urllib.parse import urlparse
             parsed = urlparse(db_url)
+            # Check if Azure by hostname (*.database.azure.com)
+            is_azure = parsed.hostname and 'azure' in parsed.hostname.lower()
             postgres_config = {
                 'host': parsed.hostname,
                 'port': parsed.port or 5432,
                 'database': parsed.path.lstrip('/'),
                 'user': parsed.username,
                 'password': parsed.password,
-                'sslmode': 'require'
+                'sslmode': 'require' if is_azure else 'prefer'
             }
         else:
-            pg_host = 'postgres' if os.environ.get('DATABASE_URL') else 'localhost'
             postgres_config = {
-                'host': pg_host,
+                'host': 'localhost',
                 'port': 5432,
                 'database': 'casa_teva_db',
                 'user': 'casa_teva',

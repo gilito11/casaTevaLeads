@@ -183,6 +183,15 @@ enriched AS (
     WHERE rn = 1  -- Keep only the most recent record per tenant + phone
 ),
 
+-- Image scores from staging (table created via pre_hook if not exists)
+image_scores AS (
+    SELECT
+        lead_id,
+        image_score,
+        images_analyzed
+    FROM {{ ref('stg_lead_image_scores') }}
+),
+
 final AS (
     SELECT
         -- Primary key
@@ -245,7 +254,7 @@ final AS (
         e.created_at_marts
 
     FROM enriched e
-    LEFT JOIN public.lead_image_scores lis ON e.lead_id = lis.lead_id
+    LEFT JOIN image_scores lis ON e.lead_id = lis.lead_id
 )
 
 SELECT * FROM final

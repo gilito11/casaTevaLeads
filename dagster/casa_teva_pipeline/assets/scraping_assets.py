@@ -707,7 +707,7 @@ def scraping_stats(
                 cur.execute("""
                     SELECT COUNT(*)
                     FROM public_marts.dim_leads
-                    WHERE created_at >= CURRENT_DATE
+                    WHERE fecha_primera_captura >= CURRENT_DATE
                 """)
                 stats['new_leads_today'] = cur.fetchone()[0]
 
