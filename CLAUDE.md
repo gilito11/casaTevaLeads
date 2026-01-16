@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 15 January 2026 (Listing checker, agency filter, hide admin users)
+> **Last Updated**: 17 January 2026 (Dashboard filters, Habitaclia image fix)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -170,6 +170,14 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Runbooks**: `docs/RUNBOOKS.md` con procedimientos de incidentes
 - **Key Vault**: `casateva-kv` para secrets (pendiente migracion)
 
+### Bugs Arreglados (17 Enero 2026)
+
+**1. Habitaclia no extraia fotos**
+- **Problema**: Scraper de Habitaclia devuelvia 0 fotos por anuncio
+- **Causa**: Filtro `id_for_match` comparaba IDs incompatibles (anuncio vs directorio imagen)
+- **Fix**: Eliminar filtro erroneo, mantener deduplicacion por directory/filename
+- **Archivo**: `scrapers/botasaurus_habitaclia.py`
+
 ### Bugs Arreglados (15 Enero 2026)
 
 **1. DATABASE_URL parsing en runners Botasaurus**
@@ -189,6 +197,23 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Causa**: La tabla se crea en asset `image_analysis` que corre DESPUES de dbt
 - **Fix**: Nuevo modelo `stg_lead_image_scores.sql` con pre_hook que crea la tabla
 - **Archivo**: `dbt_project/models/staging/stg_lead_image_scores.sql`
+
+### Dashboard Analytics (17 Enero 2026)
+Mejoras en `/analytics/`:
+
+**Filtros interactivos**:
+- Portal (habitaclia, fotocasa, milanuncios, idealista)
+- Zona geografica
+- Periodo (7, 30, 90 dias)
+
+**KPIs arreglados**:
+- `score_medio`: Ahora calcula AVG(lead_score) real
+- `dias_medio_primer_contacto`: Calcula dias desde captura hasta primer contacto
+
+**Nueva seccion "Ultimos Leads"**:
+- Tabla con 10 leads mas recientes
+- Muestra: titulo, portal, zona, precio, score, estado, fecha
+- Links directos a detalle del lead
 
 ### Idealista - Estado actual (15 Enero 2026)
 **⚠️ Idealista sigue con bloqueos intermitentes de DataDome** en algunas zonas.
