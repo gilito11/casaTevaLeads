@@ -103,6 +103,25 @@ def analytics_dashboard_view(request):
     """
     tenant_id = request.session.get('tenant_id', 1)
 
+    # Filtros desde GET params
+    filtro_portal = request.GET.get('portal', '')
+    filtro_zona = request.GET.get('zona', '')
+    filtro_dias = request.GET.get('dias', '')  # 7, 30, 90
+
+    # Construir WHERE clause para filtros
+    filtros_sql = []
+    filtros_params = [tenant_id]
+    if filtro_portal:
+        filtros_sql.append("l.source_portal = %s")
+        filtros_params.append(filtro_portal)
+    if filtro_zona:
+        filtros_sql.append("l.zona_clasificada = %s")
+        filtros_params.append(filtro_zona)
+    if filtro_dias and filtro_dias.isdigit():
+        filtros_sql.append(f"l.fecha_primera_captura >= CURRENT_DATE - INTERVAL '{int(filtro_dias)} days'")
+
+    filtros_where = " AND " + " AND ".join(filtros_sql) if filtros_sql else ""
+
     context = {
         'kpis': {},
         'embudo': [],
@@ -111,19 +130,43 @@ def analytics_dashboard_view(request):
         'comparativa_portales': [],
         'precios_por_zona': [],
         'tipologia_inmuebles': [],
+        'ultimos_leads': [],
+        'filtro_portal': filtro_portal,
+        'filtro_zona': filtro_zona,
+        'filtro_dias': filtro_dias,
+        'portales_disponibles': [],
+        'zonas_disponibles': [],
     }
 
     with connection.cursor() as cursor:
-        # KPIs principales - query directa combinando leads con estados
+        # Obtener opciones para filtros
         try:
             cursor.execute("""
+                SELECT DISTINCT source_portal FROM public_marts.dim_leads
+                WHERE tenant_id = %s AND source_portal IS NOT NULL ORDER BY source_portal
+            """, [tenant_id])
+            context['portales_disponibles'] = [row[0] for row in cursor.fetchall()]
+
+            cursor.execute("""
+                SELECT DISTINCT zona_clasificada FROM public_marts.dim_leads
+                WHERE tenant_id = %s AND zona_clasificada IS NOT NULL AND zona_clasificada != ''
+                ORDER BY zona_clasificada
+            """, [tenant_id])
+            context['zonas_disponibles'] = [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error fetching filter options: {e}")
+
+        # KPIs principales - query directa combinando leads con estados
+        try:
+            cursor.execute(f"""
                 WITH lead_con_estado AS (
                     SELECT
                         l.*,
-                        COALESCE(e.estado, 'NUEVO') as estado_real
+                        COALESCE(e.estado, 'NUEVO') as estado_real,
+                        e.fecha_primer_contacto
                     FROM public_marts.dim_leads l
                     LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
-                    WHERE l.tenant_id = %s
+                    WHERE l.tenant_id = %s {filtros_where}
                 )
                 SELECT
                     COUNT(*) as total_leads,
@@ -141,9 +184,15 @@ def analytics_dashboard_view(request):
                     ) as tasa_conversion,
                     COALESCE(SUM(precio) FILTER (WHERE estado_real NOT IN ('NO_INTERESADO', 'NO_CONTACTAR', 'YA_VENDIDO')), 0) as valor_pipeline,
                     COUNT(*) FILTER (WHERE fecha_primera_captura >= CURRENT_DATE - INTERVAL '7 days') as leads_ultima_semana,
-                    COUNT(*) FILTER (WHERE fecha_primera_captura >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes
+                    COUNT(*) FILTER (WHERE fecha_primera_captura >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes,
+                    COALESCE(AVG(lead_score), 0)::INTEGER as score_medio,
+                    COALESCE(AVG(
+                        CASE WHEN fecha_primer_contacto IS NOT NULL
+                        THEN EXTRACT(EPOCH FROM (fecha_primer_contacto - fecha_primera_captura)) / 86400
+                        END
+                    ), 0)::NUMERIC(5,1) as dias_medio_primer_contacto
                 FROM lead_con_estado
-            """, [tenant_id])
+            """, filtros_params)
             context['kpis'] = dict_fetchone(cursor)
         except Exception as e:
             logger.error(f"Error fetching KPIs: {e}")
@@ -151,7 +200,8 @@ def analytics_dashboard_view(request):
                 'total_leads': 0, 'leads_nuevos': 0, 'leads_en_proceso': 0,
                 'leads_interesados': 0, 'leads_convertidos': 0, 'tasa_conversion': 0,
                 'valor_pipeline': 0, 'leads_ultima_semana': 0, 'leads_contactados': 0,
-                'leads_en_espera': 0, 'leads_descartados': 0, 'leads_este_mes': 0
+                'leads_en_espera': 0, 'leads_descartados': 0, 'leads_este_mes': 0,
+                'score_medio': 0, 'dias_medio_primer_contacto': 0
             }
 
         # Embudo de conversión - estados ordenados
@@ -258,6 +308,7 @@ def analytics_dashboard_view(request):
                         l.telefono_norm,
                         l.precio,
                         l.superficie_m2 as metros,
+                        l.lead_score,
                         COALESCE(e.estado, 'NUEVO') as estado_real
                     FROM public_marts.dim_leads l
                     LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
@@ -279,6 +330,7 @@ def analytics_dashboard_view(request):
                         THEN 100.0 * COUNT(*) FILTER (WHERE estado_real IN ('CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'CLIENTE')) / COUNT(*)
                         ELSE 0 END, 1
                     ) as tasa_contacto,
+                    COALESCE(AVG(lead_score), 0)::INTEGER as score_medio,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(AVG(CASE WHEN metros > 0 THEN precio / metros ELSE NULL END), 0) as precio_m2_medio
                 FROM lead_con_estado
@@ -342,6 +394,33 @@ def analytics_dashboard_view(request):
             context['tipologia_inmuebles'] = rows
         except Exception as e:
             logger.error(f"Error fetching tipologia: {e}")
+
+        # Últimos leads captados (10 más recientes)
+        try:
+            cursor.execute(f"""
+                SELECT
+                    l.lead_id,
+                    l.titulo,
+                    l.precio,
+                    l.source_portal as portal,
+                    l.zona_clasificada as zona,
+                    l.telefono_norm as telefono,
+                    l.lead_score as score,
+                    l.fecha_primera_captura,
+                    COALESCE(e.estado, 'NUEVO') as estado
+                FROM public_marts.dim_leads l
+                LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
+                WHERE l.tenant_id = %s {filtros_where}
+                ORDER BY l.fecha_primera_captura DESC
+                LIMIT 10
+            """, filtros_params)
+            rows = dict_fetchall(cursor)
+            for row in rows:
+                if row.get('fecha_primera_captura'):
+                    row['fecha_primera_captura'] = row['fecha_primera_captura'].strftime('%d/%m %H:%M')
+            context['ultimos_leads'] = rows
+        except Exception as e:
+            logger.error(f"Error fetching ultimos leads: {e}")
 
     # Proximas visitas (del usuario actual, próximos 7 días)
     from leads.models import Interaction

@@ -19,6 +19,47 @@
         </a>
     </div>
 
+    <!-- Filtros -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <form method="get" class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Portal:</label>
+                <select name="portal" onchange="this.form.submit()"
+                        class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
+                    <option value="">Todos</option>
+                    {% for p in portales_disponibles %}
+                    <option value="{{ p }}" {% if filtro_portal == p %}selected{% endif %}>{{ p|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Zona:</label>
+                <select name="zona" onchange="this.form.submit()"
+                        class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
+                    <option value="">Todas</option>
+                    {% for z in zonas_disponibles %}
+                    <option value="{{ z }}" {% if filtro_zona == z %}selected{% endif %}>{{ z }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Periodo:</label>
+                <select name="dias" onchange="this.form.submit()"
+                        class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
+                    <option value="">Todo el tiempo</option>
+                    <option value="7" {% if filtro_dias == '7' %}selected{% endif %}>Ultimos 7 dias</option>
+                    <option value="30" {% if filtro_dias == '30' %}selected{% endif %}>Ultimos 30 dias</option>
+                    <option value="90" {% if filtro_dias == '90' %}selected{% endif %}>Ultimos 90 dias</option>
+                </select>
+            </div>
+            {% if filtro_portal or filtro_zona or filtro_dias %}
+            <a href="{% url 'analytics:dashboard' %}" class="text-sm text-red-600 hover:text-red-800 dark:text-red-400">
+                Limpiar filtros
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
     <!-- Proximas Visitas -->
     {% if proximas_visitas %}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -146,6 +187,65 @@
             </div>
         </div>
     </div>
+
+    <!-- Ultimos Leads Captados -->
+    {% if ultimos_leads %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Ultimos Leads Captados</h3>
+            <a href="{% url 'leads:contact_list' %}" class="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400">
+                Ver todos
+            </a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Titulo</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Portal</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Zona</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Precio</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Score</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Fecha</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for lead in ultimos_leads %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-3 py-2">
+                            <a href="{% url 'leads:contact_detail' lead.lead_id %}" class="text-primary-600 hover:text-primary-800 dark:text-primary-400 font-medium truncate block max-w-xs">
+                                {{ lead.titulo|truncatechars:40 }}
+                            </a>
+                        </td>
+                        <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ lead.portal|title }}</td>
+                        <td class="px-3 py-2 text-gray-600 dark:text-gray-300">{{ lead.zona|default:"-" }}</td>
+                        <td class="px-3 py-2 text-right font-medium text-gray-900 dark:text-white">{{ lead.precio|floatformat:0|default:"-" }}&euro;</td>
+                        <td class="px-3 py-2 text-center">
+                            <span class="px-2 py-0.5 text-xs font-medium rounded-full
+                                {% if lead.score >= 70 %}bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300
+                                {% elif lead.score >= 40 %}bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300
+                                {% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}">
+                                {{ lead.score|default:0 }}
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 text-center">
+                            <span class="px-2 py-0.5 text-xs font-medium rounded-full
+                                {% if lead.estado == 'NUEVO' %}bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300
+                                {% elif lead.estado == 'INTERESADO' %}bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300
+                                {% elif lead.estado == 'CLIENTE' %}bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300
+                                {% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}">
+                                {{ lead.estado }}
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 text-right text-gray-500 dark:text-gray-400">{{ lead.fecha_primera_captura }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Embudo de Conversion -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
