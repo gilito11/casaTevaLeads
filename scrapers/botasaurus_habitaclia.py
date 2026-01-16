@@ -498,10 +498,7 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                     # Extract photos - Habitaclia uses images.habimg.com/imgh/ structure
                     # Pattern: //images.habimg.com/imgh/XXX-XXXXXXX/filename.jpg
                     # Photos come in multiple sizes: _XXL.jpg, _XL.jpg, _L.jpg, etc.
-                    # ISSUE: First photo appears multiple times (og:image, thumbnail, carousel)
-                    # FIX: Extract unique image ID from path, not just filename
-                    anuncio_id = listing.get('anuncio_id', '')
-                    id_for_match = anuncio_id[-7:] if len(anuncio_id) > 7 else anuncio_id
+                    # Deduplicate by extracting unique image ID from path
 
                     # Match all habimg.com URLs (imgh/, thumb/, etc.)
                     photos = re.findall(
@@ -518,8 +515,6 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                         if photo.startswith('//'):
                             photo = 'https:' + photo
                         if 'logo' in photo.lower():
-                            continue
-                        if id_for_match and id_for_match not in photo:
                             continue
 
                         # Extract unique ID: path after domain + filename without size
