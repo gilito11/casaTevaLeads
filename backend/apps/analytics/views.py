@@ -103,6 +103,22 @@ def debug_dashboard(request):
         except Exception as e:
             errors.append(f"column_type: {e}")
 
+    # Test 7: Check Django ORM parsing of fotos
+    try:
+        from leads.models import Lead
+        lead_with_photos = Lead.objects.filter(portal='milanuncios').exclude(fotos__isnull=True).first()
+        if lead_with_photos:
+            results['django_fotos_test'] = {
+                'lead_id': lead_with_photos.lead_id,
+                'fotos_type': type(lead_with_photos.fotos).__name__,
+                'fotos_length': len(lead_with_photos.fotos) if lead_with_photos.fotos else 0,
+                'first_foto': lead_with_photos.fotos[0][:100] if lead_with_photos.fotos and len(lead_with_photos.fotos) > 0 else None
+            }
+        else:
+            results['django_fotos_test'] = 'No milanuncios lead with photos found'
+    except Exception as e:
+        errors.append(f"django_fotos_test: {e}")
+
     return JsonResponse({
         'status': 'error' if errors else 'ok',
         'errors': errors,
