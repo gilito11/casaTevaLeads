@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 17 January 2026 (Dashboard filters, Habitaclia image fix)
+> **Last Updated**: 17 January 2026 (Automated contact system with queue + 2Captcha)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -165,6 +165,49 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Deteccion de cambios HTML**: Alerta si >50% de anuncios sin titulo/precio (estructura HTML cambiada)
 - **Reintentos automaticos**: 3 intentos con backoff exponencial antes de alertar
 - **Duracion job**: ~25 min (4 scrapers + dbt)
+
+### Sistema de Contacto Automatico (17 Enero 2026)
+Sistema para contactar leads automaticamente via los portales inmobiliarios.
+
+**Arquitectura**:
+```
+CRM (encolar leads) -> PostgreSQL (contact_queue)
+                            ↓
+Dagster (job diario) -> Playwright (headless)
+                            ↓
+              Fotocasa: cookies de sesion guardadas
+              Habitaclia: 2Captcha para reCAPTCHA
+```
+
+**Modelos Django** (`leads/models.py`):
+- `ContactQueue`: Cola de leads pendientes (portal, mensaje, estado, prioridad)
+- `PortalSession`: Cookies de sesion por portal (tenant, portal, cookies JSON)
+
+**Dagster** (`dagster/casa_teva_pipeline/assets/contact_assets.py`):
+- Asset: `process_contact_queue` (max 5 contactos/dia)
+- Job: `contact_job`
+- Schedule: `contact_schedule` (L-V 10:00 AM, desactivado por defecto)
+
+**Endpoints CRM**:
+- `POST /leads/<lead_id>/enqueue/` - Encolar un lead
+- `POST /leads/bulk-enqueue/` - Encolar multiples leads
+- `GET /leads/contact-queue/` - Ver cola de contactos
+- `POST /leads/contact-queue/<id>/cancel/` - Cancelar contacto
+
+**Variables de entorno**:
+```
+CAPTCHA_API_KEY=<2captcha_api_key>    # ~$3/1500 CAPTCHAs
+CONTACT_NAME=<nombre_formularios>
+CONTACT_EMAIL=<email_contacto>
+CONTACT_PHONE=<telefono_contacto>
+FOTOCASA_EMAIL=<cuenta_fotocasa>      # Opcional
+FOTOCASA_PASSWORD=<password>          # Opcional
+```
+
+**Limitaciones**:
+- Max 5 contactos/dia (conservador para evitar bloqueos)
+- Delay 2-5 min entre contactos (simular humano)
+- Solo soporta Fotocasa y Habitaclia (tienen formulario web)
 
 ### Fiabilidad Produccion (Enero 2026)
 - **Backup PostgreSQL**: 35 dias retencion (Azure)
