@@ -327,7 +327,27 @@ def api_precios_por_zona(request):
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                l.zona_clasificada,
+                CASE
+                    -- Fix encoding issues and normalize zone names
+                    WHEN l.zona_clasificada ILIKE '%%trrega%%' OR l.zona_clasificada ILIKE '%%tàrrega%%' OR l.zona_clasificada ILIKE '%%tarrega%%' THEN 'Tàrrega'
+                    WHEN l.zona_clasificada ILIKE '%%mollerussa%%' THEN 'Mollerussa'
+                    WHEN l.zona_clasificada ILIKE '%%balaguer%%' THEN 'Balaguer'
+                    WHEN l.zona_clasificada ILIKE '%%lleida%%' OR l.zona_clasificada ILIKE '%%lerida%%' THEN 'Lleida Ciudad'
+                    WHEN l.zona_clasificada ILIKE '%%salou%%' THEN 'Salou'
+                    WHEN l.zona_clasificada ILIKE '%%cambrils%%' THEN 'Cambrils'
+                    WHEN l.zona_clasificada ILIKE '%%tarragona%%' THEN 'Tarragona Ciudad'
+                    WHEN l.zona_clasificada ILIKE '%%reus%%' THEN 'Reus'
+                    WHEN l.zona_clasificada ILIKE '%%vendrell%%' THEN 'El Vendrell'
+                    WHEN l.zona_clasificada ILIKE '%%tortosa%%' THEN 'Tortosa'
+                    WHEN l.zona_clasificada ILIKE '%%amposta%%' THEN 'Amposta'
+                    WHEN l.zona_clasificada ILIKE '%%deltebre%%' THEN 'Deltebre'
+                    WHEN l.zona_clasificada ILIKE '%%ametlla%%' THEN 'L''Ametlla de Mar'
+                    WHEN l.zona_clasificada ILIKE '%%sant carles%%' OR l.zona_clasificada ILIKE '%%rapita%%' OR l.zona_clasificada ILIKE '%%ràpita%%' THEN 'Sant Carles de la Ràpita'
+                    WHEN l.zona_clasificada ILIKE '%%miami%%' THEN 'Miami Platja'
+                    WHEN l.zona_clasificada ILIKE '%%alpicat%%' THEN 'Alpicat'
+                    WHEN l.zona_clasificada ILIKE '%%tremp%%' THEN 'Tremp'
+                    ELSE l.zona_clasificada
+                END as zona_clasificada,
                 COALESCE(AVG(l.precio), 0) as precio_medio,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l.precio), 0) as precio_mediana,
                 COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio,
@@ -340,7 +360,7 @@ def api_precios_por_zona(request):
               AND l.zona_clasificada != ''
               AND l.zona_clasificada != 'Otros'
               AND l.precio > 0
-            GROUP BY l.zona_clasificada
+            GROUP BY 1
             ORDER BY total_inmuebles DESC
             LIMIT 20
         """, params)

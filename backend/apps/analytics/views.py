@@ -347,11 +347,31 @@ def analytics_dashboard_view(request):
         except Exception as e:
             logger.error(f"Error fetching comparativa portales: {e}")
 
-        # Precios por zona
+        # Precios por zona (normalizado para encoding issues)
         try:
             cursor.execute("""
                 SELECT
-                    zona_clasificada as zona_clasificada,
+                    CASE
+                        -- Fix encoding issues and normalize zone names
+                        WHEN zona_clasificada ILIKE '%%trrega%%' OR zona_clasificada ILIKE '%%tàrrega%%' OR zona_clasificada ILIKE '%%tarrega%%' THEN 'Tàrrega'
+                        WHEN zona_clasificada ILIKE '%%mollerussa%%' THEN 'Mollerussa'
+                        WHEN zona_clasificada ILIKE '%%balaguer%%' THEN 'Balaguer'
+                        WHEN zona_clasificada ILIKE '%%lleida%%' OR zona_clasificada ILIKE '%%lerida%%' THEN 'Lleida Ciudad'
+                        WHEN zona_clasificada ILIKE '%%salou%%' THEN 'Salou'
+                        WHEN zona_clasificada ILIKE '%%cambrils%%' THEN 'Cambrils'
+                        WHEN zona_clasificada ILIKE '%%tarragona%%' THEN 'Tarragona Ciudad'
+                        WHEN zona_clasificada ILIKE '%%reus%%' THEN 'Reus'
+                        WHEN zona_clasificada ILIKE '%%vendrell%%' THEN 'El Vendrell'
+                        WHEN zona_clasificada ILIKE '%%tortosa%%' THEN 'Tortosa'
+                        WHEN zona_clasificada ILIKE '%%amposta%%' THEN 'Amposta'
+                        WHEN zona_clasificada ILIKE '%%deltebre%%' THEN 'Deltebre'
+                        WHEN zona_clasificada ILIKE '%%ametlla%%' THEN 'L''Ametlla de Mar'
+                        WHEN zona_clasificada ILIKE '%%sant carles%%' OR zona_clasificada ILIKE '%%rapita%%' OR zona_clasificada ILIKE '%%ràpita%%' THEN 'Sant Carles de la Ràpita'
+                        WHEN zona_clasificada ILIKE '%%miami%%' THEN 'Miami Platja'
+                        WHEN zona_clasificada ILIKE '%%alpicat%%' THEN 'Alpicat'
+                        WHEN zona_clasificada ILIKE '%%tremp%%' THEN 'Tremp'
+                        ELSE zona_clasificada
+                    END as zona_clasificada,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY precio), 0) as precio_mediana,
                     COALESCE(AVG(CASE WHEN superficie_m2 > 0 THEN precio / superficie_m2 ELSE NULL END), 0) as precio_m2_medio,
@@ -361,7 +381,7 @@ def analytics_dashboard_view(request):
                   AND zona_clasificada IS NOT NULL
                   AND zona_clasificada != ''
                   AND precio > 0
-                GROUP BY zona_clasificada
+                GROUP BY 1
                 ORDER BY total_inmuebles DESC
                 LIMIT 15
             """, [tenant_id])
