@@ -178,6 +178,12 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Fix**: Eliminar filtro erroneo, mantener deduplicacion por directory/filename
 - **Archivo**: `scrapers/botasaurus_habitaclia.py`
 
+**2. Dashboard 500 error - Wrong URL pattern**
+- **Problema**: Dashboard devuelvia 500 en `/analytics/dashboard/`
+- **Causa**: Template usaba `{% url 'leads:contact_detail' lead.lead_id %}` pero `contact_detail` espera integer ID, no MD5 hash
+- **Fix**: Cambiar a `{% url 'leads:detail' lead.lead_id %}` (acepta string)
+- **Archivo**: `backend/templates/analytics/dashboard.html`
+
 ### Bugs Arreglados (15 Enero 2026)
 
 **1. DATABASE_URL parsing en runners Botasaurus**
