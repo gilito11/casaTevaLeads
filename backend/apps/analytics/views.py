@@ -64,6 +64,33 @@ def debug_dashboard(request):
     except Exception as e:
         errors.append(f"Interaction import: {e}")
 
+    # Test 4: Check photos by portal
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute("""
+                SELECT source_portal, COUNT(*) as total,
+                       COUNT(*) FILTER (WHERE fotos_json IS NOT NULL AND fotos_json::text != 'null' AND fotos_json::text != '[]') as con_fotos
+                FROM public_marts.dim_leads
+                WHERE tenant_id = %s
+                GROUP BY source_portal
+                ORDER BY source_portal
+            """, [tenant_id])
+            results['photos_by_portal'] = {row[0]: {'total': row[1], 'con_fotos': row[2]} for row in cursor.fetchall()}
+        except Exception as e:
+            errors.append(f"photos: {e}")
+
+        # Test 5: Sample Milanuncios photos
+        try:
+            cursor.execute("""
+                SELECT lead_id, fotos_json::text
+                FROM public_marts.dim_leads
+                WHERE tenant_id = %s AND source_portal = 'milanuncios'
+                LIMIT 3
+            """, [tenant_id])
+            results['milanuncios_sample'] = [{'lead_id': row[0], 'fotos': row[1][:200] if row[1] else None} for row in cursor.fetchall()]
+        except Exception as e:
+            errors.append(f"milanuncios_sample: {e}")
+
     return JsonResponse({
         'status': 'error' if errors else 'ok',
         'errors': errors,
