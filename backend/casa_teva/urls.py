@@ -39,6 +39,15 @@ def health_check(request):
             cursor.execute('SELECT 1')
             cursor.fetchone()
         health['database'] = 'ok'
+
+        # Check contact automation tables if ?tables=1
+        if request.GET.get('tables'):
+            cursor.execute("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_name IN ('leads_contact_queue', 'leads_portal_session')
+            """)
+            health['contact_tables'] = [r[0] for r in cursor.fetchall()]
+
     except Exception as e:
         health['status'] = 'degraded'
         health['database'] = 'error'
