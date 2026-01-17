@@ -82,14 +82,26 @@ def debug_dashboard(request):
         # Test 5: Sample Milanuncios photos
         try:
             cursor.execute("""
-                SELECT lead_id, fotos_json::text
+                SELECT lead_id, fotos_json::text, pg_typeof(fotos_json) as col_type
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s AND source_portal = 'milanuncios'
                 LIMIT 3
             """, [tenant_id])
-            results['milanuncios_sample'] = [{'lead_id': row[0], 'fotos': row[1][:200] if row[1] else None} for row in cursor.fetchall()]
+            results['milanuncios_sample'] = [{'lead_id': row[0], 'fotos': row[1][:200] if row[1] else None, 'type': row[2]} for row in cursor.fetchall()]
         except Exception as e:
             errors.append(f"milanuncios_sample: {e}")
+
+        # Test 6: Check column type
+        try:
+            cursor.execute("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public_marts' AND table_name = 'dim_leads' AND column_name = 'fotos_json'
+            """)
+            row = cursor.fetchone()
+            results['fotos_column_type'] = row[1] if row else 'NOT FOUND'
+        except Exception as e:
+            errors.append(f"column_type: {e}")
 
     return JsonResponse({
         'status': 'error' if errors else 'ok',
