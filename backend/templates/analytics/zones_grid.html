@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Estado Zonas{% endblock %}
+
+{% block content %}
+<style>
+    .cell { @apply w-8 h-8 rounded text-xs flex items-center justify-center font-medium; }
+    .cell.green { @apply bg-green-500 text-white; }
+    .cell.yellow { @apply bg-yellow-400 text-gray-900; }
+    .cell.orange { @apply bg-orange-500 text-white; }
+    .cell.red { @apply bg-red-500 text-white; }
+    .cell.gray { @apply bg-gray-200 dark:bg-gray-700 text-gray-400; }
+    .cell.disabled { @apply bg-gray-100 dark:bg-gray-800 text-gray-300; }
+</style>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Estado de Zonas</h1>
+        <a href="{% url 'analytics:scrape_history' %}" class="px-3 py-1 text-sm rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300">Ver Historial</a>
+    </div>
+
+    <!-- Leyenda -->
+    <div class="flex flex-wrap gap-3 text-xs">
+        <span class="flex items-center gap-1"><span class="w-4 h-4 rounded bg-green-500"></span> Hoy/Ayer</span>
+        <span class="flex items-center gap-1"><span class="w-4 h-4 rounded bg-yellow-400"></span> 2-3 dias</span>
+        <span class="flex items-center gap-1"><span class="w-4 h-4 rounded bg-orange-500"></span> 4-7 dias</span>
+        <span class="flex items-center gap-1"><span class="w-4 h-4 rounded bg-red-500"></span> >7 dias</span>
+        <span class="flex items-center gap-1"><span class="w-4 h-4 rounded bg-gray-200"></span> Nunca</span>
+    </div>
+
+    <!-- Grid -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500">Zona</th>
+                    <th class="px-2 py-2 text-center font-medium text-gray-500 w-10">MA</th>
+                    <th class="px-2 py-2 text-center font-medium text-gray-500 w-10">FC</th>
+                    <th class="px-2 py-2 text-center font-medium text-gray-500 w-10">HA</th>
+                    <th class="px-2 py-2 text-center font-medium text-gray-500 w-10">ID</th>
+                    <th class="px-2 py-2 text-center font-medium text-gray-500 w-12">Act</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for z in zones %}
+                <tr class="{% if not z.activa %}opacity-50{% endif %}">
+                    <td class="px-3 py-2 font-medium text-gray-900 dark:text-white truncate max-w-[200px]" title="{{ z.nombre }}">
+                        {{ z.nombre }}
+                    </td>
+                    <td class="px-2 py-2 text-center">
+                        {% if z.ma %}
+                        <div class="cell {{ z.ma_class }}" title="{{ z.ma_dias|default:'?' }}d - {{ z.ma_total }} listings">
+                            {{ z.ma_dias|default:'-' }}
+                        </div>
+                        {% else %}
+                        <div class="cell disabled">-</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-2 py-2 text-center">
+                        {% if z.fc %}
+                        <div class="cell {{ z.fc_class }}" title="{{ z.fc_dias|default:'?' }}d - {{ z.fc_total }} listings">
+                            {{ z.fc_dias|default:'-' }}
+                        </div>
+                        {% else %}
+                        <div class="cell disabled">-</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-2 py-2 text-center">
+                        {% if z.ha %}
+                        <div class="cell {{ z.ha_class }}" title="{{ z.ha_dias|default:'?' }}d - {{ z.ha_total }} listings">
+                            {{ z.ha_dias|default:'-' }}
+                        </div>
+                        {% else %}
+                        <div class="cell disabled">-</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-2 py-2 text-center">
+                        {% if z.id %}
+                        <div class="cell {{ z.id_class }}" title="{{ z.id_dias|default:'?' }}d - {{ z.id_total }} listings">
+                            {{ z.id_dias|default:'-' }}
+                        </div>
+                        {% else %}
+                        <div class="cell disabled">-</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-2 py-2 text-center">
+                        {% if z.activa %}
+                        <span class="text-green-500">ON</span>
+                        {% else %}
+                        <span class="text-gray-400">OFF</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-3 py-8 text-center text-gray-500">No hay zonas configuradas</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-xs text-gray-500">
+        Numeros = dias desde ultimo scrape. Hover para ver detalles.
+    </p>
+</div>
+{% endblock %}

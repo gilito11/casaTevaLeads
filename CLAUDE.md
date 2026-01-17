@@ -207,13 +207,24 @@ CONTACT_EMAIL=<email_contacto>
 CONTACT_PHONE=<telefono_contacto>
 FOTOCASA_EMAIL=<cuenta_fotocasa>      # Login automatico
 FOTOCASA_PASSWORD=<password>          # Login automatico
+MILANUNCIOS_EMAIL=<cuenta_milanuncios>  # Login automatico (chat interno)
+MILANUNCIOS_PASSWORD=<password>         # Login automatico
+IDEALISTA_EMAIL=<cuenta_idealista>      # Login automatico (DataDome)
+IDEALISTA_PASSWORD=<password>           # Login automatico
 ```
+
+**Portales soportados**:
+| Portal | Metodo | Requisitos |
+|--------|--------|------------|
+| Fotocasa | Formulario web | FOTOCASA_EMAIL/PASSWORD |
+| Habitaclia | Formulario + reCAPTCHA | CAPTCHA_API_KEY (~$1/1000) |
+| Milanuncios | Chat interno | MILANUNCIOS_EMAIL/PASSWORD |
+| Idealista | Formulario + DataDome | CAPTCHA_API_KEY (~$3/1000) + IDEALISTA_EMAIL/PASSWORD |
 
 **Limitaciones**:
 - Max 5 contactos/dia (conservador para evitar bloqueos)
 - Delay 2-5 min entre contactos (simular humano)
-- Solo soporta Fotocasa y Habitaclia (tienen formulario web)
-- Milanuncios e Idealista pendientes de implementar
+- Idealista mas caro por DataDome (~$3/1000 vs $1/1000 reCAPTCHA)
 
 ### Fiabilidad Produccion (Enero 2026)
 - **Backup PostgreSQL**: 35 dias retencion (Azure)

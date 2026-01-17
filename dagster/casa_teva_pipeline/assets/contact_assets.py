@@ -238,6 +238,138 @@ async def process_habitaclia_contact(
     return result
 
 
+async def process_milanuncios_contact(
+    contact: dict,
+    session: Optional[dict],
+    context: AssetExecutionContext
+) -> dict:
+    """Process a single Milanuncios contact using internal chat."""
+    from scrapers.contact_automation.milanuncios_contact import MilanunciosContact
+
+    result = {
+        'success': False,
+        'phone': None,
+        'message_sent': False,
+        'error': None
+    }
+
+    # Check for credentials
+    if not os.environ.get('MILANUNCIOS_EMAIL') or not os.environ.get('MILANUNCIOS_PASSWORD'):
+        result['error'] = 'MILANUNCIOS_EMAIL/PASSWORD not configured'
+        context.log.warning("Milanuncios credentials not set, skipping contact")
+        return result
+
+    automation = MilanunciosContact(headless=True)
+
+    try:
+        await automation.setup_browser()
+
+        # Load cookies from DB if available
+        if session and session.get('cookies'):
+            cookies = session['cookies']
+            if isinstance(cookies, str):
+                cookies = json.loads(cookies)
+            await automation.context.add_cookies(cookies)
+            context.log.info(f"Loaded {len(cookies)} cookies from DB session")
+
+        # Check if logged in, login if needed
+        if not await automation.is_logged_in():
+            context.log.info("Session expired, attempting login...")
+            if not await automation.login():
+                result['error'] = 'Login failed'
+                return result
+
+        # Contact the lead
+        contact_result = await automation.contact_lead(
+            lead_id=contact['lead_id'],
+            listing_url=contact['listing_url'],
+            message=contact['mensaje']
+        )
+
+        result['success'] = contact_result.success
+        result['phone'] = contact_result.phone_extracted
+        result['message_sent'] = contact_result.message_sent
+        result['error'] = contact_result.error
+
+    except Exception as e:
+        result['error'] = str(e)
+        context.log.error(f"Error processing Milanuncios contact: {e}")
+
+    finally:
+        await automation.close()
+
+    return result
+
+
+async def process_idealista_contact(
+    contact: dict,
+    session: Optional[dict],
+    context: AssetExecutionContext
+) -> dict:
+    """Process a single Idealista contact (with DataDome handling via 2Captcha)."""
+    from scrapers.contact_automation.idealista_contact import IdealistaContact
+
+    result = {
+        'success': False,
+        'phone': None,
+        'message_sent': False,
+        'error': None
+    }
+
+    # Check for credentials
+    captcha_api_key = os.environ.get('CAPTCHA_API_KEY')
+    if not captcha_api_key:
+        result['error'] = 'CAPTCHA_API_KEY not configured (required for DataDome)'
+        context.log.warning("CAPTCHA_API_KEY not set, skipping Idealista contact")
+        return result
+
+    if not os.environ.get('IDEALISTA_EMAIL') or not os.environ.get('IDEALISTA_PASSWORD'):
+        result['error'] = 'IDEALISTA_EMAIL/PASSWORD not configured'
+        context.log.warning("Idealista credentials not set, skipping contact")
+        return result
+
+    automation = IdealistaContact(headless=True, captcha_api_key=captcha_api_key)
+
+    try:
+        await automation.setup_browser()
+
+        # Load cookies from DB if available
+        if session and session.get('cookies'):
+            cookies = session['cookies']
+            if isinstance(cookies, str):
+                cookies = json.loads(cookies)
+            await automation.context.add_cookies(cookies)
+            context.log.info(f"Loaded {len(cookies)} cookies from DB session")
+
+        # Check if logged in, login if needed
+        if not await automation.is_logged_in():
+            context.log.info("Session expired, attempting login...")
+            if not await automation.login():
+                result['error'] = 'Login failed (possibly DataDome blocked)'
+                return result
+
+        # Contact the lead
+        contact_result = await automation.contact_lead(
+            lead_id=contact['lead_id'],
+            listing_url=contact['listing_url'],
+            message=contact['mensaje']
+        )
+
+        result['success'] = contact_result.success
+        result['phone'] = contact_result.phone_extracted
+        result['message_sent'] = contact_result.message_sent
+        result['error'] = contact_result.error
+
+    except Exception as e:
+        result['error'] = str(e)
+        context.log.error(f"Error processing Idealista contact: {e}")
+
+    finally:
+        await automation.close()
+
+    return result
+
+
 @asset(
     description="Procesa la cola de contactos automaticos",
     compute_kind="playwright",
@@ -306,8 +438,12 @@ def process_contact_queue(
             result = asyncio.run(process_fotocasa_contact(contact, session, context))
         elif portal == 'habitaclia':
             result = asyncio.run(process_habitaclia_contact(contact, session, context))
+        elif portal == 'milanuncios':
+            result = asyncio.run(process_milanuncios_contact(contact, session, context))
+        elif portal == 'idealista':
+            result = asyncio.run(process_idealista_contact(contact, session, context))
         else:
-            result = {'success': False, 'error': f'Unknown portal: {portal}'}
+            result = {'success': False, 'error': f'Portal not supported for contact: {portal}'}
 
         # Update status
         if result['success']:

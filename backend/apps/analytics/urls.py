@@ -1,6 +1,6 @@
 from django.urls import path
 from django.views.generic import RedirectView
-from .views import analytics_dashboard_view, map_view, map_data_api
+from .views import analytics_dashboard_view, map_view, map_data_api, scrape_history_view, zones_grid_view
 from . import api_views
 
 app_name = 'analytics'
@@ -9,6 +9,8 @@ urlpatterns = [
     path('', RedirectView.as_view(pattern_name='analytics:dashboard'), name='index'),
     path('dashboard/', analytics_dashboard_view, name='dashboard'),
     path('mapa/', map_view, name='map'),
+    path('scrapes/', scrape_history_view, name='scrape_history'),
+    path('zonas/', zones_grid_view, name='zones_grid'),
     path('api/map-data/', map_data_api, name='map_data_api'),
 
     # New API endpoints with filter support

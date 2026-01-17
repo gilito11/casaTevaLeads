@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial Scrapes{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Historial de Scrapes</h1>
+        <div class="flex gap-2">
+            <a href="?dias=7" class="px-3 py-1 text-sm rounded {% if dias == 7 %}bg-primary-600 text-white{% else %}bg-gray-200 dark:bg-gray-700{% endif %}">7d</a>
+            <a href="?dias=14" class="px-3 py-1 text-sm rounded {% if dias == 14 %}bg-primary-600 text-white{% else %}bg-gray-200 dark:bg-gray-700{% endif %}">14d</a>
+            <a href="?dias=30" class="px-3 py-1 text-sm rounded {% if dias == 30 %}bg-primary-600 text-white{% else %}bg-gray-200 dark:bg-gray-700{% endif %}">30d</a>
+            <a href="{% url 'analytics:zones_grid' %}" class="px-3 py-1 text-sm rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300">Grid Zonas</a>
+        </div>
+    </div>
+
+    {% if history %}
+    <div class="space-y-3">
+        {% for session in history %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="font-bold text-lg text-primary-600">{{ session.fecha }}</span>
+                <span class="px-2 py-0.5 text-xs rounded-full {% if session.franja == '12:00' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                    {{ session.franja }}
+                </span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+                {% for item in session.zonas %}
+                <span class="inline-flex items-center px-2 py-0.5 text-xs rounded
+                    {% if item.portal == 'milanuncios' %}bg-orange-100 text-orange-700
+                    {% elif item.portal == 'fotocasa' %}bg-green-100 text-green-700
+                    {% elif item.portal == 'habitaclia' %}bg-blue-100 text-blue-700
+                    {% elif item.portal == 'idealista' %}bg-purple-100 text-purple-700
+                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                    {{ item.zona|truncatechars:15 }}
+                    <span class="ml-1 font-semibold">{{ item.listings }}</span>
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-8 text-center text-gray-500">
+        No hay scrapes registrados en los ultimos {{ dias }} dias
+    </div>
+    {% endif %}
+
+    <!-- Leyenda -->
+    <div class="flex flex-wrap gap-3 text-xs text-gray-500">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-orange-200"></span> Milanuncios</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-200"></span> Fotocasa</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-200"></span> Habitaclia</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-purple-200"></span> Idealista</span>
+    </div>
+</div>
+{% endblock %}

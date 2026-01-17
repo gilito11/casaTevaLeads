@@ -614,3 +614,164 @@ def map_data_api(request):
             return JsonResponse({'error': str(e)}, status=500)
 
     return JsonResponse({'zones': zones_data})
+
+
+@login_required
+def scrape_history_view(request):
+    """
+    Vista compacta del historial de scrapes.
+    Agrupa por día/horario mostrando qué zonas se scrapearon.
+    """
+    tenant_id = request.session.get('tenant_id', 1)
+    dias = int(request.GET.get('dias', 7))
+
+    # Obtener datos de raw_listings agrupados por fecha y zona
+    history = []
+
+    with connection.cursor() as cursor:
+        try:
+            # Agrupar por día y franja horaria (mañana 12:00, tarde 18:00)
+            cursor.execute("""
+                WITH scrape_sessions AS (
+                    SELECT
+                        DATE(scraped_at) as fecha,
+                        CASE
+                            WHEN EXTRACT(HOUR FROM scraped_at) < 15 THEN '12:00'
+                            ELSE '18:00'
+                        END as franja,
+                        raw_data->>'zona_geografica' as zona,
+                        portal,
+                        COUNT(*) as listings,
+                        MIN(scraped_at) as start_time,
+                        MAX(scraped_at) as end_time
+                    FROM raw.raw_listings
+                    WHERE tenant_id = %s
+                      AND scraped_at >= CURRENT_DATE - INTERVAL '%s days'
+                      AND raw_data->>'zona_geografica' IS NOT NULL
+                    GROUP BY DATE(scraped_at),
+                             CASE WHEN EXTRACT(HOUR FROM scraped_at) < 15 THEN '12:00' ELSE '18:00' END,
+                             raw_data->>'zona_geografica',
+                             portal
+                )
+                SELECT
+                    fecha,
+                    franja,
+                    json_agg(json_build_object(
+                        'zona', zona,
+                        'portal', portal,
+                        'listings', listings
+                    ) ORDER BY zona, portal) as zonas
+                FROM scrape_sessions
+                GROUP BY fecha, franja
+                ORDER BY fecha DESC, franja DESC
+            """, [tenant_id, dias])
+
+            rows = dict_fetchall(cursor)
+            for row in rows:
+                row['fecha'] = row['fecha'].strftime('%d/%m') if row['fecha'] else ''
+            history = rows
+
+        except Exception as e:
+            logger.error(f"Error fetching scrape history: {e}\n{traceback.format_exc()}")
+
+    context = {
+        'history': history,
+        'dias': dias,
+    }
+
+    return render(request, 'analytics/scrape_history.html', context)
+
+
+@login_required
+def zones_grid_view(request):
+    """
+    Vista tipo grid/casillas mostrando zonas y cuánto tiempo hace que no se scrapean.
+    Colores: verde (reciente), amarillo (>3 días), rojo (>7 días).
+    """
+    tenant_id = request.session.get('tenant_id', 1)
+
+    zones = []
+
+    with connection.cursor() as cursor:
+        try:
+            # Obtener todas las zonas configuradas con su último scrape
+            cursor.execute("""
+                WITH ultimo_scrape AS (
+                    SELECT
+                        raw_data->>'zona_geografica' as zona,
+                        portal,
+                        MAX(scraped_at) as ultimo,
+                        COUNT(*) as total_listings
+                    FROM raw.raw_listings
+                    WHERE tenant_id = %s
+                      AND raw_data->>'zona_geografica' IS NOT NULL
+                    GROUP BY raw_data->>'zona_geografica', portal
+                ),
+                zonas_config AS (
+                    SELECT
+                        nombre,
+                        slug,
+                        activa,
+                        scrapear_milanuncios as ma,
+                        scrapear_fotocasa as fc,
+                        scrapear_habitaclia as ha,
+                        scrapear_idealista as id
+                    FROM core_zonageografica
+                    WHERE tenant_id = %s
+                )
+                SELECT
+                    z.nombre,
+                    z.slug,
+                    z.activa,
+                    -- Por cada portal: último scrape y días desde entonces
+                    MAX(CASE WHEN u.portal = 'milanuncios' THEN u.ultimo END) as ma_ultimo,
+                    MAX(CASE WHEN u.portal = 'fotocasa' THEN u.ultimo END) as fc_ultimo,
+                    MAX(CASE WHEN u.portal = 'habitaclia' THEN u.ultimo END) as ha_ultimo,
+                    MAX(CASE WHEN u.portal = 'idealista' THEN u.ultimo END) as id_ultimo,
+                    -- Días desde último scrape por portal
+                    EXTRACT(DAY FROM NOW() - MAX(CASE WHEN u.portal = 'milanuncios' THEN u.ultimo END))::INT as ma_dias,
+                    EXTRACT(DAY FROM NOW() - MAX(CASE WHEN u.portal = 'fotocasa' THEN u.ultimo END))::INT as fc_dias,
+                    EXTRACT(DAY FROM NOW() - MAX(CASE WHEN u.portal = 'habitaclia' THEN u.ultimo END))::INT as ha_dias,
+                    EXTRACT(DAY FROM NOW() - MAX(CASE WHEN u.portal = 'idealista' THEN u.ultimo END))::INT as id_dias,
+                    -- Total listings por portal
+                    SUM(CASE WHEN u.portal = 'milanuncios' THEN u.total_listings ELSE 0 END)::INT as ma_total,
+                    SUM(CASE WHEN u.portal = 'fotocasa' THEN u.total_listings ELSE 0 END)::INT as fc_total,
+                    SUM(CASE WHEN u.portal = 'habitaclia' THEN u.total_listings ELSE 0 END)::INT as ha_total,
+                    SUM(CASE WHEN u.portal = 'idealista' THEN u.total_listings ELSE 0 END)::INT as id_total,
+                    -- Portales activos
+                    z.ma, z.fc, z.ha, z.id
+                FROM zonas_config z
+                LEFT JOIN ultimo_scrape u ON (
+                    u.zona ILIKE '%%' || z.nombre || '%%'
+                    OR u.zona ILIKE '%%' || z.slug || '%%'
+                    OR z.nombre ILIKE '%%' || u.zona || '%%'
+                )
+                GROUP BY z.nombre, z.slug, z.activa, z.ma, z.fc, z.ha, z.id
+                ORDER BY z.activa DESC, z.nombre
+            """, [tenant_id, tenant_id])
+
+            zones = dict_fetchall(cursor)
+
+            # Añadir clase CSS según días
+            for z in zones:
+                for portal in ['ma', 'fc', 'ha', 'id']:
+                    dias = z.get(f'{portal}_dias')
+                    if dias is None:
+                        z[f'{portal}_class'] = 'gray'  # Nunca scrapeado
+                    elif dias <= 1:
+                        z[f'{portal}_class'] = 'green'
+                    elif dias <= 3:
+                        z[f'{portal}_class'] = 'yellow'
+                    elif dias <= 7:
+                        z[f'{portal}_class'] = 'orange'
+                    else:
+                        z[f'{portal}_class'] = 'red'
+
+        except Exception as e:
+            logger.error(f"Error fetching zones grid: {e}\n{traceback.format_exc()}")
+
+    context = {
+        'zones': zones,
+    }
+
+    return render(request, 'analytics/zones_grid.html', context)

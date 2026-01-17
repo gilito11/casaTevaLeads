@@ -1,5 +1,44 @@
 from django.contrib import admin
-from .models import Tenant, TenantUser
+from django.contrib import messages
+from .models import Tenant, TenantUser, ZonaGeografica
+
+
+@admin.action(description="Activar zonas seleccionadas")
+def activar_zonas(modeladmin, request, queryset):
+    updated = queryset.update(activa=True)
+    messages.success(request, f"{updated} zonas activadas")
+
+
+@admin.action(description="Desactivar zonas seleccionadas")
+def desactivar_zonas(modeladmin, request, queryset):
+    updated = queryset.update(activa=False)
+    messages.success(request, f"{updated} zonas desactivadas")
+
+
+@admin.action(description="Eliminar zonas (sin confirmación)")
+def eliminar_zonas_rapido(modeladmin, request, queryset):
+    count = queryset.count()
+    queryset.delete()
+    messages.success(request, f"{count} zonas eliminadas")
+
+
+@admin.register(ZonaGeografica)
+class ZonaGeograficaAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'slug', 'tenant', 'activa', 'radio_km', 'get_portales']
+    list_filter = ['activa', 'tenant', 'tipo']
+    search_fields = ['nombre', 'slug']
+    list_editable = ['activa']
+    actions = [activar_zonas, desactivar_zonas, eliminar_zonas_rapido]
+    ordering = ['tenant', 'nombre']
+
+    def get_portales(self, obj):
+        portales = []
+        if obj.scrapear_milanuncios: portales.append('MA')
+        if obj.scrapear_fotocasa: portales.append('FC')
+        if obj.scrapear_habitaclia: portales.append('HA')
+        if obj.scrapear_idealista: portales.append('ID')
+        return ', '.join(portales)
+    get_portales.short_description = 'Portales'
 
 
 @admin.register(Tenant)
