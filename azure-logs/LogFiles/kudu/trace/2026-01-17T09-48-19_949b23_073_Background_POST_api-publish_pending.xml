@@ -1,7 +1,0 @@
-<step title="BackgroundTrace" date="2026-01-17T09:48:19.373" instance="949b23" url="/api/publish" method="POST" >
-  <step title="Creating temporary deployment - FetchDeploymentManager" date="2026-01-17T09:48:19.527" /><!-- duration: 36ms -->
-  <step title="Creating temporary deployment" date="2026-01-17T09:48:19.592" /><!-- duration: 606ms -->
-  <step title="Performing fetch based deployment" date="2026-01-17T09:48:20.460" >
-    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file /tmp/zipdeploy/fa3121fa-3c55-41f6-9e9e-8fbc73428aca.zip (10.07 MB) to /tmp/zipdeploy/extracted" date="2026-01-17T09:48:22.232" >
-      <step title="ChmodRecursive Process exited with total time taken in ms: 758" date="2026-01-17T09:48:45.118" /><!-- duration: 2ms -->
-    </step><!-- duration: 22896ms -->

@@ -1,7 +1,0 @@
-<step title="Incoming Request" date="2026-01-05T20:51:50.027" instance="949b23" url="/diagnostics/runtime" method="GET" type="request" pid="770,1,44" Host="inmoleads-crm.scm.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_8c4a1760a1487c4c170ecae70de8336f3fc7058c6ca8147ceb3e092f7bc77fce" Authorization="Bas..." Content-Type="application/json; charset=utf-8" Content-Length="0" X-ARR-LOG-ID="2e34eda7-bbec-445e-a2ca-4715f5c7d03a" CLIENT-IP="135.232.224.114:24640" X-SITE-DEPLOYMENT-ID="inmoleads-crm" WAS-DEFAULT-HOSTNAME="inmoleads-crm.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/diagnostics/runtime" X-Client-IP="135.232.224.114" X-Client-Port="24640" >
-  <step title="Cleanup Xml Logs" date="2026-01-05T20:51:50.036" >
-    <step title="Cleanup Infos" date="2026-01-05T20:51:50.377" totalFiles="6974" totalCleanup="6814" /><!-- duration: 317ms -->
-  </step><!-- duration: 677ms -->
-  <step title="RuntimeController.GetRuntimeVersions" date="2026-01-05T20:51:50.763" /><!-- duration: 66ms -->
-  <step title="Outgoing response" date="2026-01-05T20:51:51.237" type="response" statusCode="200" statusText="OK" /><!-- duration: 52ms -->
-</step><!-- duration: 1272ms -->

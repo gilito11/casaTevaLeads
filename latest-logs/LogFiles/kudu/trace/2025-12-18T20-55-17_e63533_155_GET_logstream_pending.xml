@@ -1,5 +1,0 @@
-<step title="Incoming Request" date="2025-12-18T20:55:17.740" instance="e63533" url="/logstream" method="GET" type="request" pid="768,1,44" Host="inmoleads-crm.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (MSI)" Accept-Encoding="identity" Authorization="Bas..." x-ms-client-request-id="f8d0e0ff-dc53-11f0-a081-2cf05d29d599" X-ARR-LOG-ID="f8d0e0ff-dc53-11f0-a081-2cf05d29d599" CLIENT-IP="46.25.102.39:61005" X-SITE-DEPLOYMENT-ID="inmoleads-crm" WAS-DEFAULT-HOSTNAME="inmoleads-crm.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="46.25.102.39" X-Client-Port="61005" >
-  <step title="Cleanup Xml Logs" date="2025-12-18T20:55:17.742" >
-    <step title="Cleanup Infos" date="2025-12-18T20:55:17.748" totalFiles="244" totalCleanup="84" /><!-- duration: 3ms -->
-  </step><!-- duration: 11ms -->
-  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-12-18T20:55:17.764" /><!-- duration: 63ms -->
