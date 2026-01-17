@@ -909,3 +909,202 @@ def calendar_view(request):
         return render(request, template, context)
 
     return render(request, 'leads/calendar.html', context)
+
+
+# ============================================================
+# CONTACT QUEUE VIEWS (Auto-contact via Dagster)
+# ============================================================
+
+@login_required
+@require_POST
+def enqueue_contact_view(request, lead_id):
+    """Encolar un lead para contacto automatico (HTMX)"""
+    from leads.models import ContactQueue
+
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    if tenant_id and lead.tenant_id != tenant_id:
+        return HttpResponse(status=403)
+
+    # Verificar que el portal soporta contacto automatico
+    portal = lead.portal
+    if portal not in ['fotocasa', 'habitaclia']:
+        return JsonResponse({
+            'error': f'Contacto automatico no soportado para {portal}'
+        }, status=400)
+
+    # Verificar que tiene URL
+    if not lead.url_anuncio:
+        return JsonResponse({
+            'error': 'Lead sin URL de anuncio'
+        }, status=400)
+
+    tenant = get_object_or_404(Tenant, tenant_id=tenant_id)
+
+    # Mensaje por defecto
+    mensaje = request.POST.get('mensaje', '').strip()
+    if not mensaje:
+        mensaje = (
+            f"Hola, he visto su anuncio en {portal.capitalize()} "
+            "y me interesa. ¿Podriamos hablar?"
+        )
+
+    # Crear entrada en cola
+    try:
+        queue_item, created = ContactQueue.objects.get_or_create(
+            tenant=tenant,
+            lead_id=str(lead.lead_id),
+            portal=portal,
+            defaults={
+                'listing_url': lead.url_anuncio,
+                'titulo': lead.titulo or lead.direccion,
+                'mensaje': mensaje,
+                'prioridad': int(request.POST.get('prioridad', 0)),
+                'created_by': request.user,
+            }
+        )
+
+        if not created:
+            # Ya existe en cola
+            return JsonResponse({
+                'status': 'already_queued',
+                'message': 'Este lead ya esta en la cola de contacto',
+                'estado': queue_item.estado
+            })
+
+        return JsonResponse({
+            'status': 'queued',
+            'message': 'Lead encolado para contacto automatico',
+            'queue_id': queue_item.id
+        })
+
+    except Exception as e:
+        logger.error(f"Error enqueueing lead {lead_id}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def bulk_enqueue_view(request):
+    """Encolar multiples leads para contacto automatico"""
+    from leads.models import ContactQueue
+
+    try:
+        data = json.loads(request.body)
+        lead_ids = data.get('lead_ids', [])
+        mensaje = data.get('mensaje', '').strip()
+        prioridad = int(data.get('prioridad', 0))
+
+        if not lead_ids:
+            return JsonResponse({'error': 'No se especificaron leads'}, status=400)
+
+        tenant_id = get_user_tenant(request)
+        tenant = get_object_or_404(Tenant, tenant_id=tenant_id)
+
+        queued = 0
+        skipped = 0
+        errors = []
+
+        for lead_id in lead_ids:
+            try:
+                lead = Lead.objects.get(lead_id=lead_id)
+
+                if tenant_id and lead.tenant_id != tenant_id:
+                    errors.append({'id': lead_id, 'reason': 'tenant_mismatch'})
+                    continue
+
+                portal = lead.portal
+                if portal not in ['fotocasa', 'habitaclia']:
+                    skipped += 1
+                    continue
+
+                if not lead.url_anuncio:
+                    skipped += 1
+                    continue
+
+                msg = mensaje or (
+                    f"Hola, he visto su anuncio en {portal.capitalize()} "
+                    "y me interesa. ¿Podriamos hablar?"
+                )
+
+                _, created = ContactQueue.objects.get_or_create(
+                    tenant=tenant,
+                    lead_id=str(lead.lead_id),
+                    portal=portal,
+                    defaults={
+                        'listing_url': lead.url_anuncio,
+                        'titulo': lead.titulo or lead.direccion,
+                        'mensaje': msg,
+                        'prioridad': prioridad,
+                        'created_by': request.user,
+                    }
+                )
+
+                if created:
+                    queued += 1
+                else:
+                    skipped += 1
+
+            except Lead.DoesNotExist:
+                errors.append({'id': lead_id, 'reason': 'not_found'})
+
+        response = {'queued': queued, 'skipped': skipped}
+        if errors:
+            response['errors'] = errors
+        return JsonResponse(response)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON invalido'}, status=400)
+
+
+@login_required
+def contact_queue_view(request):
+    """Vista de la cola de contactos pendientes"""
+    from leads.models import ContactQueue
+
+    tenant_id = get_user_tenant(request)
+
+    queue_items = ContactQueue.objects.filter(
+        tenant_id=tenant_id
+    ).order_by('-prioridad', 'created_at')
+
+    # Filtro por estado
+    estado = request.GET.get('estado', '')
+    if estado:
+        queue_items = queue_items.filter(estado=estado)
+
+    # Paginacion
+    paginator = Paginator(queue_items, 25)
+    page = request.GET.get('page', 1)
+    items = paginator.get_page(page)
+
+    context = {
+        'queue_items': items,
+        'total_items': paginator.count,
+        'estado_choices': ContactQueue.ESTADO_QUEUE_CHOICES,
+    }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'leads/partials/contact_queue_table.html', context)
+
+    return render(request, 'leads/contact_queue.html', context)
+
+
+@login_required
+@require_POST
+def cancel_queued_contact_view(request, queue_id):
+    """Cancelar un contacto pendiente en la cola"""
+    from leads.models import ContactQueue
+
+    tenant_id = get_user_tenant(request)
+    item = get_object_or_404(ContactQueue, id=queue_id, tenant_id=tenant_id)
+
+    if item.estado == 'PENDIENTE':
+        item.estado = 'CANCELADO'
+        item.save()
+        return JsonResponse({'status': 'cancelled'})
+    else:
+        return JsonResponse({
+            'error': f'No se puede cancelar item en estado {item.estado}'
+        }, status=400)

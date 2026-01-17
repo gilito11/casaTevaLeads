@@ -244,3 +244,94 @@ class AnuncioBlacklist(models.Model):
             portal=portal,
             anuncio_id=anuncio_id
         ).exists()
+
+
+class ContactQueue(models.Model):
+    """
+    Cola de leads pendientes de contactar automaticamente.
+    El CRM encola leads aqui y Dagster los procesa diariamente.
+    """
+    ESTADO_QUEUE_CHOICES = [
+        ('PENDIENTE', 'Pendiente'),
+        ('EN_PROCESO', 'En proceso'),
+        ('COMPLETADO', 'Completado'),
+        ('FALLIDO', 'Fallido'),
+        ('CANCELADO', 'Cancelado'),
+    ]
+
+    PORTAL_CHOICES = [
+        ('fotocasa', 'Fotocasa'),
+        ('habitaclia', 'Habitaclia'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='contact_queue')
+    lead_id = models.CharField(max_length=100)
+    portal = models.CharField(max_length=50, choices=PORTAL_CHOICES)
+    listing_url = models.TextField()
+    titulo = models.CharField(max_length=500, blank=True, null=True)
+    mensaje = models.TextField(help_text="Mensaje a enviar al vendedor")
+    estado = models.CharField(max_length=20, choices=ESTADO_QUEUE_CHOICES, default='PENDIENTE')
+    prioridad = models.IntegerField(default=0, help_text="Mayor numero = mayor prioridad")
+
+    # Resultado del contacto
+    telefono_extraido = models.CharField(max_length=20, blank=True, null=True)
+    mensaje_enviado = models.BooleanField(default=False)
+    error = models.TextField(blank=True, null=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    # Usuario que encolo
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contacts_encolados'
+    )
+
+    class Meta:
+        db_table = 'leads_contact_queue'
+        verbose_name = 'Cola de Contacto'
+        verbose_name_plural = 'Cola de Contactos'
+        ordering = ['-prioridad', 'created_at']
+        indexes = [
+            models.Index(fields=['estado', 'portal']),
+            models.Index(fields=['tenant', 'estado']),
+        ]
+
+    def __str__(self):
+        return f"{self.portal}: {self.lead_id} ({self.estado})"
+
+
+class PortalSession(models.Model):
+    """
+    Sesiones de portales (cookies) para automatizacion.
+    Almacena cookies de login para evitar autenticacion repetida.
+    """
+    PORTAL_CHOICES = [
+        ('fotocasa', 'Fotocasa'),
+        ('habitaclia', 'Habitaclia'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='portal_sessions')
+    portal = models.CharField(max_length=50, choices=PORTAL_CHOICES)
+    email = models.EmailField(help_text="Email de la cuenta del portal")
+    cookies = models.JSONField(help_text="Cookies de sesion (JSON)")
+    is_valid = models.BooleanField(default=True)
+    last_used = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(null=True, blank=True, help_text="Cuando expira la sesion")
+
+    class Meta:
+        db_table = 'leads_portal_session'
+        verbose_name = 'Sesion de Portal'
+        verbose_name_plural = 'Sesiones de Portales'
+        unique_together = ['tenant', 'portal']
+
+    def __str__(self):
+        status = "válida" if self.is_valid else "inválida"
+        return f"{self.portal} ({self.email}) - {status}"

@@ -18,12 +18,12 @@ from dagster import (
     DefaultScheduleStatus,
 )
 
-from casa_teva_pipeline.assets import scraping_assets, image_assets
+from casa_teva_pipeline.assets import scraping_assets, image_assets, contact_assets
 from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 
 
 # Cargar todos los assets de los módulos
-all_assets = load_assets_from_modules([scraping_assets, image_assets])
+all_assets = load_assets_from_modules([scraping_assets, image_assets, contact_assets])
 
 # Job principal de scraping
 scraping_job = define_asset_job(
@@ -57,6 +57,27 @@ scraping_schedule_daily = ScheduleDefinition(
     execution_timezone="Europe/Madrid",
     default_status=DefaultScheduleStatus.STOPPED,  # Desactivado por defecto
     description="Scraping diario a las 2 AM (backup)",
+)
+
+# Job de contacto automatico
+contact_job = define_asset_job(
+    name="contact_job",
+    description="Procesa la cola de contactos automaticos (max 5/dia)",
+    selection=AssetSelection.assets(contact_assets.process_contact_queue),
+    tags={
+        "team": "data-engineering",
+        "priority": "medium",
+    }
+)
+
+# Schedule de contacto: 10 AM diario (horario laboral)
+contact_schedule = ScheduleDefinition(
+    name="contact_schedule",
+    cron_schedule="0 10 * * 1-5",  # 10:00 AM, lunes a viernes
+    job=contact_job,
+    execution_timezone="Europe/Madrid",
+    default_status=DefaultScheduleStatus.STOPPED,  # Desactivado hasta configurar sesiones
+    description="Contacto automatico: 10:00 AM L-V (max 5 contactos/dia)",
 )
 
 # Determinar configuración de PostgreSQL según entorno
@@ -105,7 +126,7 @@ resources = {
 # Crear Definitions que exporta todo
 defs = Definitions(
     assets=all_assets,
-    jobs=[scraping_job],
-    schedules=[scraping_schedule_optimized, scraping_schedule_daily],
+    jobs=[scraping_job, contact_job],
+    schedules=[scraping_schedule_optimized, scraping_schedule_daily, contact_schedule],
     resources=resources,
 )

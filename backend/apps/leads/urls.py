@@ -13,6 +13,11 @@ urlpatterns = [
     # Calendar
     path('calendar/', views.calendar_view, name='calendar'),
 
+    # Contact Queue (auto-contact)
+    path('contact-queue/', views.contact_queue_view, name='contact_queue'),
+    path('contact-queue/<int:queue_id>/cancel/', views.cancel_queued_contact_view, name='cancel_queued'),
+    path('bulk-enqueue/', views.bulk_enqueue_view, name='bulk_enqueue'),
+
     # Contacts
     path('contacts/', views.contact_list_view, name='contact_list'),
     path('contacts/<int:contact_id>/', views.contact_detail_view, name='contact_detail'),
@@ -27,4 +32,5 @@ urlpatterns = [
     path('<str:lead_id>/delete/', views.delete_lead_view, name='delete'),
     path('<str:lead_id>/contact/', views.contact_from_lead_view, name='contact_from_lead'),
     path('<str:lead_id>/assign/', views.assign_lead_view, name='assign'),
+    path('<str:lead_id>/enqueue/', views.enqueue_contact_view, name='enqueue_contact'),
 ]
