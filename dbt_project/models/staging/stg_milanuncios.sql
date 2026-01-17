@@ -225,6 +225,20 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%0% comision%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%cero comision%'
         )
+        -- Filter out agencies by seller name patterns
+        AND NOT (
+            LOWER(COALESCE(vendedor, '')) LIKE '%inmobiliaria%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%inmuebles%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%fincas%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%agencia%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%grupo%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% s.l.%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% sl%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% s.a.%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%real estate%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%properties%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%servicios inmobiliarios%'
+        )
 )
 
 SELECT * FROM final

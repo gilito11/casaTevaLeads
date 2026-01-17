@@ -67,12 +67,19 @@ Preserva UTF-8 correcto (ej: `Tàrrega` no se corrompe a `Trrega`).
 - **Wallapop**: Eliminado - no relevante para inmobiliaria
 
 ### Filtro de agencias (dbt staging)
-Los modelos dbt filtran automaticamente anuncios con frases como:
+Los modelos dbt filtran automaticamente anuncios:
+
+**Por descripcion** (frases que indican agencias):
 - "abstenerse agencias/inmobiliarias"
 - "no agencias/no inmobiliarias"
 - "sin intermediarios"
 - "sin comisiones de agencia" (agencias disfrazadas de particulares)
 - "0% comision" / "cero comision"
+
+**Por nombre de vendedor** (Milanuncios - añadido 17 Jan 2026):
+- Nombres con: inmobiliaria, inmuebles, fincas, agencia, grupo
+- Sufijos empresariales: S.L., SL, S.A.
+- Otros: real estate, properties, servicios inmobiliarios
 
 ### Zonas disponibles
 20+ zonas preconfiguradas en `backend/apps/core/models.py`:
@@ -253,6 +260,37 @@ python scrapers/listing_checker.py --limit 100
 ### CRM - Asignatarios (15 Enero 2026)
 Los usuarios admin (`is_superuser=True` o `is_staff=True`) ya no aparecen
 en el dropdown de asignatarios. Solo usuarios normales del tenant.
+
+## Debugging - Regla Importante
+
+**REGLA**: Si un bug/error NO se resuelve en el PRIMER intento, crear inmediatamente un endpoint de debug temporal.
+
+**Patron recomendado**:
+1. Primer intento: Analizar codigo y probar fix obvio
+2. Si falla: Crear `/analytics/debug/` o similar que:
+   - Ejecute queries sospechosas individualmente
+   - Muestre tipos de datos (pg_typeof, type())
+   - Pruebe imports de modelos
+   - Devuelva JSON con errores detallados
+3. Desplegar y analizar output del debug endpoint
+4. Arreglar el problema real
+5. Eliminar endpoint de debug
+
+**Ejemplo de debug endpoint**:
+```python
+def debug_view(request):
+    errors = []
+    results = {}
+    try:
+        # Test queries individuales
+        cursor.execute("SELECT COUNT(*) FROM tabla")
+        results['count'] = cursor.fetchone()[0]
+    except Exception as e:
+        errors.append(f"query: {e}")
+    return JsonResponse({'errors': errors, 'results': results})
+```
+
+**Ventaja**: Evita ciclos largos de deploy->error->analizar->deploy. Un debug endpoint bien hecho identifica el problema en 1 deploy.
 
 ## Comandos
 
