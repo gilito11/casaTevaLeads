@@ -374,7 +374,7 @@ def api_tipologia(request):
             WHERE {where_clause}
             GROUP BY l.tipo_propiedad
             ORDER BY total DESC
-        """, [tenant_id] + params)
+        """, params + [tenant_id])
 
         rows = dict_fetchall(cursor)
 
