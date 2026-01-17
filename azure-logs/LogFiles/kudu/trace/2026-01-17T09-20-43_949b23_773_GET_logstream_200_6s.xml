@@ -1,0 +1,9 @@
+<step title="Incoming Request" date="2026-01-17T09:20:43.596" instance="949b23" url="/logstream" method="GET" type="request" pid="774,1,24" Host="inmoleads-crm.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (MSI)" Accept-Encoding="identity" Authorization="Bas..." x-ms-client-request-id="1f67e87c-f386-11f0-a5ec-2cf05d29d599" X-ARR-LOG-ID="1f67e87c-f386-11f0-a5ec-2cf05d29d599" CLIENT-IP="5.225.91.143:50859" X-SITE-DEPLOYMENT-ID="inmoleads-crm" WAS-DEFAULT-HOSTNAME="inmoleads-crm.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="5.225.91.143" X-Client-Port="50859" >
+  <step title="Cleanup Xml Logs" date="2026-01-17T09:20:43.617" >
+    <step title="Cleanup Infos" date="2026-01-17T09:20:44.553" totalFiles="12647" totalCleanup="12487" /><!-- duration: 189ms -->
+  </step><!-- duration: 1163ms -->
+  <step title="LogStreamHandlerMiddleware.Invoke" date="2026-01-17T09:20:45.140" >
+    <step title="Error occurred" date="2026-01-17T09:20:49.708" type="error" text="LogStreamManager: ProcessRequest end" /><!-- duration: 16ms -->
+  </step><!-- duration: 4629ms -->
+  <step title="Outgoing response" date="2026-01-17T09:20:49.789" type="response" statusCode="200" statusText="OK" /><!-- duration: 16ms -->
+</step><!-- duration: 6218ms -->

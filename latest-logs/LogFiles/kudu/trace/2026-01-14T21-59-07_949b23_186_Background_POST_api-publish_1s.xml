@@ -1,0 +1,3 @@
+<step title="BackgroundTrace" date="2026-01-14T21:59:07.411" instance="949b23" url="/api/publish" method="POST" >
+  <step title="Error occurred" date="2026-01-14T21:59:08.089" type="error" text="The &apos;Performing continuous deployment&apos; operation conflicts with the pending &apos;Deployment&apos; operation started at 01/14/2026 21:47:28.  Please retry operation later." stackTrace="   at Kudu.Core.Deployment.FetchDeploymentManager.&lt;&gt;c__DisplayClass22_0.&lt;PerformBackgroundDeployment&gt;b__1()" /><!-- duration: 1ms -->
+</step><!-- duration: 696ms -->

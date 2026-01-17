@@ -1,0 +1,34 @@
+<step title="BackgroundTrace" date="2026-01-11T16:13:59.407" instance="949b23" url="/deploy" method="POST" >
+  <step title="Cleanup Xml Logs" date="2026-01-11T16:13:59.414" >
+    <step title="Cleanup Infos" date="2026-01-11T16:14:00.038" totalFiles="8916" totalCleanup="8756" /><!-- duration: 115ms -->
+  </step><!-- duration: 768ms -->
+  <step title="Creating temporary deployment - FetchDeploymentManager" date="2026-01-11T16:14:01.192" /><!-- duration: 28ms -->
+  <step title="Creating temporary deployment" date="2026-01-11T16:14:01.238" /><!-- duration: 397ms -->
+  <step title="Performing fetch based deployment" date="2026-01-11T16:14:02.132" >
+    <step title="Marking deployment as failed and cleaning up the temp deployment" date="2026-01-11T16:14:09.833" /><!-- duration: 3ms -->
+  </step><!-- duration: 8022ms -->
+  <step title="Error occurred" date="2026-01-11T16:14:10.347" type="error" text="One or more errors occurred. (remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for &apos;https://github.com/gilito11/casaTevaLeads/&apos;
+
+/usr/bin/git fetch origin --progress)" stackTrace="   at System.Threading.Tasks.Task.ThrowIfExceptional(Boolean includeTaskCanceledExceptions)
+   at System.Threading.Tasks.Task.Wait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task.Wait()
+   at Kudu.Core.Deployment.FetchDeploymentManager.&lt;&gt;c__DisplayClass22_1.&lt;PerformBackgroundDeployment&gt;b__3() in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 414
+   at Kudu.Contracts.Infrastructure.LockExtensions.TryLockOperation(IOperationLock lockObj, Action operation, String operationName, TimeSpan timeout) in /tmp/KuduLite/Kudu.Contracts/Infrastructure/LockExtensions.cs:line 34
+   at Kudu.Contracts.Infrastructure.LockExtensions.LockOperation(IOperationLock lockObj, Action operation, String operationName, TimeSpan timeout) in /tmp/KuduLite/Kudu.Contracts/Infrastructure/LockExtensions.cs:line 46
+   at Kudu.Core.Deployment.FetchDeploymentManager.&lt;&gt;c__DisplayClass22_0.&lt;PerformBackgroundDeployment&gt;b__1() in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 393" innerText="remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for &apos;https://github.com/gilito11/casaTevaLeads/&apos;
+
+/usr/bin/git fetch origin --progress" innerStackTrace="   at Kudu.Core.Infrastructure.Executable.Execute(ITracer tracer, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 79
+   at Kudu.Core.SourceControl.Git.GitExeRepository.&lt;&gt;c__DisplayClass31_0.&lt;FetchWithoutConflict&gt;b__0() in /tmp/KuduLite/Kudu.Core/SourceControl/Git/GitExeRepository.cs:line 314
+   at Kudu.Core.Infrastructure.OperationManager.Attempt[T](Func`1 action, Int32 retries, Int32 delayBeforeRetry, Func`2 shouldRetry) in /tmp/KuduLite/Kudu.Core/Infrastructure/OperationManager.cs:line 29
+   at Kudu.Core.SourceControl.Git.GitExeRepository.FetchWithoutConflict(String remote, String branchName) in /tmp/KuduLite/Kudu.Core/SourceControl/Git/GitExeRepository.cs:line 314
+   at Kudu.Services.ServiceHookHandlers.ServiceHookHandlerBase.Fetch(IRepository repository, DeploymentInfoBase deploymentInfo, String targetBranch, ILogger logger, ITracer tracer) in /tmp/KuduLite/Kudu.Services/ServiceHookHandlers/ServiceHookHandlerBase.cs:line 32
+   at System.Threading.Tasks.Task`1.InnerInvoke()
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task&amp; currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Kudu.Core.Deployment.FetchDeploymentManager.PerformDeployment(DeploymentInfoBase deploymentInfo, IDisposable tempDeployment, ChangeSet tempChangeSet, DeployStatusApiResult updateStatusObj) in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 200" /><!-- duration: 8ms -->
+</step><!-- duration: 10957ms -->

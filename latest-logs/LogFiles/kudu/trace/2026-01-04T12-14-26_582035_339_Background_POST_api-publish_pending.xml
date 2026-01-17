@@ -1,0 +1,47 @@
+<step title="BackgroundTrace" date="2026-01-04T12:14:26.715" instance="582035" url="/api/publish" method="POST" >
+  <step title="Creating temporary deployment - FetchDeploymentManager" date="2026-01-04T12:14:26.783" /><!-- duration: 3ms -->
+  <step title="Creating temporary deployment" date="2026-01-04T12:14:26.792" /><!-- duration: 78ms -->
+  <step title="Performing fetch based deployment" date="2026-01-04T12:14:26.906" >
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file /tmp/zipdeploy/99b9cc7d-3732-4434-acb0-ca77f082e457.zip (0.23 MB) to /tmp/zipdeploy/extracted" date="2026-01-04T12:14:28.179" >
+      <step title="ChmodRecursive Process exited with total time taken in ms: 67" date="2026-01-04T12:14:28.452" /><!-- duration: 10ms -->
+    </step><!-- duration: 303ms -->
+    <step title="Deployment timer started" date="2026-01-04T12:14:30.509" >
+      <step title="DeploymentManager.Deploy(id:4b8396c8-9d32-4e55-81a7-4057b90b06fb)" date="2026-01-04T12:14:30.515" >
+        <step title="Collecting changeset information" date="2026-01-04T12:14:30.560" /><!-- duration: 92ms -->
+        <step title="Updating submodules" date="2026-01-04T12:14:30.657" /><!-- duration: 1139ms -->
+        <step title="Determining deployment builder" date="2026-01-04T12:14:32.005" >
+          <step title="Builder is OryxBuilder" date="2026-01-04T12:14:32.023" /><!-- duration: 3ms -->
+        </step><!-- duration: 35ms -->
+        <step title="PreDeployment: context.CleanOutputPath False" date="2026-01-04T12:14:32.097" >
+          <step title="PreDeployment: context.OutputPath /home/site/wwwroot" date="2026-01-04T12:14:32.245" >
+            <step title="Building" date="2026-01-04T12:14:32.384" >
+              <step title="Executing external process" date="2026-01-04T12:14:32.719" type="process" path="bash" arguments="-c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform python --platform-version 3.11 -p virtualenv_name=antenv --log-file /tmp/build-debug.log  -i /tmp/8de4b8ad132b889 --compress-destination-dir | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" >
+                <step title="Cpu: python(17470,42.850s)+ts(17471,0.150s)+build.sh(17469,0.000s)+build.sh(17468,0.000s)+build.sh(17385,0.040s)+oryx(17366,3.430s)+tee(17367,0.000s)+bash(17365,0.000s)=total(46.460s)" date="2026-01-04T12:15:55.315" /><!-- duration: 20ms -->
+                <step title="bash: no io activity for 61s, prev-cpu=-1.000s, current-cpu=46.460s" date="2026-01-04T12:15:55.423" /><!-- duration: 47ms -->
+                <step title="Cpu: python(17470,79.920s)+ts(17471,0.220s)+build.sh(17469,0.000s)+build.sh(17468,0.000s)+build.sh(17385,0.050s)+oryx(17366,3.710s)+tee(17367,0.000s)+bash(17365,0.000s)=total(83.900s)" date="2026-01-04T12:16:55.852" /><!-- duration: 38ms -->
+                <step title="bash: no io activity for 121s, prev-cpu=46.460s, current-cpu=83.900s" date="2026-01-04T12:16:55.931" /><!-- duration: 50ms -->
+                <step title="Cpu: python(17470,106.630s)+ts(17471,0.220s)+build.sh(17469,0.000s)+build.sh(17468,0.000s)+build.sh(17385,0.050s)+oryx(17366,3.840s)+tee(17367,0.000s)+bash(17365,0.000s)=total(110.740s)" date="2026-01-04T12:17:57.066" /><!-- duration: 31ms -->
+                <step title="bash: no io activity for 183s, prev-cpu=83.900s, current-cpu=110.740s" date="2026-01-04T12:17:57.374" /><!-- duration: 20ms -->
+                <step title="Cpu: python(17470,132.660s)+ts(17471,0.220s)+build.sh(17469,0.000s)+build.sh(17468,0.000s)+build.sh(17385,0.050s)+oryx(17366,4.020s)+tee(17367,0.000s)+bash(17365,0.000s)=total(136.950s)" date="2026-01-04T12:18:57.547" /><!-- duration: 50ms -->
+                <step title="bash: no io activity for 243s, prev-cpu=110.740s, current-cpu=136.950s" date="2026-01-04T12:18:57.855" /><!-- duration: 19ms -->
+                <step title="Cpu: gzip(17695,48.940s)+sh(17694,0.000s)+tar(17693,2.200s)+build.sh(17385,0.060s)+oryx(17366,5.110s)+tee(17367,0.010s)+bash(17365,0.000s)=total(56.320s)" date="2026-01-04T12:21:40.717" /><!-- duration: 37ms -->
+                <step title="bash: no io activity for 61s, prev-cpu=-1.000s, current-cpu=56.320s" date="2026-01-04T12:21:40.766" /><!-- duration: 20ms -->
+                <step title="Cpu: gzip(17695,86.120s)+sh(17694,0.000s)+tar(17693,4.540s)+build.sh(17385,0.060s)+oryx(17366,5.160s)+tee(17367,0.010s)+bash(17365,0.000s)=total(95.890s)" date="2026-01-04T12:22:41.264" /><!-- duration: 59ms -->
+                <step title="bash: no io activity for 121s, prev-cpu=56.320s, current-cpu=95.890s" date="2026-01-04T12:22:41.374" /><!-- duration: 57ms -->
+              </step><!-- duration: 497811ms -->
+              <step title="Using PythonDeploymentLogParser" date="2026-01-04T12:22:50.899" /><!-- duration: 3ms -->
+              <step title="Modified file to trigger a restart of the app container." date="2026-01-04T12:22:51.974" /><!-- duration: 3ms -->
+              <step title="Skip function trigger and logicapp sync because function is not enabled." date="2026-01-04T12:22:51.983" /><!-- duration: 8ms -->
+              <step title="Purge deployment items" date="2026-01-04T12:22:53.468" >
+                <step title="Remove d362644b-, Success, received at 01/03/2026 10:47:55" date="2026-01-04T12:22:53.524" /><!-- duration: 3ms -->
+              </step><!-- duration: 63ms -->
+            </step><!-- duration: 501213ms -->
+          </step><!-- duration: 501357ms -->
+          <step title="Cleaning up temp files" date="2026-01-04T12:22:53.606" /><!-- duration: 4696ms -->
+          <step title="Cleaning up temp files" date="2026-01-04T12:22:58.308" /><!-- duration: 505ms -->
+          <step title="Reloading status file with latest updates" date="2026-01-04T12:22:59.132" >
+            <step title="WebHooksManager.PublishEventAsync: PostDeployment" date="2026-01-04T12:22:59.139" /><!-- duration: 75ms -->
+          </step><!-- duration: 88ms -->
+          <step title="Cleaning up temporary deployment - fetch deployment was successful" date="2026-01-04T12:22:59.230" /><!-- duration: 6ms -->
+        </step><!-- duration: 507247ms -->
+      </step><!-- duration: 508853ms -->

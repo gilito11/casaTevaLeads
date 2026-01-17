@@ -1,0 +1,17 @@
+<step title="Incoming Request" date="2026-01-10T19:24:14.992" instance="949b23" url="/api/publish?async=true&amp;deployer=GITHUB_ONE_DEPLOY&amp;type=zip&amp;message=%7B%22type%22%3A%22deployment%22%2C%22sha%22%3A%226996ffe9f2505433a995c089800af6c2fd12155e%22%2C%22repoName%22%3A%22gilito11%2FcasaTevaLeads%22%2C%22actor%22%3A%22gilito11%22%2C%22slotName%22%3A%22Production%22%2C%22commitMessage%22%3A%22docs%3A%20Update%20CLAUDE.md%20and%20add%20CI%20test%20job%20patch%22%7D" method="POST" type="request" pid="772,1,15" Host="inmoleads-crm.scm.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_8c4a1760a1487c4c170ecae70de8336f3fc7058c6ca8147ceb3e092f7bc77fce" Authorization="Bas..." Content-Type="application/octet-stream" Cookie="ARRAffinity=949b2381a2836c2e50a9dff5453e2f181ebc7f1a608d18b1d30a7ddca97c246b;Path=/;HttpOnly;Secure;Domain=inmoleads-crm.scm.azurewebsites.net; ARRAffinitySameSite=949b2381a2836c2e50a9dff5453e2f181ebc7f1a608d18b1d30a7ddca97c246b;Path=/;HttpOnly;SameSite=None;Secure;Domain=inmoleads-crm.scm.azurewebsites.net" Transfer-Encoding="chunked" X-ARR-LOG-ID="d2d1671d-d1e0-42b2-89c4-264c08bec205" CLIENT-IP="135.119.236.49:47112" X-SITE-DEPLOYMENT-ID="inmoleads-crm" WAS-DEFAULT-HOSTNAME="inmoleads-crm.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?async=true&amp;deployer=GITHUB_ONE_DEPLOY&amp;type=zip&amp;message=%7B%22type%22%3A%22deployment%22%2C%22sha%22%3A%226996ffe9f2505433a995c089800af6c2fd12155e%22%2C%22repoName%22%3A%22gilito11%2FcasaTevaLeads%22%2C%22actor%22%3A%22gilito11%22%2C%22slotName%22%3A%22Production%22%2C%22commitMessage%22%3A%22docs%3A%20Update%20CLAUDE.md%20and%20add%20CI%20test%20job%20patch%22%7D" X-Client-IP="135.119.236.49" X-Client-Port="47112" >
+  <step title="Cleanup Xml Logs" date="2026-01-10T19:24:15.001" >
+    <step title="Cleanup Infos" date="2026-01-10T19:24:15.655" totalFiles="7886" totalCleanup="7726" /><!-- duration: 125ms -->
+  </step><!-- duration: 829ms -->
+  <step title="OneDeploy" date="2026-01-10T19:24:15.956" >
+    <step title="Starting PushDeployAsync" date="2026-01-10T19:24:16.092" /><!-- duration: 20ms -->
+    <step title="Writing artifact to /tmp/zipdeploy/b2bebf5e-baf8-49ab-ab2f-4d4ed9e3e5fc.zip" date="2026-01-10T19:24:16.133" >
+      <step title="Writing multipart request body to /tmp/zipdeploy/b2bebf5e-baf8-49ab-ab2f-4d4ed9e3e5fc.zip" date="2026-01-10T19:24:16.143" /><!-- duration: 19ms -->
+    </step><!-- duration: 97ms -->
+    <step title="Start deployment in the background" date="2026-01-10T19:24:16.284" >
+      <step title="Acquiring Deployment Lock" date="2026-01-10T19:24:16.323" /><!-- duration: 38ms -->
+      <step title="Cannot Acquire Deployment Lock already held" date="2026-01-10T19:24:16.363" /><!-- duration: 8ms -->
+    </step><!-- duration: 566ms -->
+    <step title="There is a deployment currently in progress. Please try again when it completes." date="2026-01-10T19:24:16.908" /><!-- duration: 20ms -->
+  </step><!-- duration: 981ms -->
+  <step title="Outgoing response" date="2026-01-10T19:24:16.967" type="response" statusCode="409" statusText="Conflict" /><!-- duration: 9ms -->
+</step><!-- duration: 2013ms -->

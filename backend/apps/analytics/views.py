@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import unicodedata
+import traceback
 
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
@@ -10,6 +11,64 @@ from django.http import JsonResponse
 from decimal import Decimal
 
 from core.models import ZONAS_PREESTABLECIDAS
+
+
+def debug_dashboard(request):
+    """Endpoint de diagnóstico temporal - eliminar después de usar."""
+    errors = []
+    results = {}
+    tenant_id = 1
+
+    with connection.cursor() as cursor:
+        # Test 1: Basic table access
+        try:
+            cursor.execute("SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s", [tenant_id])
+            results['dim_leads_count'] = cursor.fetchone()[0]
+        except Exception as e:
+            errors.append(f"dim_leads: {e}")
+
+        # Test 2: Join with lead_estado
+        try:
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM public_marts.dim_leads l
+                LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
+                WHERE l.tenant_id = %s
+            """, [tenant_id])
+            results['join_count'] = cursor.fetchone()[0]
+        except Exception as e:
+            errors.append(f"join: {e}")
+
+        # Test 3: Full KPIs query
+        try:
+            cursor.execute("""
+                WITH lead_con_estado AS (
+                    SELECT
+                        l.*,
+                        COALESCE(e.estado, 'NUEVO') as estado_real,
+                        e.fecha_primer_contacto
+                    FROM public_marts.dim_leads l
+                    LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
+                    WHERE l.tenant_id = %s
+                )
+                SELECT COUNT(*) FROM lead_con_estado
+            """, [tenant_id])
+            results['kpis_query'] = cursor.fetchone()[0]
+        except Exception as e:
+            errors.append(f"kpis: {e}\n{traceback.format_exc()}")
+
+    # Test Interaction model
+    try:
+        from leads.models import Interaction
+        results['interaction_model'] = 'OK'
+    except Exception as e:
+        errors.append(f"Interaction import: {e}")
+
+    return JsonResponse({
+        'status': 'error' if errors else 'ok',
+        'errors': errors,
+        'results': results
+    })
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,11 @@
+<step title="Incoming Request" date="2026-01-10T12:54:28.759" instance="949b23" url="/api/deployments/latest?deployer=OneDeploy&amp;time=2026-01-10_12-51-00Z" method="GET" type="request" pid="770,1,15" Host="inmoleads-crm.scm.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_8c4a1760a1487c4c170ecae70de8336f3fc7058c6ca8147ceb3e092f7bc77fce" Authorization="Bas..." Content-Type="application/json; charset=utf-8" Cookie="ARRAffinity=949b2381a2836c2e50a9dff5453e2f181ebc7f1a608d18b1d30a7ddca97c246b;Path=/;HttpOnly;Secure;Domain=inmoleads-crm.scm.azurewebsites.net; ARRAffinitySameSite=949b2381a2836c2e50a9dff5453e2f181ebc7f1a608d18b1d30a7ddca97c246b;Path=/;HttpOnly;SameSite=None;Secure;Domain=inmoleads-crm.scm.azurewebsites.net" Content-Length="0" X-ARR-LOG-ID="50847b3c-0635-432a-af80-b225f1dbe2e9" CLIENT-IP="20.169.74.224:54289" X-SITE-DEPLOYMENT-ID="inmoleads-crm" WAS-DEFAULT-HOSTNAME="inmoleads-crm.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/latest?deployer=OneDeploy&amp;time=2026-01-10_12-51-00Z" X-Client-IP="20.169.74.224" X-Client-Port="54289" >
+  <step title="Cleanup Xml Logs" date="2026-01-10T12:54:28.769" >
+    <step title="Cleanup Infos" date="2026-01-10T12:54:29.301" totalFiles="7694" totalCleanup="7534" /><!-- duration: 77ms -->
+  </step><!-- duration: 619ms -->
+  <step title="DeploymentService.GetResult" date="2026-01-10T12:54:29.406" >
+    <step title="DeploymentService.GetLatestDeployment" date="2026-01-10T12:54:29.408" >
+      <step title="DeploymentManager.GetResults" date="2026-01-10T12:54:29.426" /><!-- duration: 1279ms -->
+    </step><!-- duration: 1307ms -->
+  </step><!-- duration: 1318ms -->
+  <step title="Outgoing response" date="2026-01-10T12:54:30.734" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 9ms -->
+</step><!-- duration: 1995ms -->

@@ -1,0 +1,8 @@
+2026-01-01T15:55:21          Error occurred, type: error, text: Could not find file '/home/site/locks/deployment/info.lock'., stackTrace:    at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String path, OpenFlags flags, Int32 mode, Boolean failForSymlink, Boolean& wasSymlink, Func`4 createOpenException)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64& fileLength, UnixFileMode& filePermissions, Boolean failForSymlink, Boolean& wasSymlink, Func`4 createOpenException)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Encoding encoding, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at Kudu.Core.AllSafeLinuxLock.IsLockValid() in /tmp/KuduLite/Kudu.Core/AllSafeLinuxLock.cs:line 97
+   at Kudu.Core.AllSafeLinuxLock.get_IsHeld() in /tmp/KuduLite/Kudu.Core/AllSafeLinuxLock.cs:line 42

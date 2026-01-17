@@ -1,0 +1,2 @@
+2026-01-02T21:46:05    Error occurred, type: error, text: LogStreamManager: ProcessRequest end
+2026-01-02T21:46:05  Error occurred, type: error, text: LogStreamManager: Inside Reset

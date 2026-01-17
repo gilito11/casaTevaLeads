@@ -1,0 +1,43 @@
+<step title="BackgroundTrace" date="2025-12-29T20:44:41.678" instance="582035" url="/api/publish" method="POST" >
+  <step title="Creating temporary deployment - FetchDeploymentManager" date="2025-12-29T20:44:41.727" /><!-- duration: 2ms -->
+  <step title="Creating temporary deployment" date="2025-12-29T20:44:41.734" /><!-- duration: 56ms -->
+  <step title="Performing fetch based deployment" date="2025-12-29T20:44:41.825" >
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file /tmp/zipdeploy/d00b74cb-3804-4900-840e-d0f49f4ec606.zip (0.57 MB) to /tmp/zipdeploy/extracted" date="2025-12-29T20:44:42.977" >
+      <step title="ChmodRecursive Process exited with total time taken in ms: 67" date="2025-12-29T20:44:43.175" /><!-- duration: 4ms -->
+    </step><!-- duration: 208ms -->
+    <step title="Deployment timer started" date="2025-12-29T20:44:45.211" >
+      <step title="DeploymentManager.Deploy(id:6f6fe134-0663-4f76-adc1-61bdce79db4b)" date="2025-12-29T20:44:45.230" >
+        <step title="Collecting changeset information" date="2025-12-29T20:44:45.298" /><!-- duration: 112ms -->
+        <step title="Updating submodules" date="2025-12-29T20:44:45.430" /><!-- duration: 1215ms -->
+        <step title="Determining deployment builder" date="2025-12-29T20:44:46.837" >
+          <step title="Builder is OryxBuilder" date="2025-12-29T20:44:46.847" /><!-- duration: 3ms -->
+        </step><!-- duration: 17ms -->
+        <step title="PreDeployment: context.CleanOutputPath False" date="2025-12-29T20:44:46.907" >
+          <step title="PreDeployment: context.OutputPath /home/site/wwwroot" date="2025-12-29T20:44:47.011" >
+            <step title="Building" date="2025-12-29T20:44:47.145" >
+              <step title="Executing external process" date="2025-12-29T20:44:47.684" type="process" path="bash" arguments="-c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform python --platform-version 3.11 -p virtualenv_name=antenv --log-file /tmp/build-debug.log  -i /tmp/8de471b1a9216cc --compress-destination-dir | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" >
+                <step title="Cpu: python(30219,41.020s)+ts(30220,0.130s)+build.sh(30218,0.000s)+build.sh(30217,0.000s)+build.sh(30134,0.040s)+oryx(30117,2.430s)+tee(30118,0.000s)+bash(30116,0.010s)=total(43.620s)" date="2025-12-29T20:46:06.115" /><!-- duration: 19ms -->
+                <step title="bash: no io activity for 60s, prev-cpu=-1.000s, current-cpu=43.620s" date="2025-12-29T20:46:06.154" /><!-- duration: 38ms -->
+                <step title="Cpu: python(30219,86.140s)+ts(30220,0.150s)+build.sh(30218,0.000s)+build.sh(30217,0.000s)+build.sh(30134,0.040s)+oryx(30117,2.570s)+tee(30118,0.000s)+bash(30116,0.010s)=total(88.900s)" date="2025-12-29T20:47:06.453" /><!-- duration: 29ms -->
+                <step title="bash: no io activity for 121s, prev-cpu=43.620s, current-cpu=88.900s" date="2025-12-29T20:47:06.500" /><!-- duration: 12ms -->
+                <step title="Cpu: python(30219,123.840s)+ts(30220,0.150s)+build.sh(30218,0.000s)+build.sh(30217,0.000s)+build.sh(30134,0.040s)+oryx(30117,2.670s)+tee(30118,0.000s)+bash(30116,0.010s)=total(126.710s)" date="2025-12-29T20:48:07.071" /><!-- duration: 20ms -->
+                <step title="bash: no io activity for 181s, prev-cpu=88.900s, current-cpu=126.710s" date="2025-12-29T20:48:07.110" /><!-- duration: 58ms -->
+                <step title="Cpu: gzip(30414,47.850s)+sh(30413,0.000s)+tar(30412,1.920s)+build.sh(30134,0.060s)+oryx(30117,3.250s)+tee(30118,0.000s)+bash(30116,0.010s)=total(53.090s)" date="2025-12-29T20:50:05.679" /><!-- duration: 27ms -->
+                <step title="bash: no io activity for 61s, prev-cpu=-1.000s, current-cpu=53.090s" date="2025-12-29T20:50:05.718" /><!-- duration: 20ms -->
+              </step><!-- duration: 371839ms -->
+              <step title="Using PythonDeploymentLogParser" date="2025-12-29T20:51:00.458" /><!-- duration: 6ms -->
+              <step title="Modified file to trigger a restart of the app container." date="2025-12-29T20:51:01.598" /><!-- duration: 7ms -->
+              <step title="Skip function trigger and logicapp sync because function is not enabled." date="2025-12-29T20:51:01.615" /><!-- duration: 5ms -->
+              <step title="Purge deployment items" date="2025-12-29T20:51:02.641" >
+                <step title="Remove db14047e-, Success, received at 12/28/2025 09:26:52" date="2025-12-29T20:51:02.704" /><!-- duration: 3ms -->
+              </step><!-- duration: 69ms -->
+            </step><!-- duration: 375628ms -->
+          </step><!-- duration: 375767ms -->
+          <step title="Cleaning up temp files" date="2025-12-29T20:51:02.781" /><!-- duration: 4639ms -->
+          <step title="Cleaning up temp files" date="2025-12-29T20:51:07.440" /><!-- duration: 535ms -->
+          <step title="Reloading status file with latest updates" date="2025-12-29T20:51:08.058" >
+            <step title="WebHooksManager.PublishEventAsync: PostDeployment" date="2025-12-29T20:51:08.066" /><!-- duration: 227ms -->
+          </step><!-- duration: 247ms -->
+          <step title="Cleaning up temporary deployment - fetch deployment was successful" date="2025-12-29T20:51:08.328" /><!-- duration: 7ms -->
+        </step><!-- duration: 381514ms -->
+      </step><!-- duration: 383245ms -->
