@@ -48,6 +48,54 @@ def health_check(request):
             """)
             health['contact_tables'] = [r[0] for r in cursor.fetchall()]
 
+        # Create contact tables if ?create_contact_tables=secret123
+        if request.GET.get('create_contact_tables') == 'secret123':
+            try:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS leads_contact_queue (
+                        id BIGSERIAL PRIMARY KEY,
+                        lead_id VARCHAR(100) NOT NULL,
+                        portal VARCHAR(50) NOT NULL,
+                        listing_url TEXT NOT NULL,
+                        titulo VARCHAR(500),
+                        mensaje TEXT NOT NULL,
+                        estado VARCHAR(20) DEFAULT 'PENDIENTE',
+                        prioridad INTEGER DEFAULT 0,
+                        telefono_extraido VARCHAR(20),
+                        mensaje_enviado BOOLEAN DEFAULT FALSE,
+                        error TEXT,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        processed_at TIMESTAMP WITH TIME ZONE,
+                        tenant_id INTEGER NOT NULL REFERENCES core_tenant(tenant_id) ON DELETE CASCADE,
+                        created_by_id INTEGER REFERENCES auth_user(id) ON DELETE SET NULL
+                    )
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS leads_portal_session (
+                        id BIGSERIAL PRIMARY KEY,
+                        portal VARCHAR(50) NOT NULL,
+                        email VARCHAR(254) NOT NULL,
+                        cookies JSONB NOT NULL,
+                        is_valid BOOLEAN DEFAULT TRUE,
+                        last_used TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        expires_at TIMESTAMP WITH TIME ZONE,
+                        tenant_id INTEGER NOT NULL REFERENCES core_tenant(tenant_id) ON DELETE CASCADE,
+                        UNIQUE(tenant_id, portal)
+                    )
+                """)
+                cursor.execute("""
+                    INSERT INTO django_migrations (app, name, applied)
+                    VALUES ('leads', '0006_contact_automation', NOW())
+                    ON CONFLICT DO NOTHING
+                """)
+                health['tables_created'] = True
+            except Exception as e:
+                health['tables_created'] = False
+                health['create_error'] = str(e)[:200]
+
     except Exception as e:
         health['status'] = 'degraded'
         health['database'] = 'error'
