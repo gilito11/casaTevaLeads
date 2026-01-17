@@ -374,18 +374,31 @@ def analytics_dashboard_view(request):
         except Exception as e:
             logger.error(f"Error fetching precios por zona: {e}")
 
-        # Tipología de inmuebles
+        # Tipología de inmuebles (normalizado)
         try:
             cursor.execute("""
                 SELECT
-                    COALESCE(tipo_propiedad, 'Sin especificar') as tipo_propiedad,
+                    CASE
+                        WHEN LOWER(tipo_propiedad) IN ('piso', 'pisos') THEN 'Piso'
+                        WHEN LOWER(tipo_propiedad) IN ('apartamento', 'apartamentos') THEN 'Apartamento'
+                        WHEN LOWER(tipo_propiedad) IN ('casa', 'casas', 'chalet', 'chalets') THEN 'Casa'
+                        WHEN LOWER(tipo_propiedad) IN ('ático', 'atico', 'áticos', 'aticos') THEN 'Ático'
+                        WHEN LOWER(tipo_propiedad) IN ('dúplex', 'duplex') THEN 'Dúplex'
+                        WHEN LOWER(tipo_propiedad) IN ('estudio', 'estudios') THEN 'Estudio'
+                        WHEN LOWER(tipo_propiedad) IN ('local', 'locales') THEN 'Local'
+                        WHEN LOWER(tipo_propiedad) IN ('garaje', 'garajes', 'parking') THEN 'Garaje'
+                        WHEN LOWER(tipo_propiedad) IN ('terreno', 'terrenos', 'parcela', 'parcelas') THEN 'Terreno'
+                        WHEN LOWER(tipo_propiedad) IN ('finca', 'fincas') THEN 'Finca'
+                        WHEN tipo_propiedad IS NULL THEN 'Sin especificar'
+                        ELSE 'Otros'
+                    END as tipo_propiedad,
                     COUNT(*) as total,
                     ROUND(100.0 * COUNT(*) / GREATEST((SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1), 1) as porcentaje,
                     COALESCE(AVG(precio), 0) as precio_medio,
                     COALESCE(AVG(CASE WHEN superficie_m2 > 0 THEN precio / superficie_m2 ELSE NULL END), 0) as precio_m2_medio
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
-                GROUP BY tipo_propiedad
+                GROUP BY 1
                 ORDER BY total DESC
             """, [tenant_id, tenant_id])
             rows = dict_fetchall(cursor)

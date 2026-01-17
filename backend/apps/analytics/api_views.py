@@ -363,7 +363,20 @@ def api_tipologia(request):
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
-                COALESCE(l.tipo_propiedad, 'Sin especificar') as tipo_propiedad,
+                CASE
+                    WHEN LOWER(l.tipo_propiedad) IN ('piso', 'pisos') THEN 'Piso'
+                    WHEN LOWER(l.tipo_propiedad) IN ('apartamento', 'apartamentos') THEN 'Apartamento'
+                    WHEN LOWER(l.tipo_propiedad) IN ('casa', 'casas', 'chalet', 'chalets') THEN 'Casa'
+                    WHEN LOWER(l.tipo_propiedad) IN ('ático', 'atico', 'áticos', 'aticos') THEN 'Ático'
+                    WHEN LOWER(l.tipo_propiedad) IN ('dúplex', 'duplex') THEN 'Dúplex'
+                    WHEN LOWER(l.tipo_propiedad) IN ('estudio', 'estudios') THEN 'Estudio'
+                    WHEN LOWER(l.tipo_propiedad) IN ('local', 'locales') THEN 'Local'
+                    WHEN LOWER(l.tipo_propiedad) IN ('garaje', 'garajes', 'parking') THEN 'Garaje'
+                    WHEN LOWER(l.tipo_propiedad) IN ('terreno', 'terrenos', 'parcela', 'parcelas') THEN 'Terreno'
+                    WHEN LOWER(l.tipo_propiedad) IN ('finca', 'fincas') THEN 'Finca'
+                    WHEN l.tipo_propiedad IS NULL THEN 'Sin especificar'
+                    ELSE 'Otros'
+                END as tipo_propiedad,
                 COUNT(*) as total,
                 ROUND(100.0 * COUNT(*) / GREATEST(
                     (SELECT COUNT(*) FROM public_marts.dim_leads WHERE tenant_id = %s), 1
@@ -372,7 +385,7 @@ def api_tipologia(request):
                 COALESCE(AVG(CASE WHEN l.superficie_m2 > 0 THEN l.precio / l.superficie_m2 ELSE NULL END), 0) as precio_m2_medio
             FROM public_marts.dim_leads l
             WHERE {where_clause}
-            GROUP BY l.tipo_propiedad
+            GROUP BY 1
             ORDER BY total DESC
         """, params + [tenant_id])
 

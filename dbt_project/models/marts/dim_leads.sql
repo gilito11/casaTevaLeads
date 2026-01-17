@@ -117,7 +117,20 @@ enriched AS (
         url AS listing_url,
         ubicacion,
         zona_clasificada,
-        tipo_propiedad,
+        -- Normalize tipo_propiedad to Title Case and merge variants
+        CASE
+            WHEN LOWER(tipo_propiedad) IN ('piso', 'pisos') THEN 'Piso'
+            WHEN LOWER(tipo_propiedad) IN ('apartamento', 'apartamentos') THEN 'Apartamento'
+            WHEN LOWER(tipo_propiedad) IN ('casa', 'casas', 'chalet', 'chalets') THEN 'Casa'
+            WHEN LOWER(tipo_propiedad) IN ('ático', 'atico', 'áticos', 'aticos') THEN 'Ático'
+            WHEN LOWER(tipo_propiedad) IN ('dúplex', 'duplex') THEN 'Dúplex'
+            WHEN LOWER(tipo_propiedad) IN ('estudio', 'estudios') THEN 'Estudio'
+            WHEN LOWER(tipo_propiedad) IN ('local', 'locales') THEN 'Local'
+            WHEN LOWER(tipo_propiedad) IN ('garaje', 'garajes', 'parking') THEN 'Garaje'
+            WHEN LOWER(tipo_propiedad) IN ('terreno', 'terrenos', 'parcela', 'parcelas') THEN 'Terreno'
+            WHEN LOWER(tipo_propiedad) IN ('finca', 'fincas') THEN 'Finca'
+            ELSE 'Otros'
+        END AS tipo_propiedad,
         superficie_m2,
         habitaciones,
         banos,
