@@ -175,9 +175,14 @@ CRM (encolar leads) -> PostgreSQL (contact_queue)
                             ↓
 Dagster (job diario) -> Playwright (headless)
                             ↓
-              Fotocasa: cookies de sesion guardadas
+              Fotocasa: login automatico con credenciales
               Habitaclia: 2Captcha para reCAPTCHA
 ```
+
+**UI CRM**:
+- Sidebar: "Cola Contactos" - ver items pendientes/completados
+- Detalle lead (Fotocasa/Habitaclia): Boton "Contactar automaticamente"
+- Filtros por estado: PENDIENTE, EN_PROCESO, COMPLETADO, FALLIDO, CANCELADO
 
 **Modelos Django** (`leads/models.py`):
 - `ContactQueue`: Cola de leads pendientes (portal, mensaje, estado, prioridad)
@@ -194,20 +199,21 @@ Dagster (job diario) -> Playwright (headless)
 - `GET /leads/contact-queue/` - Ver cola de contactos
 - `POST /leads/contact-queue/<id>/cancel/` - Cancelar contacto
 
-**Variables de entorno**:
+**Variables de entorno** (configuradas en Azure Container Apps):
 ```
-CAPTCHA_API_KEY=<2captcha_api_key>    # ~$3/1500 CAPTCHAs
+CAPTCHA_API_KEY=<2captcha_api_key>    # ~$3/1500 CAPTCHAs (Habitaclia)
 CONTACT_NAME=<nombre_formularios>
 CONTACT_EMAIL=<email_contacto>
 CONTACT_PHONE=<telefono_contacto>
-FOTOCASA_EMAIL=<cuenta_fotocasa>      # Opcional
-FOTOCASA_PASSWORD=<password>          # Opcional
+FOTOCASA_EMAIL=<cuenta_fotocasa>      # Login automatico
+FOTOCASA_PASSWORD=<password>          # Login automatico
 ```
 
 **Limitaciones**:
 - Max 5 contactos/dia (conservador para evitar bloqueos)
 - Delay 2-5 min entre contactos (simular humano)
 - Solo soporta Fotocasa y Habitaclia (tienen formulario web)
+- Milanuncios e Idealista pendientes de implementar
 
 ### Fiabilidad Produccion (Enero 2026)
 - **Backup PostgreSQL**: 35 dias retencion (Azure)
