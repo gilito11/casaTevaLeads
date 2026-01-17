@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 17 January 2026 (Portal credentials per tenant with Fernet encryption)
+> **Last Updated**: 18 January 2026 (Portal credentials per tenant + comercial contact fields)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
