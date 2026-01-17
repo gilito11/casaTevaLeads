@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Cola de Contactos - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cola de Contactos</h1>
+            <p class="text-gray-600 dark:text-gray-400">{{ total_items }} items en cola</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+                Procesado por Dagster: L-V 10:00 AM
+            </span>
+        </div>
+    </div>
+
+    <!-- Info Banner -->
+    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div class="flex">
+            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div class="text-sm text-blue-700 dark:text-blue-300">
+                <p class="font-medium">Sistema de contacto automatico</p>
+                <p class="mt-1">Los leads encolados se contactan automaticamente via Fotocasa o Habitaclia. Maximo 5 contactos/dia para evitar bloqueos.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <form hx-get="{% url 'leads:contact_queue' %}"
+              hx-target="#queue-table-container"
+              hx-trigger="change"
+              hx-push-url="true"
+              class="flex flex-wrap gap-4 items-end">
+
+            <!-- Estado Filter -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+                <select name="estado"
+                        class="py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="">Todos</option>
+                    {% for choice in estado_choices %}
+                    <option value="{{ choice.0 }}" {% if request.GET.estado == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Quick Filters -->
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'leads:contact_queue' %}?estado=PENDIENTE"
+                   class="px-3 py-2 text-xs rounded-full {% if request.GET.estado == 'PENDIENTE' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity">
+                    Pendientes
+                </a>
+                <a href="{% url 'leads:contact_queue' %}?estado=COMPLETADO"
+                   class="px-3 py-2 text-xs rounded-full {% if request.GET.estado == 'COMPLETADO' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity">
+                    Completados
+                </a>
+                <a href="{% url 'leads:contact_queue' %}?estado=FALLIDO"
+                   class="px-3 py-2 text-xs rounded-full {% if request.GET.estado == 'FALLIDO' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %} hover:opacity-80 transition-opacity">
+                    Fallidos
+                </a>
+                <a href="{% url 'leads:contact_queue' %}"
+                   class="px-3 py-2 text-xs rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:opacity-80 transition-opacity">
+                    Limpiar filtros
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div id="queue-table-container">
+        {% include 'leads/partials/contact_queue_table.html' %}
+    </div>
+</div>
+{% endblock %}

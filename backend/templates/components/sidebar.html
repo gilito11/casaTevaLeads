@@ -95,6 +95,23 @@
                 </a>
             </li>
 
+            <!-- Cola de Contactos -->
+            <li>
+                <a href="{% url 'leads:contact_queue' %}"
+                   class="flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors
+                   {% if 'contact-queue' in request.path %}
+                   bg-primary-50 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400
+                   {% else %}
+                   text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+                   {% endif %}">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                    </svg>
+                    <span x-show="open" x-transition class="font-medium">Cola Contactos</span>
+                </a>
+            </li>
+
             <!-- Scrapers -->
             <li>
                 <a href="{% url 'scrapers' %}"
@@ -229,6 +246,7 @@
                     <li><a href="{% url 'leads:list' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Propiedades</a></li>
                     <li><a href="{% url 'leads:contact_list' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Contactos</a></li>
                     <li><a href="{% url 'leads:calendar' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Calendario</a></li>
+                    <li><a href="{% url 'leads:contact_queue' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Cola Contactos</a></li>
                     <li><a href="{% url 'scrapers' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Scrapers</a></li>
                     <li><a href="{% url 'analytics:dashboard' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Analytics</a></li>
                     <li><a href="{% url 'profile' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Mi Perfil</a></li>
