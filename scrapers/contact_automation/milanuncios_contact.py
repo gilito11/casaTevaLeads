@@ -51,10 +51,10 @@ class MilanunciosContact(BaseContactAutomation):
         'phone_number': '[class*="phone-number"], a[href^="tel:"]',
     }
 
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = False, email: str = None, password: str = None):
         super().__init__(headless=headless)
-        self.email = os.getenv('MILANUNCIOS_EMAIL')
-        self.password = os.getenv('MILANUNCIOS_PASSWORD')
+        self.email = email or os.getenv('MILANUNCIOS_EMAIL')
+        self.password = password or os.getenv('MILANUNCIOS_PASSWORD')
 
     async def accept_cookies(self):
         """Accept cookies dialog if present."""

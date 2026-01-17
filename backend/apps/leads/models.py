@@ -335,3 +335,84 @@ class PortalSession(models.Model):
     def __str__(self):
         status = "válida" if self.is_valid else "inválida"
         return f"{self.portal} ({self.email}) - {status}"
+
+
+class PortalCredential(models.Model):
+    """
+    Credenciales de portales por tenant.
+    Las passwords se almacenan cifradas con Fernet.
+    """
+    PORTAL_CHOICES = [
+        ('fotocasa', 'Fotocasa'),
+        ('habitaclia', 'Habitaclia'),
+        ('milanuncios', 'Milanuncios'),
+        ('idealista', 'Idealista'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='portal_credentials')
+    portal = models.CharField(max_length=50, choices=PORTAL_CHOICES)
+    email = models.EmailField(help_text="Email de la cuenta del portal")
+    password_encrypted = models.TextField(help_text="Password cifrada con Fernet")
+    is_active = models.BooleanField(default=True)
+    last_used = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'leads_portal_credential'
+        verbose_name = 'Credencial de Portal'
+        verbose_name_plural = 'Credenciales de Portales'
+        unique_together = ['tenant', 'portal']
+
+    def __str__(self):
+        status = "activa" if self.is_active else "inactiva"
+        return f"{self.portal} - {self.tenant.nombre} ({status})"
+
+    def set_password(self, plain_password: str):
+        """Cifra y guarda la password."""
+        from core.encryption import encrypt_value
+        self.password_encrypted = encrypt_value(plain_password)
+
+    def get_password(self) -> str:
+        """Descifra y retorna la password."""
+        from core.encryption import decrypt_value
+        return decrypt_value(self.password_encrypted)
+
+    @classmethod
+    def get_credential(cls, tenant_id: int, portal: str):
+        """
+        Obtiene las credenciales para un tenant y portal.
+        Retorna None si no existe o no está activa.
+        """
+        try:
+            return cls.objects.get(
+                tenant_id=tenant_id,
+                portal=portal,
+                is_active=True
+            )
+        except cls.DoesNotExist:
+            return None
+
+    @classmethod
+    def get_or_env(cls, tenant_id: int, portal: str):
+        """
+        Obtiene credenciales del tenant, con fallback a env vars.
+        Retorna tuple (email, password) o (None, None).
+        """
+        import os
+
+        # Intentar obtener del tenant
+        cred = cls.get_credential(tenant_id, portal)
+        if cred:
+            return (cred.email, cred.get_password())
+
+        # Fallback a env vars
+        portal_upper = portal.upper()
+        email = os.environ.get(f'{portal_upper}_EMAIL')
+        password = os.environ.get(f'{portal_upper}_PASSWORD')
+
+        if email and password:
+            return (email, password)
+
+        return (None, None)

@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 17 January 2026 (Automated contact system with queue + 2Captcha)
+> **Last Updated**: 17 January 2026 (Portal credentials per tenant with Fernet encryption)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -187,6 +187,52 @@ Dagster (job diario) -> Playwright (headless)
 **Modelos Django** (`leads/models.py`):
 - `ContactQueue`: Cola de leads pendientes (portal, mensaje, estado, prioridad)
 - `PortalSession`: Cookies de sesion por portal (tenant, portal, cookies JSON)
+- `PortalCredential`: Credenciales de portales por tenant (email, password cifrada)
+
+### Credenciales por Tenant (17 Enero 2026)
+Cada tenant puede configurar sus propias credenciales para los portales.
+
+**Modelo**: `PortalCredential` en `leads/models.py`
+- `tenant`: FK a Tenant
+- `portal`: fotocasa, habitaclia, milanuncios, idealista
+- `email`: Email de la cuenta del portal
+- `password_encrypted`: Password cifrada con Fernet
+- `is_active`: Si la credencial está activa
+- `last_used`: Última vez usada con éxito
+- `last_error`: Último error (para debugging)
+
+**Cifrado**: Las passwords se cifran con Fernet (AES-128-CBC)
+- Key: `CREDENTIAL_ENCRYPTION_KEY` (env var, generar con `Fernet.generate_key()`)
+- Módulo: `backend/apps/core/encryption.py`
+
+**Admin Django**: `/admin/leads/portalcredential/`
+- Formulario especial que cifra passwords automáticamente
+- Muestra `********` para passwords existentes
+
+**Fallback**: Si el tenant no tiene credenciales, se usan env vars globales:
+- `FOTOCASA_EMAIL/PASSWORD`
+- `MILANUNCIOS_EMAIL/PASSWORD`
+- `IDEALISTA_EMAIL/PASSWORD`
+
+**Uso en Dagster** (`contact_assets.py`):
+```python
+# Obtiene credenciales del tenant o fallback a env vars
+credentials = get_portal_credentials(postgres, tenant_id, portal)
+email, password = credentials
+```
+
+### Datos del Comercial por Tenant (17 Enero 2026)
+Cada tenant configura los datos del comercial que aparecen en formularios de contacto.
+
+**Campos en modelo Tenant** (`core/models.py`):
+- `comercial_nombre`: Nombre que aparece en formularios
+- `comercial_email`: Email para recibir respuestas
+- `comercial_telefono`: Teléfono de contacto
+
+**Uso**: Habitaclia y otros portales que piden datos del remitente.
+
+**Fallback**: Si el tenant no tiene datos, se usan env vars globales:
+- `CONTACT_NAME`, `CONTACT_EMAIL`, `CONTACT_PHONE`
 
 **Dagster** (`dagster/casa_teva_pipeline/assets/contact_assets.py`):
 - Asset: `process_contact_queue` (max 5 contactos/dia)
@@ -351,6 +397,41 @@ def debug_view(request):
 ```
 
 **Ventaja**: Evita ciclos largos de deploy->error->analizar->deploy. Un debug endpoint bien hecho identifica el problema en 1 deploy.
+
+## Onboarding de Inmobiliaria (Checklist)
+
+Cuando una nueva inmobiliaria quiera usar el sistema:
+
+### 1. Crear Tenant
+- [ ] Crear Tenant en `/admin/core/tenant/`
+- [ ] Nombre, slug, email contacto
+- [ ] Datos comercial: comercial_nombre, comercial_email, comercial_telefono
+
+### 2. Crear Usuario
+- [ ] Crear User en `/admin/auth/user/`
+- [ ] Crear TenantUser en `/admin/core/tenantuser/` (rol: admin)
+
+### 3. Configurar Zonas
+- [ ] Añadir zonas en `/admin/core/zonageografica/`
+- [ ] Activar portales por zona (MA, FC, HA, ID)
+
+### 4. Credenciales de Portales (si usa contacto automático)
+- [ ] Generar `CREDENTIAL_ENCRYPTION_KEY` si no existe:
+  ```python
+  from cryptography.fernet import Fernet
+  print(Fernet.generate_key().decode())
+  ```
+- [ ] Añadir key a Azure Container Apps
+- [ ] Crear credenciales en `/admin/leads/portalcredential/`
+  - Fotocasa: email + password
+  - Milanuncios: email + password
+  - Idealista: email + password
+  - Habitaclia: solo necesita CAPTCHA_API_KEY global
+
+### 5. Verificar
+- [ ] Usuario puede hacer login en CRM
+- [ ] Ve sus zonas en el dashboard
+- [ ] Scraping funciona (ejecutar job manual)
 
 ## Comandos
 

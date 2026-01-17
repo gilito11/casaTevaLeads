@@ -105,6 +105,20 @@ class Tenant(models.Model):
     fecha_alta = models.DateTimeField(auto_now_add=True)
     max_leads_mes = models.IntegerField(default=1000)
 
+    # Datos del comercial para contacto automático de leads
+    comercial_nombre = models.CharField(
+        max_length=100, blank=True,
+        help_text="Nombre que aparece en formularios de contacto"
+    )
+    comercial_email = models.EmailField(
+        blank=True,
+        help_text="Email para recibir respuestas de leads"
+    )
+    comercial_telefono = models.CharField(
+        max_length=20, blank=True,
+        help_text="Teléfono de contacto en formularios"
+    )
+
     class Meta:
         db_table = 'tenants'
         verbose_name = 'Tenant'

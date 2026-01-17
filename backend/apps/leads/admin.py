@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Lead, Nota, LeadEstado
+from django import forms
+from .models import Lead, Nota, LeadEstado, PortalCredential, ContactQueue
 
 
 class NotaInline(admin.TabularInline):
@@ -72,3 +73,61 @@ class NotaAdmin(admin.ModelAdmin):
     search_fields = ['texto', 'lead__telefono_norm']
     readonly_fields = ['created_at']
     autocomplete_fields = ['autor']
+
+
+class PortalCredentialForm(forms.ModelForm):
+    """Formulario especial para manejar password cifrada."""
+    password = forms.CharField(
+        widget=forms.PasswordInput(render_value=True),
+        required=False,
+        help_text="Dejar en blanco para mantener la password actual"
+    )
+
+    class Meta:
+        model = PortalCredential
+        fields = ['tenant', 'portal', 'email', 'password', 'is_active']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.password_encrypted:
+            self.fields['password'].initial = '********'
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        password = self.cleaned_data.get('password')
+        if password and password != '********':
+            instance.set_password(password)
+        if commit:
+            instance.save()
+        return instance
+
+
+@admin.register(PortalCredential)
+class PortalCredentialAdmin(admin.ModelAdmin):
+    form = PortalCredentialForm
+    list_display = ['tenant', 'portal', 'email', 'is_active', 'last_used', 'updated_at']
+    list_filter = ['portal', 'is_active', 'tenant']
+    search_fields = ['email', 'tenant__nombre']
+    readonly_fields = ['last_used', 'last_error', 'created_at', 'updated_at']
+
+    fieldsets = (
+        ('Credenciales', {
+            'fields': ('tenant', 'portal', 'email', 'password', 'is_active')
+        }),
+        ('Estado', {
+            'fields': ('last_used', 'last_error'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ContactQueue)
+class ContactQueueAdmin(admin.ModelAdmin):
+    list_display = ['lead_id', 'portal', 'tenant', 'estado', 'prioridad', 'created_at', 'processed_at']
+    list_filter = ['estado', 'portal', 'tenant']
+    search_fields = ['lead_id', 'titulo']
+    readonly_fields = ['created_at', 'updated_at', 'processed_at']

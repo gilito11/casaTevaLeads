@@ -134,7 +134,14 @@ class HabitacliaContact(BaseContactAutomation):
         'phone_number': '.telefono, [class*="phone-number"]',
     }
 
-    def __init__(self, headless: bool = False, captcha_api_key: str = None):
+    def __init__(
+        self,
+        headless: bool = False,
+        captcha_api_key: str = None,
+        contact_name: str = None,
+        contact_email: str = None,
+        contact_phone: str = None
+    ):
         super().__init__(headless=headless)
         self.email = os.getenv('HABITACLIA_EMAIL')
         self.password = os.getenv('HABITACLIA_PASSWORD')
@@ -142,6 +149,10 @@ class HabitacliaContact(BaseContactAutomation):
         self.captcha_solver = None
         if self.captcha_api_key:
             self.captcha_solver = TwoCaptchaSolver(self.captcha_api_key)
+        # Contact info for forms (tenant-specific or fallback to env)
+        self.contact_name = contact_name or os.getenv('CONTACT_NAME', 'Interesado')
+        self.contact_email = contact_email or os.getenv('CONTACT_EMAIL', '')
+        self.contact_phone = contact_phone or os.getenv('CONTACT_PHONE', '')
 
     async def accept_cookies(self):
         """Accept cookies dialog if present."""
@@ -356,8 +367,7 @@ class HabitacliaContact(BaseContactAutomation):
                 if name_input:
                     value = await name_input.input_value()
                     if not value:
-                        our_name = os.getenv('CONTACT_NAME', 'Interesado')
-                        await name_input.fill(our_name)
+                        await name_input.fill(self.contact_name)
             except:
                 pass
 
@@ -366,10 +376,8 @@ class HabitacliaContact(BaseContactAutomation):
                 email_input = await self.page.query_selector(self.SELECTORS['input_email'])
                 if email_input:
                     value = await email_input.input_value()
-                    if not value:
-                        our_email = os.getenv('CONTACT_EMAIL', '')
-                        if our_email:
-                            await email_input.fill(our_email)
+                    if not value and self.contact_email:
+                        await email_input.fill(self.contact_email)
             except:
                 pass
 
@@ -378,10 +386,8 @@ class HabitacliaContact(BaseContactAutomation):
                 phone_input = await self.page.query_selector(self.SELECTORS['input_phone'])
                 if phone_input:
                     value = await phone_input.input_value()
-                    if not value:
-                        our_phone = os.getenv('CONTACT_PHONE', '')
-                        if our_phone:
-                            await phone_input.fill(our_phone)
+                    if not value and self.contact_phone:
+                        await phone_input.fill(self.contact_phone)
             except:
                 pass
 

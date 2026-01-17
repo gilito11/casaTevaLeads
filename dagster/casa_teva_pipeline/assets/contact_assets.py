@@ -82,6 +82,104 @@ def update_contact_status(
         conn.commit()
 
 
+def get_portal_credentials(postgres: PostgresResource, tenant_id: int, portal: str) -> tuple:
+    """
+    Get credentials for a portal, with fallback to env vars.
+    Returns (email, password) or (None, None) if not found.
+    """
+    # Try tenant-specific credentials first
+    with postgres.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT email, password_encrypted
+                FROM leads_portal_credential
+                WHERE tenant_id = %s AND portal = %s AND is_active = true
+            """, (tenant_id, portal))
+            row = cur.fetchone()
+
+            if row:
+                email, password_encrypted = row
+                # Decrypt password using Fernet
+                try:
+                    from cryptography.fernet import Fernet
+                    import base64
+
+                    key = os.environ.get('CREDENTIAL_ENCRYPTION_KEY')
+                    if not key:
+                        # Dev fallback key
+                        key = 'dev-only-key-do-not-use-in-prod!'
+                        key = base64.urlsafe_b64encode(key.encode()[:32].ljust(32, b'\0')).decode()
+
+                    f = Fernet(key.encode())
+                    password = f.decrypt(password_encrypted.encode()).decode()
+                    return (email, password)
+                except Exception as e:
+                    logger.warning(f"Failed to decrypt credentials for {portal}: {e}")
+
+    # Fallback to env vars
+    portal_upper = portal.upper()
+    email = os.environ.get(f'{portal_upper}_EMAIL')
+    password = os.environ.get(f'{portal_upper}_PASSWORD')
+
+    if email and password:
+        return (email, password)
+
+    return (None, None)
+
+
+def update_credential_last_used(postgres: PostgresResource, tenant_id: int, portal: str):
+    """Update last_used timestamp for credential."""
+    with postgres.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE leads_portal_credential
+                SET last_used = NOW(), updated_at = NOW()
+                WHERE tenant_id = %s AND portal = %s
+            """, (tenant_id, portal))
+        conn.commit()
+
+
+def update_credential_error(postgres: PostgresResource, tenant_id: int, portal: str, error: str):
+    """Update last_error for credential."""
+    with postgres.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE leads_portal_credential
+                SET last_error = %s, updated_at = NOW()
+                WHERE tenant_id = %s AND portal = %s
+            """, (error, tenant_id, portal))
+        conn.commit()
+
+
+def get_tenant_contact_info(postgres: PostgresResource, tenant_id: int) -> dict:
+    """
+    Get commercial contact info for a tenant.
+    Used for filling contact forms (name, email, phone).
+    """
+    with postgres.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT comercial_nombre, comercial_email, comercial_telefono
+                FROM tenants
+                WHERE tenant_id = %s
+            """, (tenant_id,))
+            row = cur.fetchone()
+
+            if row:
+                return {
+                    'name': row[0] or os.environ.get('CONTACT_NAME', 'Interesado'),
+                    'email': row[1] or os.environ.get('CONTACT_EMAIL', ''),
+                    'phone': row[2] or os.environ.get('CONTACT_PHONE', '')
+                }
+
+    # Fallback to env vars
+    return {
+        'name': os.environ.get('CONTACT_NAME', 'Interesado'),
+        'email': os.environ.get('CONTACT_EMAIL', ''),
+        'phone': os.environ.get('CONTACT_PHONE', '')
+    }
+
+
 def get_portal_session(postgres: PostgresResource, tenant_id: int, portal: str) -> Optional[dict]:
     """Get saved session cookies for a portal."""
     with postgres.get_connection() as conn:
@@ -129,7 +227,8 @@ def invalidate_session(postgres: PostgresResource, tenant_id: int, portal: str):
 async def process_fotocasa_contact(
     contact: dict,
     session: Optional[dict],
-    context: AssetExecutionContext
+    context: AssetExecutionContext,
+    credentials: tuple = (None, None)
 ) -> dict:
     """Process a single Fotocasa contact using Playwright."""
     from scrapers.contact_automation.fotocasa_contact import FotocasaContact
@@ -141,7 +240,13 @@ async def process_fotocasa_contact(
         'error': None
     }
 
-    automation = FotocasaContact(headless=True)
+    # Use passed credentials or fallback to env vars
+    email, password = credentials
+    if not email or not password:
+        email = os.environ.get('FOTOCASA_EMAIL')
+        password = os.environ.get('FOTOCASA_PASSWORD')
+
+    automation = FotocasaContact(headless=True, email=email, password=password)
 
     try:
         await automation.setup_browser()
@@ -185,7 +290,8 @@ async def process_fotocasa_contact(
 async def process_habitaclia_contact(
     contact: dict,
     session: Optional[dict],
-    context: AssetExecutionContext
+    context: AssetExecutionContext,
+    contact_info: dict = None
 ) -> dict:
     """Process a single Habitaclia contact (with 2Captcha support)."""
     from scrapers.contact_automation.habitaclia_contact import HabitacliaContact
@@ -203,7 +309,15 @@ async def process_habitaclia_contact(
         context.log.warning("CAPTCHA_API_KEY not set, skipping Habitaclia contact")
         return result
 
-    automation = HabitacliaContact(headless=True, captcha_api_key=captcha_api_key)
+    # Use tenant contact info or defaults
+    contact_info = contact_info or {}
+    automation = HabitacliaContact(
+        headless=True,
+        captcha_api_key=captcha_api_key,
+        contact_name=contact_info.get('name'),
+        contact_email=contact_info.get('email'),
+        contact_phone=contact_info.get('phone')
+    )
 
     try:
         await automation.setup_browser()
@@ -241,7 +355,8 @@ async def process_habitaclia_contact(
 async def process_milanuncios_contact(
     contact: dict,
     session: Optional[dict],
-    context: AssetExecutionContext
+    context: AssetExecutionContext,
+    credentials: tuple = (None, None)
 ) -> dict:
     """Process a single Milanuncios contact using internal chat."""
     from scrapers.contact_automation.milanuncios_contact import MilanunciosContact
@@ -253,13 +368,18 @@ async def process_milanuncios_contact(
         'error': None
     }
 
-    # Check for credentials
-    if not os.environ.get('MILANUNCIOS_EMAIL') or not os.environ.get('MILANUNCIOS_PASSWORD'):
-        result['error'] = 'MILANUNCIOS_EMAIL/PASSWORD not configured'
+    # Use passed credentials or fallback to env vars
+    email, password = credentials
+    if not email or not password:
+        email = os.environ.get('MILANUNCIOS_EMAIL')
+        password = os.environ.get('MILANUNCIOS_PASSWORD')
+
+    if not email or not password:
+        result['error'] = 'MILANUNCIOS credentials not configured (tenant or env vars)'
         context.log.warning("Milanuncios credentials not set, skipping contact")
         return result
 
-    automation = MilanunciosContact(headless=True)
+    automation = MilanunciosContact(headless=True, email=email, password=password)
 
     try:
         await automation.setup_browser()
@@ -304,7 +424,8 @@ async def process_milanuncios_contact(
 async def process_idealista_contact(
     contact: dict,
     session: Optional[dict],
-    context: AssetExecutionContext
+    context: AssetExecutionContext,
+    credentials: tuple = (None, None)
 ) -> dict:
     """Process a single Idealista contact (with DataDome handling via 2Captcha)."""
     from scrapers.contact_automation.idealista_contact import IdealistaContact
@@ -316,19 +437,25 @@ async def process_idealista_contact(
         'error': None
     }
 
-    # Check for credentials
+    # Check for captcha API key (global, not per-tenant)
     captcha_api_key = os.environ.get('CAPTCHA_API_KEY')
     if not captcha_api_key:
         result['error'] = 'CAPTCHA_API_KEY not configured (required for DataDome)'
         context.log.warning("CAPTCHA_API_KEY not set, skipping Idealista contact")
         return result
 
-    if not os.environ.get('IDEALISTA_EMAIL') or not os.environ.get('IDEALISTA_PASSWORD'):
-        result['error'] = 'IDEALISTA_EMAIL/PASSWORD not configured'
+    # Use passed credentials or fallback to env vars
+    email, password = credentials
+    if not email or not password:
+        email = os.environ.get('IDEALISTA_EMAIL')
+        password = os.environ.get('IDEALISTA_PASSWORD')
+
+    if not email or not password:
+        result['error'] = 'IDEALISTA credentials not configured (tenant or env vars)'
         context.log.warning("Idealista credentials not set, skipping contact")
         return result
 
-    automation = IdealistaContact(headless=True, captcha_api_key=captcha_api_key)
+    automation = IdealistaContact(headless=True, captcha_api_key=captcha_api_key, email=email, password=password)
 
     try:
         await automation.setup_browser()
@@ -424,24 +551,44 @@ def process_contact_queue(
         # Get session for this portal
         session = get_portal_session(postgres, tenant_id, portal)
 
+        # Get credentials for this tenant/portal (with fallback to env vars)
+        credentials = get_portal_credentials(postgres, tenant_id, portal)
+
+        # Get tenant contact info (for filling contact forms)
+        contact_info = get_tenant_contact_info(postgres, tenant_id)
+
         if not session:
             context.log.warning(f"No valid session for {portal} (tenant {tenant_id})")
+            # For portals that require session (FC, HA), this is an error
+            # For portals with auto-login (MA, ID), we can still try
+            if portal in ('fotocasa', 'habitaclia'):
+                update_contact_status(
+                    postgres, contact_id, 'FALLIDO',
+                    error=f'No valid session for {portal}'
+                )
+                results['failed'] += 1
+                continue
+
+        # Check credentials for portals that need them
+        if portal in ('milanuncios', 'idealista') and credentials == (None, None):
+            context.log.warning(f"No credentials for {portal} (tenant {tenant_id})")
             update_contact_status(
                 postgres, contact_id, 'FALLIDO',
-                error=f'No valid session for {portal}'
+                error=f'No credentials configured for {portal}'
             )
+            update_credential_error(postgres, tenant_id, portal, 'No credentials configured')
             results['failed'] += 1
             continue
 
-        # Process based on portal
+        # Process based on portal (pass credentials and contact info)
         if portal == 'fotocasa':
-            result = asyncio.run(process_fotocasa_contact(contact, session, context))
+            result = asyncio.run(process_fotocasa_contact(contact, session, context, credentials))
         elif portal == 'habitaclia':
-            result = asyncio.run(process_habitaclia_contact(contact, session, context))
+            result = asyncio.run(process_habitaclia_contact(contact, session, context, contact_info))
         elif portal == 'milanuncios':
-            result = asyncio.run(process_milanuncios_contact(contact, session, context))
+            result = asyncio.run(process_milanuncios_contact(contact, session, context, credentials))
         elif portal == 'idealista':
-            result = asyncio.run(process_idealista_contact(contact, session, context))
+            result = asyncio.run(process_idealista_contact(contact, session, context, credentials))
         else:
             result = {'success': False, 'error': f'Portal not supported for contact: {portal}'}
 
@@ -453,6 +600,7 @@ def process_contact_queue(
                 mensaje_enviado=result.get('message_sent', False)
             )
             update_session_last_used(postgres, tenant_id, portal)
+            update_credential_last_used(postgres, tenant_id, portal)
             results['successful'] += 1
             if result.get('phone'):
                 results['phones_extracted'] += 1
@@ -464,6 +612,10 @@ def process_contact_queue(
                 error=result.get('error')
             )
             results['failed'] += 1
+
+            # Update credential error
+            if result.get('error'):
+                update_credential_error(postgres, tenant_id, portal, result['error'])
 
             # Invalidate session if auth error
             if result.get('error') and 'session' in result['error'].lower():

@@ -153,10 +153,10 @@ class IdealistaContact(BaseContactAutomation):
     # User agent (must match what 2Captcha uses)
     USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
 
-    def __init__(self, headless: bool = False, captcha_api_key: str = None):
+    def __init__(self, headless: bool = False, captcha_api_key: str = None, email: str = None, password: str = None):
         super().__init__(headless=headless)
-        self.email = os.getenv('IDEALISTA_EMAIL')
-        self.password = os.getenv('IDEALISTA_PASSWORD')
+        self.email = email or os.getenv('IDEALISTA_EMAIL')
+        self.password = password or os.getenv('IDEALISTA_PASSWORD')
         self.captcha_api_key = captcha_api_key or os.getenv('CAPTCHA_API_KEY')
         self.datadome_solver = None
         if self.captcha_api_key:
