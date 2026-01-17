@@ -64,7 +64,7 @@ async def main():
 
     # Verificar credenciales
     if not os.getenv('FOTOCASA_EMAIL') or not os.getenv('FOTOCASA_PASSWORD'):
-        print("\n⚠️  CONFIGURACIÓN REQUERIDA:")
+        print("\n[!]  CONFIGURACIÓN REQUERIDA:")
         print("   Crea un archivo .env con:")
         print("   FOTOCASA_EMAIL=tu_email@ejemplo.com")
         print("   FOTOCASA_PASSWORD=tu_contraseña")
@@ -73,69 +73,69 @@ async def main():
         return
 
     print("\n" + "="*60)
-    print("🏠 FOTOCASA CONTACT AUTOMATION - TEST")
+    print("FOTOCASA CONTACT AUTOMATION - TEST")
     print("="*60)
     print(f"URL: {args.url}")
     print(f"Headless: {args.headless}")
-    print(f"Solo teléfono: {args.phone_only}")
+    print(f"Solo telefono: {args.phone_only}")
     print("="*60 + "\n")
 
     contact = FotocasaContact(headless=args.headless)
 
     try:
-        print("🔧 Iniciando navegador...")
+        print("[*] Iniciando navegador...")
         await contact.setup_browser()
 
         # Check/perform login
         if args.login:
-            print("🔑 Forzando login...")
+            print("[*] Forzando login...")
             success = await contact.login()
             if not success:
-                print("❌ Login fallido. Verifica credenciales.")
+                print("[FAIL] Login fallido. Verifica credenciales.")
                 return
         else:
-            print("🔍 Verificando sesión guardada...")
+            print("[?] Verificando sesión guardada...")
             if not await contact.is_logged_in():
-                print("🔑 Sesión expirada, haciendo login...")
+                print("[*] Sesión expirada, haciendo login...")
                 success = await contact.login()
                 if not success:
-                    print("❌ Login fallido. Verifica credenciales.")
+                    print("[FAIL] Login fallido. Verifica credenciales.")
                     return
             else:
-                print("✅ Sesión activa")
+                print("[OK] Sesión activa")
 
         # Navigate to listing
-        print(f"\n📄 Abriendo anuncio...")
-        await contact.page.goto(args.url, wait_until='networkidle')
+        print(f"\n[>] Abriendo anuncio...")
+        await contact.page.goto(args.url, wait_until='domcontentloaded', timeout=60000)
         await asyncio.sleep(2)
 
         # Get seller name
         seller = await contact.get_seller_name()
         if seller:
-            print(f"👤 Vendedor: {seller}")
+            print(f"[U] Vendedor: {seller}")
 
         # Extract phone
-        print("\n📞 Intentando extraer teléfono...")
+        print("\n[TEL] Intentando extraer teléfono...")
         phone = await contact.extract_phone(args.url)
         if phone:
-            print(f"✅ Teléfono extraído: {phone}")
+            print(f"[OK] Teléfono extraído: {phone}")
         else:
-            print("⚠️  No se pudo extraer el teléfono")
+            print("[!]  No se pudo extraer el teléfono")
 
         # Send message if not phone-only
         if not args.phone_only:
-            print(f"\n✉️  Enviando mensaje...")
+            print(f"\n[MSG]  Enviando mensaje...")
             print(f"   Mensaje: {args.message[:50]}...")
 
             success = await contact.send_message(args.url, args.message)
             if success:
-                print("✅ ¡Mensaje enviado correctamente!")
+                print("[OK] ¡Mensaje enviado correctamente!")
             else:
-                print("❌ Error al enviar mensaje")
+                print("[FAIL] Error al enviar mensaje")
 
         # Summary
         print("\n" + "="*60)
-        print("📊 RESUMEN")
+        print("[=] RESUMEN")
         print("="*60)
         print(f"Vendedor: {seller or 'No encontrado'}")
         print(f"Teléfono: {phone or 'No extraído'}")
@@ -148,7 +148,7 @@ async def main():
         raise
 
     finally:
-        print("🔧 Cerrando navegador...")
+        print("[*] Cerrando navegador...")
         await contact.close()
 
 

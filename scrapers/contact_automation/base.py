@@ -85,30 +85,44 @@ class BaseContactAutomation(ABC):
         """Initialize Playwright with stealth settings."""
         from playwright.async_api import async_playwright
 
-        try:
-            from playwright_stealth import stealth_async
-            self.has_stealth = True
-        except ImportError:
-            logger.warning("playwright-stealth not installed, running without stealth")
-            self.has_stealth = False
+        # Temporarily disable stealth - causing browser close issues
+        self.has_stealth = False
+        self.stealth = None
+        # try:
+        #     from playwright_stealth import Stealth
+        #     self.stealth = Stealth(navigator_webdriver=True)
+        #     self.has_stealth = True
+        # except ImportError:
+        #     logger.warning("playwright-stealth not installed, running without stealth")
+        #     self.stealth = None
 
         self.playwright = await async_playwright().start()
 
-        # Use Firefox for better anti-detection
-        self.browser = await self.playwright.firefox.launch(
+        # Use Chromium - better compatibility with most sites
+        self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
-            slow_mo=50  # Slow down actions to appear human
+            slow_mo=50,  # Slow down actions to appear human
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+            ]
         )
 
         # Create context with saved cookies if available
         context_options = {
             'viewport': {'width': 1920, 'height': 1080},
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'locale': 'es-ES',
             'timezone_id': 'Europe/Madrid',
         }
 
         self.context = await self.browser.new_context(**context_options)
+
+        # Apply stealth to context if available
+        if self.has_stealth and self.stealth:
+            await self.stealth.apply_stealth_async(self.context)
+            logger.info("Stealth mode applied to context")
 
         # Load saved cookies
         if self.cookies_file.exists():
@@ -117,10 +131,6 @@ class BaseContactAutomation(ABC):
             logger.info(f"Loaded {len(cookies)} cookies from {self.cookies_file}")
 
         self.page = await self.context.new_page()
-
-        # Apply stealth if available
-        if self.has_stealth:
-            await stealth_async(self.page)
 
     async def save_cookies(self):
         """Save session cookies for future use."""

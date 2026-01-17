@@ -62,32 +62,69 @@ class FotocasaContact(BaseContactAutomation):
         self.email = os.getenv('FOTOCASA_EMAIL')
         self.password = os.getenv('FOTOCASA_PASSWORD')
 
-    async def is_logged_in(self) -> bool:
-        """Check if session is active."""
+    async def accept_cookies(self):
+        """Accept cookies dialog if present."""
         try:
-            await self.page.goto(self.BASE_URL, wait_until='networkidle')
-            await asyncio.sleep(2)
-
-            # Look for user menu or avatar indicating logged in state
-            for selector in ['[class*="UserMenu"]', '[class*="Avatar"]', '[data-testid="user-menu"]']:
+            # Common cookie accept button selectors for Fotocasa
+            cookie_selectors = [
+                'button:has-text("Aceptar")',
+                'button:has-text("Aceptar todo")',
+                'button:has-text("Aceptar y cerrar")',
+                '#didomi-notice-agree-button',
+                '[id*="accept"]',
+                '.didomi-continue-without-agreeing',
+            ]
+            for selector in cookie_selectors:
                 try:
-                    element = await self.page.wait_for_selector(selector, timeout=3000)
-                    if element:
-                        logger.info("Session is active (found user element)")
+                    btn = await self.page.wait_for_selector(selector, timeout=2000)
+                    if btn:
+                        await btn.click()
+                        logger.info(f"Clicked cookie accept button: {selector}")
+                        await asyncio.sleep(1)
                         return True
                 except:
                     continue
+            return False
+        except:
+            return False
 
-            # Check if login link is visible (means NOT logged in)
-            login_link = await self.page.query_selector('a[href*="acceso"], text="Acceder"')
-            if login_link:
-                logger.info("Not logged in (login link visible)")
+    async def is_logged_in(self) -> bool:
+        """Check if session is active by looking for user name in header."""
+        try:
+            await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=15000)
+            await asyncio.sleep(3)
+
+            # Accept cookies first
+            await self.accept_cookies()
+            await asyncio.sleep(1)
+
+            # Get page content
+            content = await self.page.content()
+
+            # If we see a username/name in the header, we're logged in
+            # Look for patterns like user menus or profile indicators
+            if 'Eric' in content or 'Mi cuenta' in content or 'Mis alertas' in content:
+                logger.info("Session is active (found user indicators)")
+                return True
+
+            # Check if "Acceder" link is visible (means NOT logged in)
+            if 'Acceder</a>' in content or '>Acceder<' in content:
+                logger.info("Not logged in (Acceder link visible)")
                 return False
+
+            # If cookies exist, assume logged in
+            if self.cookies_file.exists():
+                logger.info("Cookies exist, assuming logged in")
+                return True
 
             return False
 
         except Exception as e:
             logger.error(f"Error checking login status: {e}")
+            # If cookies exist, try anyway
+            if self.cookies_file.exists():
+                logger.info("Error but cookies exist, assuming logged in")
+                return True
             return False
 
     async def login(self, email: str = None, password: str = None) -> bool:
@@ -102,22 +139,39 @@ class FotocasaContact(BaseContactAutomation):
         try:
             logger.info("Navigating to login page...")
             await self.page.goto(self.LOGIN_URL, wait_until='networkidle')
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
 
-            # Accept cookies if dialog appears
-            try:
-                accept_btn = await self.page.wait_for_selector(
-                    'button:has-text("Aceptar"), [id*="accept"]', timeout=3000
-                )
-                if accept_btn:
-                    await accept_btn.click()
-                    await asyncio.sleep(1)
-            except:
-                pass
+            # Accept cookies dialog
+            await self.accept_cookies()
+            await asyncio.sleep(1)
 
-            # Fill email
+            # Fill email - try multiple selectors
             logger.info("Filling email...")
-            email_input = await self.page.wait_for_selector(self.SELECTORS['login_email'])
+            email_input = None
+            for selector in ['input[type="email"]', 'input[name="email"]', '#email', 'input[placeholder*="mail"]']:
+                try:
+                    email_input = await self.page.wait_for_selector(selector, timeout=5000)
+                    if email_input:
+                        break
+                except:
+                    continue
+
+            if not email_input:
+                logger.error("Could not find email input field")
+                # Take screenshot for debugging
+                try:
+                    await self.page.screenshot(path='debug_login_page.png')
+                    logger.info("Screenshot saved to debug_login_page.png")
+                except:
+                    pass
+                # Print page content for debugging
+                content = await self.page.content()
+                if 'SENTIMOS LA' in content:
+                    logger.error("Fotocasa is blocking - anti-bot detected")
+                elif 'email' in content.lower():
+                    logger.error("Email field exists in HTML but selector not matching")
+                return False
+
             await email_input.fill(email)
             await asyncio.sleep(0.5)
 
@@ -169,24 +223,55 @@ class FotocasaContact(BaseContactAutomation):
             if phone_btn:
                 logger.info("Found 'Ver teléfono' button, clicking...")
                 await phone_btn.click()
-                await asyncio.sleep(2)
+                await asyncio.sleep(3)
 
-                # Try to extract the revealed phone number
-                page_content = await self.page.content()
-
-                # Spanish phone patterns
-                phone_patterns = [
-                    r'(\+34\s?)?[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}',
-                    r'[6789]\d{8}',
+                # Try to find phone in specific elements first
+                phone_selectors = [
+                    'a[href^="tel:"]',
+                    '[class*="phone"] a',
+                    '[class*="Phone"] a',
+                    '[data-testid*="phone"]',
                 ]
 
-                for pattern in phone_patterns:
-                    matches = re.findall(pattern, page_content)
-                    if matches:
-                        # Clean and return first valid phone
-                        phone = re.sub(r'[\s.-]', '', matches[0])
-                        if len(phone) >= 9:
-                            return phone[-9:]  # Last 9 digits (remove +34)
+                for sel in phone_selectors:
+                    try:
+                        phone_el = await self.page.query_selector(sel)
+                        if phone_el:
+                            href = await phone_el.get_attribute('href')
+                            if href and 'tel:' in href:
+                                phone = href.replace('tel:', '').replace('+34', '').replace(' ', '')
+                                if len(phone) == 9 and phone[0] in '6789':
+                                    logger.info(f"Phone found via tel: link: {phone}")
+                                    return phone
+                            text = await phone_el.inner_text()
+                            if text:
+                                phone = re.sub(r'[^\d]', '', text)
+                                if len(phone) >= 9:
+                                    phone = phone[-9:]
+                                    if phone[0] in '6789':
+                                        logger.info(f"Phone found in element text: {phone}")
+                                        return phone
+                    except:
+                        continue
+
+                # Fallback: search page content with strict pattern
+                page_content = await self.page.content()
+
+                # Look for tel: links first (most reliable)
+                tel_matches = re.findall(r'tel:(\+?34)?(\d{9})', page_content)
+                if tel_matches:
+                    phone = tel_matches[0][1]
+                    if phone[0] in '6789':
+                        logger.info(f"Phone found via tel: pattern: {phone}")
+                        return phone
+
+                # Spanish mobile pattern (6xx, 7xx) - most common for particulares
+                mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
+                matches = re.findall(mobile_pattern, page_content)
+                if matches:
+                    phone = re.sub(r'[\s.-]', '', matches[0])
+                    logger.info(f"Phone found via mobile pattern: {phone}")
+                    return phone
 
                 logger.warning("Phone button clicked but number not found in page")
                 return None
