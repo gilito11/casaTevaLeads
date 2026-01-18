@@ -1108,3 +1108,29 @@ def cancel_queued_contact_view(request, queue_id):
         return JsonResponse({
             'error': f'No se puede cancelar item en estado {item.estado}'
         }, status=400)
+
+
+@login_required
+@require_POST
+def retry_queued_contact_view(request, queue_id):
+    """Reintentar un contacto fallido"""
+    from leads.models import ContactQueue
+
+    tenant_id = get_user_tenant(request)
+    item = get_object_or_404(ContactQueue, id=queue_id, tenant_id=tenant_id)
+
+    if item.estado == 'FALLIDO':
+        item.estado = 'PENDIENTE'
+        item.error = None
+        item.save()
+
+        if request.headers.get('HX-Request'):
+            # Trigger HTMX page refresh
+            response = HttpResponse(status=200)
+            response['HX-Refresh'] = 'true'
+            return response
+        return JsonResponse({'status': 'requeued', 'id': item.id})
+    else:
+        return JsonResponse({
+            'error': f'Solo se puede reintentar items con estado FALLIDO (actual: {item.estado})'
+        }, status=400)
