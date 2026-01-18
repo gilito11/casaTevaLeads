@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 18 January 2026 (Portal credentials per tenant + comercial contact fields)
+> **Last Updated**: 18 January 2026 (Fix: Fotocasa auto-login + session cookie saving)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -166,8 +166,20 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Reintentos automaticos**: 3 intentos con backoff exponencial antes de alertar
 - **Duracion job**: ~25 min (4 scrapers + dbt)
 
-### Sistema de Contacto Automatico (17 Enero 2026)
+### Sistema de Contacto Automatico (18 Enero 2026)
 Sistema para contactar leads automaticamente via los portales inmobiliarios.
+
+**Auto-login y Session Cookies** (Fix 18 Enero 2026):
+- Todos los portales (excepto Habitaclia) ahora hacen auto-login si no hay sesión guardada
+- Después de login exitoso, las cookies se guardan automáticamente en `PortalSession`
+- Las cookies se reutilizan en futuros contactos para evitar re-login
+- Si las cookies expiran, se hace auto-login de nuevo
+
+**Flujo de autenticación**:
+1. Buscar sesión existente en `leads_portal_session`
+2. Si existe y es válida → usar cookies
+3. Si no existe o expiró → auto-login con credenciales
+4. Guardar nuevas cookies para futuros usos
 
 **Arquitectura**:
 ```
@@ -175,8 +187,10 @@ CRM (encolar leads) -> PostgreSQL (contact_queue)
                             ↓
 Dagster (job diario) -> Playwright (headless)
                             ↓
-              Fotocasa: login automatico con credenciales
-              Habitaclia: 2Captcha para reCAPTCHA
+              Fotocasa: auto-login + guardar cookies
+              Milanuncios: auto-login + guardar cookies
+              Idealista: auto-login + DataDome + guardar cookies
+              Habitaclia: requiere sesión previa (usa CAPTCHA)
 ```
 
 **UI CRM**:
