@@ -224,11 +224,33 @@ def invalidate_session(postgres: PostgresResource, tenant_id: int, portal: str):
         conn.commit()
 
 
+def save_session_cookies(postgres: PostgresResource, tenant_id: int, portal: str, email: str, cookies: list):
+    """Save or update session cookies after successful login."""
+    cookies_json = json.dumps(cookies)
+    with postgres.get_connection() as conn:
+        with conn.cursor() as cur:
+            # Upsert: insert or update
+            cur.execute("""
+                INSERT INTO leads_portal_session (tenant_id, portal, email, cookies, is_valid, last_used, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, true, NOW(), NOW(), NOW())
+                ON CONFLICT (tenant_id, portal)
+                DO UPDATE SET
+                    cookies = EXCLUDED.cookies,
+                    email = EXCLUDED.email,
+                    is_valid = true,
+                    last_used = NOW(),
+                    updated_at = NOW()
+            """, (tenant_id, portal, email, cookies_json))
+        conn.commit()
+
+
 async def process_fotocasa_contact(
     contact: dict,
     session: Optional[dict],
     context: AssetExecutionContext,
-    credentials: tuple = (None, None)
+    credentials: tuple = (None, None),
+    postgres: PostgresResource = None,
+    tenant_id: int = None
 ) -> dict:
     """Process a single Fotocasa contact using Playwright."""
     from scrapers.contact_automation.fotocasa_contact import FotocasaContact
@@ -259,11 +281,22 @@ async def process_fotocasa_contact(
             await automation.context.add_cookies(cookies)
             context.log.info(f"Loaded {len(cookies)} cookies from DB session")
 
-        # Check if logged in
+        # Check if logged in, login if needed
         if not await automation.is_logged_in():
-            context.log.warning("Session expired or invalid")
-            result['error'] = 'Session expired - need re-login'
-            return result
+            context.log.info("Session expired or no session, attempting login...")
+            if email and password:
+                if not await automation.login(email, password):
+                    result['error'] = 'Login failed'
+                    return result
+                context.log.info("Login successful")
+                # Save session cookies for future use
+                if postgres and tenant_id:
+                    cookies = await automation.context.cookies()
+                    save_session_cookies(postgres, tenant_id, 'fotocasa', email, cookies)
+                    context.log.info(f"Saved {len(cookies)} cookies to DB")
+            else:
+                result['error'] = 'No credentials for auto-login'
+                return result
 
         # Contact the lead
         contact_result = await automation.contact_lead(
@@ -356,7 +389,9 @@ async def process_milanuncios_contact(
     contact: dict,
     session: Optional[dict],
     context: AssetExecutionContext,
-    credentials: tuple = (None, None)
+    credentials: tuple = (None, None),
+    postgres: PostgresResource = None,
+    tenant_id: int = None
 ) -> dict:
     """Process a single Milanuncios contact using internal chat."""
     from scrapers.contact_automation.milanuncios_contact import MilanunciosContact
@@ -398,6 +433,12 @@ async def process_milanuncios_contact(
             if not await automation.login():
                 result['error'] = 'Login failed'
                 return result
+            context.log.info("Login successful")
+            # Save session cookies for future use
+            if postgres and tenant_id:
+                cookies = await automation.context.cookies()
+                save_session_cookies(postgres, tenant_id, 'milanuncios', email, cookies)
+                context.log.info(f"Saved {len(cookies)} cookies to DB")
 
         # Contact the lead
         contact_result = await automation.contact_lead(
@@ -425,7 +466,9 @@ async def process_idealista_contact(
     contact: dict,
     session: Optional[dict],
     context: AssetExecutionContext,
-    credentials: tuple = (None, None)
+    credentials: tuple = (None, None),
+    postgres: PostgresResource = None,
+    tenant_id: int = None
 ) -> dict:
     """Process a single Idealista contact (with DataDome handling via 2Captcha)."""
     from scrapers.contact_automation.idealista_contact import IdealistaContact
@@ -474,6 +517,12 @@ async def process_idealista_contact(
             if not await automation.login():
                 result['error'] = 'Login failed (possibly DataDome blocked)'
                 return result
+            context.log.info("Login successful")
+            # Save session cookies for future use
+            if postgres and tenant_id:
+                cookies = await automation.context.cookies()
+                save_session_cookies(postgres, tenant_id, 'idealista', email, cookies)
+                context.log.info(f"Saved {len(cookies)} cookies to DB")
 
         # Contact the lead
         contact_result = await automation.contact_lead(
@@ -559,17 +608,27 @@ def process_contact_queue(
 
         if not session:
             context.log.warning(f"No valid session for {portal} (tenant {tenant_id})")
-            # For portals that require session (FC, HA), this is an error
-            # For portals with auto-login (MA, ID), we can still try
-            if portal in ('fotocasa', 'habitaclia'):
-                update_contact_status(
-                    postgres, contact_id, 'FALLIDO',
-                    error=f'No valid session for {portal}'
-                )
-                results['failed'] += 1
-                continue
+            # All portals can try auto-login if credentials are available
+            # Only fail if no session AND no credentials
+            if credentials == (None, None):
+                # Habitaclia doesn't need credentials (uses CAPTCHA), but needs session
+                if portal == 'habitaclia':
+                    update_contact_status(
+                        postgres, contact_id, 'FALLIDO',
+                        error=f'No valid session for {portal}'
+                    )
+                    results['failed'] += 1
+                    continue
+                # Fotocasa/Milanuncios/Idealista need credentials for auto-login
+                elif portal in ('fotocasa', 'milanuncios', 'idealista'):
+                    update_contact_status(
+                        postgres, contact_id, 'FALLIDO',
+                        error=f'No credentials configured for {portal}'
+                    )
+                    results['failed'] += 1
+                    continue
 
-        # Check credentials for portals that need them
+        # Check credentials for portals that need them (when session exists but may be expired)
         if portal in ('milanuncios', 'idealista') and credentials == (None, None):
             context.log.warning(f"No credentials for {portal} (tenant {tenant_id})")
             update_contact_status(
@@ -582,13 +641,13 @@ def process_contact_queue(
 
         # Process based on portal (pass credentials and contact info)
         if portal == 'fotocasa':
-            result = asyncio.run(process_fotocasa_contact(contact, session, context, credentials))
+            result = asyncio.run(process_fotocasa_contact(contact, session, context, credentials, postgres, tenant_id))
         elif portal == 'habitaclia':
             result = asyncio.run(process_habitaclia_contact(contact, session, context, contact_info))
         elif portal == 'milanuncios':
-            result = asyncio.run(process_milanuncios_contact(contact, session, context, credentials))
+            result = asyncio.run(process_milanuncios_contact(contact, session, context, credentials, postgres, tenant_id))
         elif portal == 'idealista':
-            result = asyncio.run(process_idealista_contact(contact, session, context, credentials))
+            result = asyncio.run(process_idealista_contact(contact, session, context, credentials, postgres, tenant_id))
         else:
             result = {'success': False, 'error': f'Portal not supported for contact: {portal}'}
 
@@ -639,6 +698,12 @@ def process_contact_queue(
 
     # Send alert on failures
     if results['failed'] > 0:
+        # Build detailed failure info
+        failed_details = [
+            f"• {d['portal']}: {d['error']}"
+            for d in results['details']
+            if not d['success']
+        ]
         send_alert(
             title="Contact automation completed with failures",
             message=f"{results['failed']}/{results['processed']} contacts failed",
@@ -646,7 +711,8 @@ def process_contact_queue(
             details={
                 'successful': results['successful'],
                 'failed': results['failed'],
-                'phones_extracted': results['phones_extracted']
+                'phones_extracted': results['phones_extracted'],
+                'errors': '\n'.join(failed_details) if failed_details else 'Unknown'
             }
         )
 
