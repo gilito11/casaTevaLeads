@@ -58,3 +58,19 @@ sources:
               expression: "scraping_timestamp <= created_at"
               config:
                 severity: warn
+
+      - name: listing_price_history
+        description: "Historical price tracking for listings to detect price drops"
+        columns:
+          - name: id
+            description: "Primary key"
+          - name: tenant_id
+            description: "Tenant identifier"
+          - name: portal
+            description: "Source portal name"
+          - name: anuncio_id
+            description: "Listing ID from portal"
+          - name: precio
+            description: "Price at capture time"
+          - name: fecha_captura
+            description: "Timestamp of price capture"

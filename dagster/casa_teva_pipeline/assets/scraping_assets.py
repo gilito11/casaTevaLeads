@@ -20,11 +20,22 @@ from casa_teva_pipeline.resources.postgres_resource import PostgresResource
 try:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
     from scrapers.error_handling import send_alert, AlertSeverity, get_madrid_time
+    from scrapers.utils.telegram_alerts import (
+        send_telegram_alert,
+        send_new_leads_summary,
+        send_scraping_error,
+    )
     ALERTING_AVAILABLE = True
 except ImportError:
     ALERTING_AVAILABLE = False
     from zoneinfo import ZoneInfo
     def send_alert(*args, **kwargs):
+        pass
+    def send_telegram_alert(*args, **kwargs):
+        pass
+    def send_new_leads_summary(*args, **kwargs):
+        pass
+    def send_scraping_error(*args, **kwargs):
         pass
     def get_madrid_time():
         return datetime.now(ZoneInfo('Europe/Madrid'))
@@ -522,7 +533,7 @@ def scraping_all_portals(
     context.log.info(f"Scraping completado: {completed} OK, {errors} errores, {skipped} omitidos")
     context.log.info(f"Total leads encontrados: {total_leads}")
 
-    # Send alerts based on results
+    # Send alerts based on results (Discord + Telegram)
     if errors > 0 or timeouts > 0:
         send_alert(
             title="Scraping completado con errores",
@@ -536,9 +547,15 @@ def scraping_all_portals(
                 'failed_scrapers': ', '.join(failed_scrapers) if failed_scrapers else 'None',
             },
         )
+        # Telegram: error alert for each failed scraper
+        for r in all_results:
+            if r['status'] in ('error', 'timeout'):
+                send_scraping_error(
+                    portal=r['scraper'],
+                    error=r.get('error', f"Timeout after 45 min") if r['status'] == 'error' else "Timeout",
+                    zones=r.get('zones'),
+                )
     elif total_leads == 0 and completed < len(all_results):
-        # Only alert if some scrapers failed - 0 leads with all success
-        # usually means duplicates (which is fine, dbt will dedupe)
         send_alert(
             title="Scraping sin resultados",
             message="No se encontraron leads en ningún portal",
@@ -546,7 +563,6 @@ def scraping_all_portals(
             details={'zonas_activas': len(zones), 'completed': completed},
         )
     elif total_leads > 0:
-        # Only send success alert if configured (optional)
         if os.environ.get('ALERT_ON_SUCCESS', '').lower() == 'true':
             send_alert(
                 title="Scraping completado",
@@ -720,11 +736,98 @@ def scraping_stats(
 
     context.log.info(f"Estadísticas: {stats['total_leads']} leads totales, {stats['new_leads_today']} nuevos hoy")
 
+    # Telegram: send summary if new leads found today
+    if stats['new_leads_today'] > 0:
+        send_new_leads_summary(
+            total_leads=stats['new_leads_today'],
+            leads_by_portal=stats['leads_by_portal'],
+            new_today=stats['new_leads_today'],
+        )
+
     return Output(
         value=stats,
         metadata={
             'total_leads': MetadataValue.int(stats['total_leads']),
             'new_leads_today': MetadataValue.int(stats['new_leads_today']),
             'leads_by_portal': MetadataValue.json(stats['leads_by_portal']),
+        }
+    )
+
+
+@asset(
+    description="Detecta y alerta sobre bajadas de precio",
+    compute_kind="python",
+    group_name="monitoring",
+    deps=["dbt_transform"],
+)
+def price_drop_alerts(
+    context: AssetExecutionContext,
+    postgres: PostgresResource,
+) -> Output[Dict[str, Any]]:
+    """
+    Detecta leads con bajada de precio y envia alertas por Telegram.
+
+    Criterios:
+    - precio_cambio_pct < -5% (bajada significativa)
+    - Solo leads con estado NUEVO o EN_PROCESO
+    """
+    try:
+        from scrapers.utils.telegram_alerts import send_price_drop_alert
+    except ImportError:
+        context.log.warning("Telegram alerts not available")
+        return Output(value={'alerts_sent': 0}, metadata={})
+
+    context.log.info("Buscando leads con bajada de precio...")
+
+    alerts_sent = 0
+    price_drops = []
+
+    try:
+        with postgres.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        titulo,
+                        source_portal,
+                        zona_clasificada,
+                        precio_anterior,
+                        precio,
+                        listing_url
+                    FROM public_marts.dim_leads
+                    WHERE precio_cambio_pct < -5
+                      AND precio_anterior IS NOT NULL
+                      AND ultima_actualizacion >= CURRENT_DATE
+                    ORDER BY precio_cambio_pct ASC
+                    LIMIT 10
+                """)
+
+                for row in cur.fetchall():
+                    titulo, portal, zona, precio_ant, precio_nuevo, url = row
+
+                    if precio_ant and precio_nuevo and precio_ant > precio_nuevo:
+                        send_price_drop_alert(
+                            titulo=titulo or "Sin titulo",
+                            portal=portal or "desconocido",
+                            zona=zona or "desconocida",
+                            precio_anterior=float(precio_ant),
+                            precio_nuevo=float(precio_nuevo),
+                            url=url or "",
+                        )
+                        alerts_sent += 1
+                        price_drops.append({
+                            'titulo': titulo,
+                            'portal': portal,
+                            'reduccion': float(precio_ant - precio_nuevo),
+                        })
+
+    except Exception as e:
+        context.log.error(f"Error buscando bajadas de precio: {e}")
+
+    context.log.info(f"Alertas de bajada de precio enviadas: {alerts_sent}")
+
+    return Output(
+        value={'alerts_sent': alerts_sent, 'price_drops': price_drops},
+        metadata={
+            'alerts_sent': MetadataValue.int(alerts_sent),
         }
     )

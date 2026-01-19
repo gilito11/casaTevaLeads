@@ -153,36 +153,34 @@ enriched AS (
         NULL::TEXT AS motivo_descarte,
 
         -- Lead quality score (0-100)
-        -- Criterios: telefono (+30), precio (<100k:+20, 100-200k:+15, >200k:+10),
-        -- zona prioritaria (+15), antiguedad (<24h:+20, <7d:+10, >7d:+5), particular (+10)
+        -- Criterios optimizados para detectar vendedores receptivos:
+        -- 1. dias_en_mercado: >30 dias = mas receptivo (+30 pts max)
+        -- 2. tiene_telefono: telefono visible = menos spam recibido (+20 pts)
+        -- 3. num_fotos: pocas fotos = particular amateur (+10 pts si <5 fotos)
+        -- 4. precio_bajo: <100k = vendedor motivado (+20 pts)
         (
-            -- Telefono disponible: +30pts (lo mas importante)
-            CASE WHEN telefono_norm IS NOT NULL AND telefono_norm != '' THEN 30 ELSE 0 END
-            -- Precio: <100k:+20, 100-200k:+15, >200k:+10
-            + CASE
-                WHEN precio IS NULL THEN 0
-                WHEN precio < 100000 THEN 20
-                WHEN precio <= 200000 THEN 15
-                ELSE 10
+            -- 1. Dias en mercado: mas tiempo = mas receptivo (0-30 pts)
+            -- Usando fecha_publicacion si existe, sino scraping_timestamp
+            CASE
+                WHEN fecha_publicacion IS NOT NULL THEN
+                    LEAST(30, EXTRACT(DAY FROM NOW() - fecha_publicacion)::INTEGER)
+                ELSE
+                    LEAST(30, EXTRACT(DAY FROM NOW() - scraping_timestamp)::INTEGER)
             END
-            -- Zona prioritaria (Salou, Cambrils, Tarragona): +15pts
+            -- 2. Tiene telefono visible: +20pts (menos spam recibido)
+            + CASE WHEN telefono_norm IS NOT NULL AND telefono_norm != '' THEN 20 ELSE 0 END
+            -- 3. Pocas fotos (<5): +10pts (particular amateur, no agencia)
             + CASE
-                WHEN LOWER(COALESCE(zona_clasificada, '')) LIKE '%salou%'
-                     OR LOWER(COALESCE(zona_clasificada, '')) LIKE '%cambrils%'
-                     OR LOWER(COALESCE(zona_clasificada, '')) LIKE '%tarragona%'
-                     OR LOWER(COALESCE(ubicacion, '')) LIKE '%salou%'
-                     OR LOWER(COALESCE(ubicacion, '')) LIKE '%cambrils%'
-                     OR LOWER(COALESCE(ubicacion, '')) LIKE '%tarragona%'
-                THEN 15 ELSE 0
+                WHEN fotos_json IS NULL THEN 10
+                WHEN jsonb_array_length(fotos_json) < 5 THEN 10
+                ELSE 0
             END
-            -- Antiguedad: <24h:+20, <7d:+10, >7d:+5
+            -- 4. Precio bajo (<100k): +20pts (vendedor motivado)
             + CASE
-                WHEN fecha_publicacion IS NULL THEN 5
-                WHEN fecha_publicacion >= NOW() - INTERVAL '24 hours' THEN 20
-                WHEN fecha_publicacion >= NOW() - INTERVAL '7 days' THEN 10
-                ELSE 5
+                WHEN precio IS NOT NULL AND precio < 100000 THEN 20
+                ELSE 0
             END
-            -- Particular confirmado: +10pts
+            -- Bonus: particular confirmado +10pts
             + CASE WHEN es_particular = TRUE THEN 10 ELSE 0 END
         ) AS lead_score,
 
@@ -203,6 +201,39 @@ image_scores AS (
         image_score,
         images_analyzed
     FROM {{ ref('stg_lead_image_scores') }}
+),
+
+-- Price history for detecting price drops
+price_history AS (
+    SELECT
+        tenant_id,
+        portal,
+        anuncio_id,
+        precio,
+        fecha_captura,
+        LAG(precio) OVER (
+            PARTITION BY tenant_id, portal, anuncio_id
+            ORDER BY fecha_captura
+        ) AS precio_anterior
+    FROM raw.listing_price_history
+),
+
+-- Get most recent price change per listing
+price_changes AS (
+    SELECT DISTINCT ON (tenant_id, portal, anuncio_id)
+        tenant_id,
+        portal,
+        anuncio_id,
+        precio AS precio_actual,
+        precio_anterior,
+        CASE
+            WHEN precio_anterior IS NOT NULL AND precio_anterior > 0
+            THEN ROUND(((precio - precio_anterior) / precio_anterior * 100)::NUMERIC, 1)
+            ELSE NULL
+        END AS precio_cambio_pct
+    FROM price_history
+    WHERE precio_anterior IS NOT NULL
+    ORDER BY tenant_id, portal, anuncio_id, fecha_captura DESC
 ),
 
 final AS (
@@ -238,6 +269,13 @@ final AS (
         e.precio_por_m2,
         e.fotos_json,
 
+        -- Price tracking (for detecting price drops)
+        pc.precio_anterior,
+        pc.precio_cambio_pct,
+
+        -- Days on market (since first capture)
+        EXTRACT(DAY FROM NOW() - e.fecha_primera_captura)::INTEGER AS dias_en_mercado,
+
         -- Lead metadata
         e.es_particular,
         e.permite_inmobiliarias,
@@ -248,7 +286,9 @@ final AS (
         lis.images_analyzed,
 
         -- Combined score: lead_score + image_score (max 130 = 100 + 30)
-        e.lead_score + COALESCE(lis.image_score, 0) AS lead_score_total,
+        -- Bonus +15 if price dropped (motivated seller)
+        e.lead_score + COALESCE(lis.image_score, 0)
+            + CASE WHEN pc.precio_cambio_pct < 0 THEN 15 ELSE 0 END AS lead_score_total,
 
         -- CRM workflow fields
         e.estado,
@@ -268,6 +308,9 @@ final AS (
 
     FROM enriched e
     LEFT JOIN image_scores lis ON e.lead_id = lis.lead_id
+    LEFT JOIN price_changes pc ON e.tenant_id = pc.tenant_id
+        AND e.source_portal = pc.portal
+        AND e.source_listing_id::TEXT = pc.anuncio_id
 )
 
 SELECT * FROM final

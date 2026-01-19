@@ -22,6 +22,17 @@
         </div>
 
         <div class="flex items-center space-x-3">
+            <!-- Duplicados Badge -->
+            {% if duplicate_info and duplicate_info.num_portales > 1 %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                  title="Portales: {{ duplicate_info.portales }}">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                En {{ duplicate_info.num_portales }} portales
+            </span>
+            {% endif %}
+
             <!-- Score Badge -->
             {% include 'components/score_badge.html' with score=lead.lead_score %}
 
@@ -111,7 +122,23 @@
                             <p class="text-2xl font-bold text-primary-600 dark:text-primary-400">
                                 {% if lead.precio %}{{ lead.precio|floatformat:0 }}&euro;{% else %}-{% endif %}
                             </p>
+                            {% if lead.precio_cambio_pct and lead.precio_cambio_pct < 0 %}
+                            <p class="text-sm font-medium text-green-600 dark:text-green-400 flex items-center justify-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd" transform="rotate(180 10 10)"/>
+                                </svg>
+                                {{ lead.precio_cambio_pct|floatformat:1 }}% (antes: {{ lead.precio_anterior|floatformat:0 }})
+                            </p>
+                            {% elif lead.precio_cambio_pct and lead.precio_cambio_pct > 0 %}
+                            <p class="text-sm font-medium text-red-500 dark:text-red-400 flex items-center justify-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                +{{ lead.precio_cambio_pct|floatformat:1 }}%
+                            </p>
+                            {% else %}
                             <p class="text-sm text-gray-500 dark:text-gray-400">Precio</p>
+                            {% endif %}
                         </div>
                         <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
                             <p class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -389,6 +416,12 @@
                         <dt class="text-gray-500 dark:text-gray-400">Fecha Scraping</dt>
                         <dd class="font-medium text-gray-900 dark:text-white">{{ lead.fecha_scraping|date:"d/m/Y H:i" }}</dd>
                     </div>
+                    {% if lead.dias_en_mercado %}
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Dias en mercado</dt>
+                        <dd class="font-medium text-gray-900 dark:text-white">{{ lead.dias_en_mercado }} dias</dd>
+                    </div>
+                    {% endif %}
                     {% with primer_contacto=lead_estado.fecha_primer_contacto|default:lead.fecha_primer_contacto %}
                     {% if primer_contacto %}
                     <div>

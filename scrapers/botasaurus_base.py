@@ -256,6 +256,13 @@ class BotasaurusBaseScraper:
 
             rows_affected = cursor.rowcount
             self.postgres_conn.commit()
+
+            # Track price history for price drop detection
+            precio = listing_data.get('precio')
+            if precio and anuncio_id:
+                self._save_price_history(cursor, portal, anuncio_id, precio)
+                self.postgres_conn.commit()
+
             cursor.close()
 
             if rows_affected > 0:
@@ -270,6 +277,17 @@ class BotasaurusBaseScraper:
             if self.postgres_conn:
                 self.postgres_conn.rollback()
             return False
+
+    def _save_price_history(self, cursor, portal: str, anuncio_id: str, precio: float) -> None:
+        """Save price to history table for price drop detection."""
+        try:
+            cursor.execute("""
+                INSERT INTO raw.listing_price_history (tenant_id, portal, anuncio_id, precio)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (tenant_id, portal, anuncio_id, precio) DO NOTHING
+            """, (self.tenant_id, portal, anuncio_id, precio))
+        except Exception as e:
+            logger.debug(f"Price history insert skipped: {e}")
 
     def close(self):
         """Close connections."""

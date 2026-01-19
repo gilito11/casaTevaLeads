@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 19 January 2026 (Duplicados cross-portal detection)
+> **Last Updated**: 19 January 2026 (Telegram alerts for scraping)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -165,6 +165,35 @@ Sistema de alertas via webhook para detectar problemas de scraping:
 - **Deteccion de cambios HTML**: Alerta si >50% de anuncios sin titulo/precio (estructura HTML cambiada)
 - **Reintentos automaticos**: 3 intentos con backoff exponencial antes de alertar
 - **Duracion job**: ~25 min (4 scrapers + dbt)
+
+### Alertas Telegram (19 Enero 2026)
+Alertas adicionales via Telegram Bot para notificaciones en movil.
+
+**Variables de entorno**:
+- `TELEGRAM_BOT_TOKEN`: Token del bot (obtener de @BotFather en Telegram)
+- `TELEGRAM_CHAT_ID`: ID del chat/grupo donde enviar alertas (puede ser negativo para grupos)
+
+**Como obtener el CHAT_ID**:
+1. Crear bot con @BotFather, obtener token
+2. Agregar bot al grupo deseado
+3. Enviar mensaje al grupo
+4. Visitar: `https://api.telegram.org/bot<TOKEN>/getUpdates`
+5. Buscar `"chat":{"id":-123456789}` en la respuesta
+
+**Tipos de alertas**:
+| Tipo | Trigger | Contenido |
+|------|---------|-----------|
+| Resumen diario | Nuevos leads hoy > 0 | Total leads, desglose por portal |
+| Bajada precio | precio_cambio_pct < -5% | Titulo, precio anterior/nuevo, URL |
+| Error scraping | Scraper falla/timeout | Portal, error, zonas afectadas |
+
+**Modulo**: `scrapers/utils/telegram_alerts.py`
+- `send_telegram_alert(message)` - Envio generico
+- `send_new_leads_summary(total, by_portal)` - Resumen de nuevos leads
+- `send_price_drop_alert(titulo, portal, zona, precio_ant, precio_nuevo, url)` - Bajada de precio
+- `send_scraping_error(portal, error, zones)` - Error de scraper
+
+**Asset Dagster**: `price_drop_alerts` - Detecta y alerta bajadas >5% del dia
 
 ### Sistema de Contacto Automatico (18 Enero 2026)
 Sistema para contactar leads automaticamente via los portales inmobiliarios.
@@ -531,6 +560,30 @@ Detecta cuando el mismo inmueble aparece en multiples portales.
 - `portales`: Lista de portales (ej: "fotocasa, milanuncios")
 
 **UI**: Badge morado "En X portales" en detalle del lead (si num_portales > 1)
+
+### Historico de Precios (19 Enero 2026)
+Detecta bajadas de precio para identificar vendedores motivados.
+
+**Tabla**: `raw.listing_price_history`
+- `tenant_id`, `portal`, `anuncio_id`: Identificador del anuncio
+- `precio`: Precio en ese momento
+- `fecha_captura`: Cuando se capturo el precio
+
+**Flujo**:
+1. Scrapers (Botasaurus/ScrapingBee) guardan precio en `listing_price_history` cada scrape
+2. dbt calcula `precio_anterior` y `precio_cambio_pct` en `dim_leads`
+3. Si precio baja, se suma +15 al `lead_score_total` (vendedor motivado)
+
+**Campos en dim_leads**:
+- `precio_anterior`: Ultimo precio antes del actual
+- `precio_cambio_pct`: Porcentaje de cambio (negativo = bajada)
+- `dias_en_mercado`: Dias desde primera captura
+
+**UI**:
+- Lista leads: Flecha verde con % si baja, roja si sube
+- Detalle lead: Precio anterior mostrado junto al actual
+
+**Migracion**: `migrations/001_create_price_history.sql`
 
 ### Campos importantes
 - `fotos`: Array de URLs de imagenes (JSONB)

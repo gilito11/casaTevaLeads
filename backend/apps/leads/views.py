@@ -202,6 +202,21 @@ def lead_detail_view(request, lead_id):
     # Obtener usuarios del tenant para dropdown de asignacion
     team_users = get_tenant_users(tenant_id)
 
+    # Verificar duplicados cross-portal
+    duplicate_info = None
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT num_portales, portales
+                FROM public_marts.dim_lead_duplicates
+                WHERE lead_id = %s AND tenant_id = %s
+            """, [str(lead.lead_id), tenant_id])
+            row = cursor.fetchone()
+            if row:
+                duplicate_info = {'num_portales': row[0], 'portales': row[1]}
+    except Exception:
+        pass  # Tabla puede no existir aun
+
     context = {
         'lead': lead,
         'notas': notas,
@@ -209,6 +224,7 @@ def lead_detail_view(request, lead_id):
         'estado_actual': estado_actual,
         'lead_estado': lead_estado,
         'team_users': team_users,
+        'duplicate_info': duplicate_info,
     }
 
     return render(request, 'leads/detail.html', context)
