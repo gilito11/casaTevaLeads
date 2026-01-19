@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 18 January 2026 (Fix: Fotocasa auto-login + session cookie saving)
+> **Last Updated**: 18 January 2026 (Comercial contact fields per TenantUser - email por comercial)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -247,6 +247,26 @@ Cada tenant configura los datos del comercial que aparecen en formularios de con
 
 **Fallback**: Si el tenant no tiene datos, se usan env vars globales:
 - `CONTACT_NAME`, `CONTACT_EMAIL`, `CONTACT_PHONE`
+
+### Email por Comercial (18 Enero 2026)
+**Decisión**: Cada comercial recibe los contactos a su propio email (no email común).
+
+**Campos añadidos a TenantUser** (`core/models.py`):
+- `comercial_nombre`: Nombre en formularios (fallback: user.first_name)
+- `comercial_email`: Email para respuestas (fallback: user.email)
+- `comercial_telefono`: Teléfono de contacto
+
+**Prioridad de datos de contacto**:
+1. Si lead tiene comercial asignado → usar datos del TenantUser asignado
+2. Si no tiene asignado → usar datos del Tenant
+3. Si tampoco → usar env vars globales
+
+**Helper methods en TenantUser**:
+```python
+tenant_user.get_contact_name()   # comercial_nombre o user.full_name
+tenant_user.get_contact_email()  # comercial_email o user.email
+tenant_user.get_contact_phone()  # comercial_telefono
+```
 
 **Dagster** (`dagster/casa_teva_pipeline/assets/contact_assets.py`):
 - Asset: `process_contact_queue` (max 5 contactos/dia)

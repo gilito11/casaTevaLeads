@@ -146,6 +146,20 @@ class TenantUser(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='tenant_users')
     rol = models.CharField(max_length=20, choices=ROL_CHOICES)
 
+    # Datos de contacto del comercial (para formularios de contacto automático)
+    comercial_nombre = models.CharField(
+        max_length=100, blank=True,
+        help_text="Nombre en formularios (si vacío, usa user.first_name)"
+    )
+    comercial_email = models.EmailField(
+        blank=True,
+        help_text="Email para recibir respuestas (si vacío, usa user.email)"
+    )
+    comercial_telefono = models.CharField(
+        max_length=20, blank=True,
+        help_text="Teléfono de contacto en formularios"
+    )
+
     class Meta:
         db_table = 'tenant_users'
         unique_together = ['user', 'tenant']
@@ -154,6 +168,18 @@ class TenantUser(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.tenant.nombre} ({self.rol})"
+
+    def get_contact_name(self):
+        """Nombre para formularios de contacto."""
+        return self.comercial_nombre or self.user.get_full_name() or self.user.username
+
+    def get_contact_email(self):
+        """Email para formularios de contacto."""
+        return self.comercial_email or self.user.email
+
+    def get_contact_phone(self):
+        """Teléfono para formularios de contacto."""
+        return self.comercial_telefono
 
 
 class ZonaGeografica(models.Model):

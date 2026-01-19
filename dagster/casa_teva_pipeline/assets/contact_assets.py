@@ -44,13 +44,16 @@ def get_pending_contacts(postgres: PostgresResource, limit: int = 5) -> list:
     """Get pending contacts from queue ordered by priority."""
     with postgres.get_connection() as conn:
         with conn.cursor() as cur:
+            # Join with lead_estado to get assigned comercial
             cur.execute("""
                 SELECT
-                    id, tenant_id, lead_id, portal, listing_url,
-                    titulo, mensaje, prioridad
-                FROM leads_contact_queue
-                WHERE estado = 'PENDIENTE'
-                ORDER BY prioridad DESC, created_at ASC
+                    cq.id, cq.tenant_id, cq.lead_id, cq.portal, cq.listing_url,
+                    cq.titulo, cq.mensaje, cq.prioridad,
+                    le.asignado_a_id
+                FROM leads_contact_queue cq
+                LEFT JOIN leads_lead_estado le ON cq.lead_id = le.lead_id AND cq.tenant_id = le.tenant_id
+                WHERE cq.estado = 'PENDIENTE'
+                ORDER BY cq.prioridad DESC, cq.created_at ASC
                 LIMIT %s
             """, (limit,))
             columns = [desc[0] for desc in cur.description]
@@ -151,13 +154,40 @@ def update_credential_error(postgres: PostgresResource, tenant_id: int, portal: 
         conn.commit()
 
 
-def get_tenant_contact_info(postgres: PostgresResource, tenant_id: int) -> dict:
+def get_tenant_contact_info(postgres: PostgresResource, tenant_id: int, asignado_a_id: int = None) -> dict:
     """
-    Get commercial contact info for a tenant.
-    Used for filling contact forms (name, email, phone).
+    Get commercial contact info for a contact.
+    Priority: assigned comercial > tenant defaults > env vars.
     """
     with postgres.get_connection() as conn:
         with conn.cursor() as cur:
+            # First try: get assigned comercial's contact info
+            if asignado_a_id:
+                cur.execute("""
+                    SELECT
+                        tu.comercial_nombre,
+                        tu.comercial_email,
+                        tu.comercial_telefono,
+                        u.first_name,
+                        u.last_name,
+                        u.email
+                    FROM tenant_users tu
+                    JOIN auth_user u ON tu.user_id = u.id
+                    WHERE tu.user_id = %s AND tu.tenant_id = %s
+                """, (asignado_a_id, tenant_id))
+                row = cur.fetchone()
+
+                if row:
+                    comercial_nombre, comercial_email, comercial_telefono, first_name, last_name, user_email = row
+                    # Use comercial fields, fallback to user fields
+                    name = comercial_nombre or f"{first_name} {last_name}".strip() or 'Comercial'
+                    email = comercial_email or user_email or ''
+                    phone = comercial_telefono or ''
+
+                    if name and email:  # Only use if we have at least name and email
+                        return {'name': name, 'email': email, 'phone': phone}
+
+            # Fallback: tenant defaults
             cur.execute("""
                 SELECT comercial_nombre, comercial_email, comercial_telefono
                 FROM tenants
@@ -165,14 +195,14 @@ def get_tenant_contact_info(postgres: PostgresResource, tenant_id: int) -> dict:
             """, (tenant_id,))
             row = cur.fetchone()
 
-            if row:
+            if row and (row[0] or row[1]):
                 return {
                     'name': row[0] or os.environ.get('CONTACT_NAME', 'Interesado'),
                     'email': row[1] or os.environ.get('CONTACT_EMAIL', ''),
                     'phone': row[2] or os.environ.get('CONTACT_PHONE', '')
                 }
 
-    # Fallback to env vars
+    # Final fallback: env vars
     return {
         'name': os.environ.get('CONTACT_NAME', 'Interesado'),
         'email': os.environ.get('CONTACT_EMAIL', ''),
@@ -604,7 +634,9 @@ def process_contact_queue(
         credentials = get_portal_credentials(postgres, tenant_id, portal)
 
         # Get tenant contact info (for filling contact forms)
-        contact_info = get_tenant_contact_info(postgres, tenant_id)
+        # Priority: assigned comercial > tenant defaults > env vars
+        asignado_a_id = contact.get('asignado_a_id')
+        contact_info = get_tenant_contact_info(postgres, tenant_id, asignado_a_id)
 
         if not session:
             context.log.warning(f"No valid session for {portal} (tenant {tenant_id})")

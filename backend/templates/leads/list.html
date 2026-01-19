@@ -57,9 +57,10 @@
                 <select name="portal"
                         class="w-full py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                     <option value="">Todos los portales</option>
+                    <option value="habitaclia" {% if request.GET.portal == 'habitaclia' %}selected{% endif %}>Habitaclia</option>
                     <option value="fotocasa" {% if request.GET.portal == 'fotocasa' %}selected{% endif %}>Fotocasa</option>
                     <option value="milanuncios" {% if request.GET.portal == 'milanuncios' %}selected{% endif %}>Milanuncios</option>
-                    <option value="wallapop" {% if request.GET.portal == 'wallapop' %}selected{% endif %}>Wallapop</option>
+                    <option value="idealista" {% if request.GET.portal == 'idealista' %}selected{% endif %}>Idealista</option>
                 </select>
             </div>
 
