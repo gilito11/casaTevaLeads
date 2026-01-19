@@ -75,7 +75,18 @@ all_matches AS (
     SELECT * FROM location_matches
 ),
 
--- Calcular estadisticas por grupo
+-- Calcular estadisticas por grupo (usando subquery para evitar COUNT DISTINCT en window)
+group_portal_stats AS (
+    SELECT
+        am.tenant_id,
+        am.duplicate_group_id,
+        COUNT(DISTINCT l.source_portal) AS num_portales,
+        STRING_AGG(DISTINCT l.source_portal, ', ' ORDER BY l.source_portal) AS portales
+    FROM all_matches am
+    JOIN leads l ON am.lead_id = l.lead_id AND am.tenant_id = l.tenant_id
+    GROUP BY am.tenant_id, am.duplicate_group_id
+),
+
 group_stats AS (
     SELECT
         am.tenant_id,
@@ -83,10 +94,12 @@ group_stats AS (
         am.duplicate_group_id,
         am.match_type,
         COUNT(*) OVER (PARTITION BY am.tenant_id, am.duplicate_group_id) AS num_leads_grupo,
-        COUNT(DISTINCT l.source_portal) OVER (PARTITION BY am.tenant_id, am.duplicate_group_id) AS num_portales,
-        STRING_AGG(DISTINCT l.source_portal, ', ') OVER (PARTITION BY am.tenant_id, am.duplicate_group_id) AS portales
+        gps.num_portales,
+        gps.portales
     FROM all_matches am
-    JOIN leads l ON am.lead_id = l.lead_id AND am.tenant_id = l.tenant_id
+    JOIN group_portal_stats gps
+        ON am.tenant_id = gps.tenant_id
+        AND am.duplicate_group_id = gps.duplicate_group_id
 )
 
 SELECT DISTINCT
