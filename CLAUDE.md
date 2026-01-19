@@ -1,9 +1,50 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 19 January 2026 (Telegram alerts for scraping)
+> **Last Updated**: 19 January 2026 (Diferenciación competitiva)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
+
+## Contexto de Negocio y Objetivo Competitivo
+
+### Situación (Enero 2026)
+La inmobiliaria cliente (idea original suya) rechazó la propuesta de licencia:
+- **Propuesta**: 3.000€ licencia inicial + 100€/mes
+- **Respuesta**: No aceptan porque "la idea es suya"
+
+### Competencia directa
+| Producto | Precio | Qué ofrece |
+|----------|--------|------------|
+| **Idealista Tools** | ~50€/provincia/mes | Captación temprana (valoraciones), CRM, leads multi-portal |
+| **Fotocasa Pro** | Variable | Publicación en 3 portales (FC+HA+MA), captación |
+
+**Punto clave**: Ambos agregan leads de TODOS los portales, no solo el suyo.
+
+### Estrategia: Funcionalidades que ellos NO tienen
+
+| Feature Casa Teva | Idealista/Fotocasa |
+|-------------------|-------------------|
+| ✅ Alertas bajada de precio en tiempo real | ❌ No |
+| ✅ Scoring inteligente de leads (0-90 pts) | ❌ No |
+| ✅ Detección duplicados cross-portal | ❌ No |
+| ✅ Alertas Telegram instantáneas | ❌ No |
+| ✅ Contacto automatizado vía portales | ❌ No |
+| ✅ Histórico de precios por anuncio | ❌ No |
+| ✅ Coste fijo ~100€/mes (todas las zonas) | 💰 Variable por zona |
+| ✅ Datos en tu propia BD | ❌ En su plataforma |
+
+### Objetivo
+**Superar en funcionalidades a Idealista Tools y Fotocasa Pro** para justificar el valor del producto y encontrar clientes dispuestos a pagar.
+
+### Roadmap diferenciador
+- [x] Lead scoring inteligente (días mercado, teléfono, fotos, precio)
+- [x] Histórico de precios + alertas bajadas
+- [x] Duplicados cross-portal
+- [x] Alertas Telegram tiempo real
+- [x] Contacto automatizado (4 portales)
+- [ ] Informe valoración PDF automático (Issue #31)
+- [ ] Integración WhatsApp (pendiente evaluar riesgo baneo)
+- [ ] API para integraciones con otros CRMs
 
 ## Stack
 - **Backend**: Django 5.x + DRF
