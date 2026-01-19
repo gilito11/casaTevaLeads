@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 18 January 2026 (Comercial contact fields per TenantUser - email por comercial)
+> **Last Updated**: 19 January 2026 (Duplicados cross-portal detection)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -514,7 +514,23 @@ raw.raw_listings (JSONB) -> public_staging.stg_* -> public_marts.dim_leads
 
 ### Modelos dbt
 - **public_staging/**: `stg_habitaclia`, `stg_fotocasa`, `stg_milanuncios`, `stg_idealista` (views)
-- **public_marts/**: `dim_leads` (incremental, unique_key=[tenant_id, telefono_norm])
+- **public_marts/**: `dim_leads` (incremental), `dim_lead_duplicates` (duplicados cross-portal)
+
+### Duplicados Cross-Portal (19 Enero 2026)
+Detecta cuando el mismo inmueble aparece en multiples portales.
+
+**Modelo**: `public_marts.dim_lead_duplicates`
+
+**Estrategia de matching**:
+1. Por telefono normalizado (match exacto) - prioritario
+2. Por ubicacion + precio (+-10%) + metros (+-5%) - fallback
+
+**Campos**:
+- `duplicate_group_id`: ID del grupo de duplicados
+- `num_portales`: Cuantos portales tienen este inmueble
+- `portales`: Lista de portales (ej: "fotocasa, milanuncios")
+
+**UI**: Badge morado "En X portales" en detalle del lead (si num_portales > 1)
 
 ### Campos importantes
 - `fotos`: Array de URLs de imagenes (JSONB)
@@ -567,3 +583,34 @@ Push a master -> GitHub Actions -> ACR -> Azure Container Apps
 - Ejecutar comandos largos en background
 - Tomar decisiones sin preguntar
 - Ser conciso
+
+---
+
+## Contexto Próxima Sesión (19 Enero 2026)
+
+### Estado actual
+- ✅ Sistema de contacto automático funcionando (4 portales)
+- ✅ Credenciales por tenant con cifrado Fernet
+- ✅ Email por comercial implementado (campos en TenantUser)
+- ✅ Admin actualizado con fieldsets para comerciales
+- ⏳ Deploys a Azure en progreso (puede tardar)
+
+### Migraciones aplicadas
+- `0007_add_portal_credential.py` (leads)
+- `0008_add_comercial_contact_fields.py` (core - Tenant)
+- `0009_add_comercial_fields_to_tenantuser.py` (core - TenantUser)
+
+### Issues abiertas
+- #28: Mejoras pendientes para producción (rate limiting, Key Vault, etc.)
+- #31: Informe de valoración PDF automático (baja prioridad)
+
+### Próximos pasos sugeridos
+1. **Probar contacto automático** - Encolar un lead real y verificar que funciona
+2. **Configurar comerciales** - Añadir datos de contacto en TenantUsers existentes
+3. **Issue #28** - Rate limiting o Key Vault si hay tiempo
+
+### Archivos clave modificados hoy
+- `backend/apps/core/models.py` - TenantUser con campos comercial
+- `backend/apps/core/admin.py` - Fieldsets para comerciales
+- `dagster/casa_teva_pipeline/assets/contact_assets.py` - Prioridad comercial asignado
+- `backend/apps/leads/models.py` - PortalCredential con cifrado
