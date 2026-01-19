@@ -445,6 +445,12 @@ Cuando una nueva inmobiliaria quiera usar el sistema:
 - [ ] Crear User en `/admin/auth/user/`
 - [ ] Crear TenantUser en `/admin/core/tenantuser/` (rol: admin)
 
+### 2b. Configurar Datos de Comerciales (para contacto automático)
+- [ ] En cada TenantUser configurar:
+  - `comercial_nombre`: Nombre en formularios (fallback: User.first_name)
+  - `comercial_email`: Email para respuestas (fallback: User.email)
+  - `comercial_telefono`: Teléfono de contacto
+
 ### 3. Configurar Zonas
 - [ ] Añadir zonas en `/admin/core/zonageografica/`
 - [ ] Activar portales por zona (MA, FC, HA, ID)
