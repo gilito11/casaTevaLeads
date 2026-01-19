@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block title %}Agenda - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Agenda de Tareas</h1>
+            <p class="text-gray-600 dark:text-gray-400">Seguimiento de acciones pendientes</p>
+        </div>
+        <button onclick="document.getElementById('modal-nueva-tarea').classList.remove('hidden')"
+                class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Nueva Tarea
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Pendientes</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ stats.pendientes }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Para hoy</p>
+                    <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ stats.hoy }}</p>
+                </div>
+                <div class="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                    <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Vencidas</p>
+                    <p class="text-2xl font-bold text-red-600 dark:text-red-400">{{ stats.vencidas }}</p>
+                </div>
+                <div class="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="?filtro=pendientes"
+               class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                      {% if filtro == 'pendientes' %}bg-primary-600 text-white{% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600{% endif %}">
+                Pendientes
+            </a>
+            <a href="?filtro=hoy"
+               class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                      {% if filtro == 'hoy' %}bg-primary-600 text-white{% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600{% endif %}">
+                Hoy
+            </a>
+            <a href="?filtro=semana"
+               class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                      {% if filtro == 'semana' %}bg-primary-600 text-white{% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600{% endif %}">
+                Esta semana
+            </a>
+            <a href="?filtro=vencidas"
+               class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                      {% if filtro == 'vencidas' %}bg-red-600 text-white{% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600{% endif %}">
+                Vencidas
+            </a>
+            <a href="?filtro=completadas"
+               class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                      {% if filtro == 'completadas' %}bg-green-600 text-white{% else %}bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600{% endif %}">
+                Completadas
+            </a>
+        </div>
+    </div>
+
+    <!-- Lista de Tareas -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        {% if tasks %}
+        <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% for task in tasks %}
+            <li class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <div class="flex items-start gap-4">
+                    <!-- Checkbox -->
+                    {% if not task.completada %}
+                    <form hx-post="{% url 'leads:task_complete' task.id %}" hx-swap="none">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="mt-1 w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 hover:border-primary-500 transition-colors">
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="mt-1 w-5 h-5 rounded bg-green-500 flex items-center justify-center">
+                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    {% endif %}
+
+                    <!-- Contenido -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <p class="font-medium text-gray-900 dark:text-white {% if task.completada %}line-through text-gray-500{% endif %}">
+                                {{ task.titulo }}
+                            </p>
+                            <!-- Badge tipo -->
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                {% if task.tipo == 'llamar' %}bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300
+                                {% elif task.tipo == 'visitar' %}bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300
+                                {% elif task.tipo == 'enviar_info' %}bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300
+                                {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+                                {{ task.get_tipo_display }}
+                            </span>
+                            <!-- Badge prioridad -->
+                            {% if task.prioridad == 'urgente' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                URGENTE
+                            </span>
+                            {% elif task.prioridad == 'alta' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                                Alta
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if task.descripcion %}
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ task.descripcion|truncatechars:100 }}</p>
+                        {% endif %}
+                        <div class="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span class="{% if task.esta_vencida %}text-red-600 dark:text-red-400 font-medium{% endif %}">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                {{ task.fecha_vencimiento|date:"d M H:i" }}
+                                {% if task.esta_vencida %}(Vencida){% endif %}
+                            </span>
+                            {% if task.lead_id %}
+                            <a href="{% url 'leads:detail' task.lead_id %}" class="text-primary-600 hover:underline">
+                                Ver lead
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="flex items-center gap-2">
+                        <form hx-post="{% url 'leads:task_delete' task.id %}" hx-swap="none"
+                              hx-confirm="Eliminar esta tarea?">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="p-12 text-center">
+            <svg class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+            <p class="mt-4 text-gray-500 dark:text-gray-400">No hay tareas {% if filtro != 'pendientes' %}con este filtro{% endif %}</p>
+            <button onclick="document.getElementById('modal-nueva-tarea').classList.remove('hidden')"
+                    class="mt-4 inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors">
+                Crear primera tarea
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Nueva Tarea -->
+<div id="modal-nueva-tarea" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('modal-nueva-tarea').classList.add('hidden')"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Nueva Tarea</h3>
+            <form hx-post="{% url 'leads:task_create' %}" hx-swap="none">
+                {% csrf_token %}
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titulo *</label>
+                        <input type="text" name="titulo" required
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                               placeholder="Ej: Llamar a Juan Garcia">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripcion</label>
+                        <textarea name="descripcion" rows="2"
+                                  class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                  placeholder="Detalles adicionales..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
+                            <select name="tipo"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                {% for value, label in tipos_tarea %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prioridad</label>
+                            <select name="prioridad"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                <option value="baja">Baja</option>
+                                <option value="media" selected>Media</option>
+                                <option value="alta">Alta</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha y hora</label>
+                        <input type="datetime-local" name="fecha_vencimiento"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button"
+                            onclick="document.getElementById('modal-nueva-tarea').classList.add('hidden')"
+                            class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                        Crear Tarea
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

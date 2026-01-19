@@ -1,6 +1,9 @@
 from django.urls import path
 from django.views.generic import RedirectView
-from .views import analytics_dashboard_view, map_view, map_data_api, scrape_history_view, zones_grid_view
+from .views import (
+    analytics_dashboard_view, map_view, map_data_api, scrape_history_view, zones_grid_view,
+    acm_view, acm_calcular_api, acm_lead_api, pdf_valoracion_view, pdf_lead_view
+)
 from . import api_views
 
 app_name = 'analytics'
@@ -13,7 +16,16 @@ urlpatterns = [
     path('zonas/', zones_grid_view, name='zones_grid'),
     path('api/map-data/', map_data_api, name='map_data_api'),
 
-    # New API endpoints with filter support
+    # ACM - Análisis Comparativo de Mercado
+    path('valoracion/', acm_view, name='acm'),
+    path('api/acm/', acm_calcular_api, name='acm_calcular'),
+    path('api/acm/<str:lead_id>/', acm_lead_api, name='acm_lead'),
+
+    # PDF de Valoración
+    path('pdf/valoracion/', pdf_valoracion_view, name='pdf_valoracion'),
+    path('pdf/lead/<str:lead_id>/', pdf_lead_view, name='pdf_lead'),
+
+    # API endpoints with filter support
     path('api/kpis/', api_views.api_kpis, name='api_kpis'),
     path('api/embudo/', api_views.api_embudo, name='api_embudo'),
     path('api/leads-por-dia/', api_views.api_leads_por_dia, name='api_leads_por_dia'),

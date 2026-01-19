@@ -1150,3 +1150,166 @@ def retry_queued_contact_view(request, queue_id):
         return JsonResponse({
             'error': f'Solo se puede reintentar items con estado FALLIDO (actual: {item.estado})'
         }, status=400)
+
+
+# ============================================================================
+# Agenda / Tareas
+# ============================================================================
+
+@login_required
+def task_list_view(request):
+    """Vista de lista de tareas con filtros"""
+    from leads.models import Task
+    from datetime import timedelta
+
+    tenant_id = get_user_tenant(request)
+
+    # Filtros
+    filtro = request.GET.get('filtro', 'pendientes')  # pendientes, hoy, semana, todas, completadas
+    filtro_tipo = request.GET.get('tipo', '')
+
+    tasks_qs = Task.objects.filter(tenant_id=tenant_id)
+
+    # Filtrar por usuario (solo sus tareas asignadas)
+    if not request.user.is_staff:
+        tasks_qs = tasks_qs.filter(asignado_a=request.user)
+
+    # Aplicar filtro de tiempo
+    hoy = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    if filtro == 'pendientes':
+        tasks_qs = tasks_qs.filter(completada=False)
+    elif filtro == 'hoy':
+        tasks_qs = tasks_qs.filter(
+            completada=False,
+            fecha_vencimiento__date=hoy.date()
+        )
+    elif filtro == 'semana':
+        fin_semana = hoy + timedelta(days=7)
+        tasks_qs = tasks_qs.filter(
+            completada=False,
+            fecha_vencimiento__lte=fin_semana
+        )
+    elif filtro == 'vencidas':
+        tasks_qs = tasks_qs.filter(
+            completada=False,
+            fecha_vencimiento__lt=hoy
+        )
+    elif filtro == 'completadas':
+        tasks_qs = tasks_qs.filter(completada=True)
+
+    if filtro_tipo:
+        tasks_qs = tasks_qs.filter(tipo=filtro_tipo)
+
+    tasks_qs = tasks_qs.order_by('completada', 'fecha_vencimiento', '-prioridad')
+
+    # Estadísticas
+    stats = {
+        'pendientes': Task.objects.filter(tenant_id=tenant_id, completada=False).count(),
+        'hoy': Task.objects.filter(
+            tenant_id=tenant_id, completada=False, fecha_vencimiento__date=hoy.date()
+        ).count(),
+        'vencidas': Task.objects.filter(
+            tenant_id=tenant_id, completada=False, fecha_vencimiento__lt=hoy
+        ).count(),
+    }
+
+    context = {
+        'tasks': tasks_qs,
+        'filtro': filtro,
+        'filtro_tipo': filtro_tipo,
+        'tipos_tarea': Task.TIPO_CHOICES,
+        'stats': stats,
+    }
+
+    return render(request, 'leads/task_list.html', context)
+
+
+@login_required
+def task_create_view(request):
+    """Crear nueva tarea"""
+    from leads.models import Task
+    from datetime import timedelta
+
+    tenant_id = get_user_tenant(request)
+
+    if request.method == 'POST':
+        titulo = request.POST.get('titulo', '').strip()
+        descripcion = request.POST.get('descripcion', '').strip()
+        tipo = request.POST.get('tipo', 'seguimiento')
+        prioridad = request.POST.get('prioridad', 'media')
+        fecha_vencimiento = request.POST.get('fecha_vencimiento', '')
+        lead_id = request.POST.get('lead_id', '')
+
+        if not titulo:
+            return JsonResponse({'error': 'El titulo es requerido'}, status=400)
+
+        # Fecha por defecto: mañana a las 10:00
+        if not fecha_vencimiento:
+            fecha_vencimiento = (timezone.now() + timedelta(days=1)).replace(
+                hour=10, minute=0, second=0, microsecond=0
+            )
+        else:
+            from django.utils.dateparse import parse_datetime
+            fecha_vencimiento = parse_datetime(fecha_vencimiento)
+            if not fecha_vencimiento:
+                return JsonResponse({'error': 'Fecha invalida'}, status=400)
+
+        task = Task.objects.create(
+            tenant_id=tenant_id,
+            titulo=titulo,
+            descripcion=descripcion,
+            tipo=tipo,
+            prioridad=prioridad,
+            fecha_vencimiento=fecha_vencimiento,
+            lead_id=lead_id if lead_id else None,
+            asignado_a=request.user,
+            created_by=request.user,
+        )
+
+        if request.headers.get('HX-Request'):
+            return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+
+        return JsonResponse({'status': 'created', 'id': task.id})
+
+    # GET: mostrar formulario
+    lead_id = request.GET.get('lead_id', '')
+    context = {
+        'tipos_tarea': Task.TIPO_CHOICES,
+        'prioridades': Task.PRIORIDAD_CHOICES,
+        'lead_id': lead_id,
+    }
+    return render(request, 'leads/task_form.html', context)
+
+
+@login_required
+@require_POST
+def task_complete_view(request, task_id):
+    """Marcar tarea como completada"""
+    from leads.models import Task
+
+    tenant_id = get_user_tenant(request)
+    task = get_object_or_404(Task, id=task_id, tenant_id=tenant_id)
+
+    task.marcar_completada()
+
+    if request.headers.get('HX-Request'):
+        return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+
+    return JsonResponse({'status': 'completed', 'id': task.id})
+
+
+@login_required
+@require_POST
+def task_delete_view(request, task_id):
+    """Eliminar tarea"""
+    from leads.models import Task
+
+    tenant_id = get_user_tenant(request)
+    task = get_object_or_404(Task, id=task_id, tenant_id=tenant_id)
+
+    task.delete()
+
+    if request.headers.get('HX-Request'):
+        return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+
+    return JsonResponse({'status': 'deleted'})

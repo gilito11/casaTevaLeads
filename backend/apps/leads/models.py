@@ -416,3 +416,97 @@ class PortalCredential(models.Model):
             return (email, password)
 
         return (None, None)
+
+
+class Task(models.Model):
+    """
+    Tareas/Recordatorios para seguimiento de leads.
+    Agenda de acciones pendientes para el comercial.
+    """
+    TIPO_CHOICES = [
+        ('llamar', 'Llamar'),
+        ('visitar', 'Visitar'),
+        ('enviar_info', 'Enviar información'),
+        ('seguimiento', 'Seguimiento'),
+        ('reunion', 'Reunión'),
+        ('otro', 'Otro'),
+    ]
+
+    PRIORIDAD_CHOICES = [
+        ('baja', 'Baja'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+        ('urgente', 'Urgente'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='tasks')
+    lead_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='tasks'
+    )
+
+    titulo = models.CharField(max_length=255)
+    descripcion = models.TextField(blank=True, null=True)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='seguimiento')
+    prioridad = models.CharField(max_length=10, choices=PRIORIDAD_CHOICES, default='media')
+
+    fecha_vencimiento = models.DateTimeField()
+    completada = models.BooleanField(default=False)
+    fecha_completada = models.DateTimeField(null=True, blank=True)
+
+    asignado_a = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tasks_asignadas'
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tasks_creadas'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'leads_task'
+        verbose_name = 'Tarea'
+        verbose_name_plural = 'Tareas'
+        ordering = ['completada', 'fecha_vencimiento', '-prioridad']
+        indexes = [
+            models.Index(fields=['tenant', 'asignado_a', 'completada']),
+            models.Index(fields=['fecha_vencimiento', 'completada']),
+        ]
+
+    def __str__(self):
+        estado = "✓" if self.completada else "○"
+        return f"{estado} {self.titulo} ({self.fecha_vencimiento.strftime('%d/%m')})"
+
+    def marcar_completada(self):
+        """Marca la tarea como completada."""
+        self.completada = True
+        self.fecha_completada = timezone.now()
+        self.save(update_fields=['completada', 'fecha_completada', 'updated_at'])
+
+    @property
+    def esta_vencida(self):
+        """Retorna True si la tarea está vencida y no completada."""
+        if self.completada:
+            return False
+        return timezone.now() > self.fecha_vencimiento
+
+    @property
+    def dias_para_vencer(self):
+        """Días restantes hasta vencimiento (negativo si vencida)."""
+        if self.completada:
+            return None
+        delta = self.fecha_vencimiento - timezone.now()
+        return delta.days

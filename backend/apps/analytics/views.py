@@ -3,14 +3,17 @@ import logging
 import re
 import unicodedata
 import traceback
+from dataclasses import asdict
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import connection
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.http import require_http_methods, require_POST, require_GET
 from decimal import Decimal
 
 from core.models import ZONAS_PREESTABLECIDAS
+from .services import calcular_acm, acm_para_lead, generar_pdf_valoracion, generar_pdf_lead
 
 
 logger = logging.getLogger(__name__)
@@ -775,3 +778,231 @@ def zones_grid_view(request):
     }
 
     return render(request, 'analytics/zones_grid.html', context)
+
+
+# ============================================================================
+# ACM - Análisis Comparativo de Mercado
+# ============================================================================
+
+@login_required
+def acm_view(request):
+    """Vista principal del ACM con formulario."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    # Obtener zonas disponibles para el selector
+    zonas = []
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT DISTINCT zona_clasificada
+            FROM public_marts.dim_leads
+            WHERE tenant_id = %s AND zona_clasificada IS NOT NULL AND zona_clasificada != ''
+            ORDER BY zona_clasificada
+        """, [tenant_id])
+        zonas = [row[0] for row in cursor.fetchall()]
+
+    context = {
+        'zonas': zonas,
+        'tipos_inmueble': ['Piso', 'Casa', 'Apartamento', 'Ático', 'Dúplex', 'Estudio', 'Local', 'Terreno'],
+    }
+
+    return render(request, 'analytics/acm.html', context)
+
+
+@login_required
+@require_GET
+def acm_calcular_api(request):
+    """API para calcular ACM."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    zona = request.GET.get('zona', '')
+    metros = request.GET.get('metros', '')
+    tipo = request.GET.get('tipo', '')
+    habitaciones = request.GET.get('habitaciones', '')
+
+    if not zona or not metros:
+        return JsonResponse({'error': 'Zona y metros son requeridos'}, status=400)
+
+    try:
+        metros_float = float(metros)
+    except ValueError:
+        return JsonResponse({'error': 'Metros debe ser un número'}, status=400)
+
+    hab_int = None
+    if habitaciones:
+        try:
+            hab_int = int(habitaciones)
+        except ValueError:
+            pass
+
+    try:
+        acm = calcular_acm(
+            tenant_id=tenant_id,
+            zona=zona,
+            metros=metros_float,
+            tipo_inmueble=tipo if tipo else None,
+            habitaciones=hab_int
+        )
+
+        # Convertir dataclass a dict para JSON
+        result = {
+            'zona': acm.zona,
+            'tipo_inmueble': acm.tipo_inmueble,
+            'metros': acm.metros,
+            'habitaciones': acm.habitaciones,
+            'precio_estimado': acm.precio_estimado,
+            'precio_min': acm.precio_min,
+            'precio_max': acm.precio_max,
+            'precio_mediana': acm.precio_mediana,
+            'precio_m2_medio': acm.precio_m2_medio,
+            'num_comparables': acm.num_comparables,
+            'confianza': acm.confianza,
+            'tendencia_precios': acm.tendencia_precios,
+            'comparables': [
+                {
+                    'lead_id': c.lead_id,
+                    'titulo': c.titulo,
+                    'precio': c.precio,
+                    'metros': c.metros,
+                    'precio_m2': c.precio_m2,
+                    'zona': c.zona,
+                    'portal': c.portal,
+                    'url': c.url,
+                    'habitaciones': c.habitaciones,
+                    'fecha_captura': c.fecha_captura,
+                    'similitud': c.similitud,
+                }
+                for c in acm.comparables
+            ]
+        }
+
+        return JsonResponse(result)
+
+    except Exception as e:
+        logger.error(f"Error en ACM: {e}\n{traceback.format_exc()}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_GET
+def acm_lead_api(request, lead_id):
+    """API para obtener ACM de un lead específico."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    try:
+        acm = acm_para_lead(tenant_id, lead_id)
+        if not acm:
+            return JsonResponse({'error': 'No se pudo calcular ACM para este lead'}, status=404)
+
+        result = {
+            'precio_estimado': acm.precio_estimado,
+            'precio_min': acm.precio_min,
+            'precio_max': acm.precio_max,
+            'precio_m2_medio': acm.precio_m2_medio,
+            'num_comparables': acm.num_comparables,
+            'confianza': acm.confianza,
+        }
+
+        return JsonResponse(result)
+
+    except Exception as e:
+        logger.error(f"Error en ACM para lead {lead_id}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================================================
+# PDF de Valoración
+# ============================================================================
+
+@login_required
+@require_GET
+def pdf_valoracion_view(request):
+    """Genera PDF de valoración desde parámetros."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    zona = request.GET.get('zona', '')
+    metros = request.GET.get('metros', '')
+    tipo = request.GET.get('tipo', '')
+    habitaciones = request.GET.get('habitaciones', '')
+    cliente = request.GET.get('cliente', '')
+
+    if not zona or not metros:
+        return HttpResponse('Zona y metros son requeridos', status=400)
+
+    try:
+        metros_float = float(metros)
+    except ValueError:
+        return HttpResponse('Metros debe ser un número', status=400)
+
+    hab_int = None
+    if habitaciones:
+        try:
+            hab_int = int(habitaciones)
+        except ValueError:
+            pass
+
+    try:
+        acm = calcular_acm(
+            tenant_id=tenant_id,
+            zona=zona,
+            metros=metros_float,
+            tipo_inmueble=tipo if tipo else None,
+            habitaciones=hab_int
+        )
+
+        # Obtener nombre de inmobiliaria del tenant
+        from core.models import Tenant
+        try:
+            tenant = Tenant.objects.get(id=tenant_id)
+            nombre_inmobiliaria = tenant.nombre
+        except Tenant.DoesNotExist:
+            nombre_inmobiliaria = "Casa Teva"
+
+        pdf_buffer = generar_pdf_valoracion(
+            acm=acm,
+            nombre_cliente=cliente if cliente else None,
+            nombre_inmobiliaria=nombre_inmobiliaria
+        )
+
+        response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+        filename = f"valoracion_{zona.replace(' ', '_')}_{metros}m2.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error generando PDF: {e}\n{traceback.format_exc()}")
+        return HttpResponse(f'Error generando PDF: {str(e)}', status=500)
+
+
+@login_required
+@require_GET
+def pdf_lead_view(request, lead_id):
+    """Genera PDF de valoración para un lead específico."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    try:
+        # Obtener nombre de inmobiliaria
+        from core.models import Tenant
+        try:
+            tenant = Tenant.objects.get(id=tenant_id)
+            nombre_inmobiliaria = tenant.nombre
+        except Tenant.DoesNotExist:
+            nombre_inmobiliaria = "Casa Teva"
+
+        pdf_buffer = generar_pdf_lead(
+            tenant_id=tenant_id,
+            lead_id=lead_id,
+            nombre_inmobiliaria=nombre_inmobiliaria
+        )
+
+        if not pdf_buffer:
+            return HttpResponse('No se pudo generar el PDF para este lead', status=404)
+
+        response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="valoracion_{lead_id}.pdf"'
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error generando PDF para lead {lead_id}: {e}")
+        return HttpResponse(f'Error: {str(e)}', status=500)
