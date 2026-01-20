@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 19 January 2026 (Diferenciación competitiva)
+> **Last Updated**: 20 January 2026 (Investigación competitiva + nuevas features)
 
 ## Resumen
 Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
@@ -17,8 +17,26 @@ La inmobiliaria cliente (idea original suya) rechazó la propuesta de licencia:
 |----------|--------|------------|
 | **Idealista Tools** | ~50€/provincia/mes | Captación temprana (valoraciones), CRM, leads multi-portal |
 | **Fotocasa Pro** | Variable | Publicación en 3 portales (FC+HA+MA), captación |
+| **Betipo** | 19.99€/mes + 9.99€/100 val | Widget valorador + captación |
+| **ClickExplora** | Variable | App + alertas tiempo real |
+| **CASAFARI** | Premium | Data + Lead Flow |
+| **Inmovilla** | 79€/mes | CRM completo + web |
+| **Witei** | 40€/mes | CRM simple |
 
 **Punto clave**: Ambos agregan leads de TODOS los portales, no solo el suyo.
+
+### Quejas Principales de Usuarios (Trustpilot Enero 2026)
+**Idealista (1.4★ - 606 reseñas)**:
+- Cobros ocultos: "Subidón 24h" 23,90€/día sin confirmación
+- No permite valorar agencias (OCU tiene demandas activas)
+- Soporte inexistente
+
+**Fotocasa (1.4★ - 48% 1 estrella)**:
+- Anuncios fraudulentos sin verificar
+- Pisos vendidos siguen publicados meses después
+- Habitaciones disfrazadas de pisos
+
+**Oportunidad**: Transparencia y soporte real son diferenciadores fáciles.
 
 ### Estrategia: Funcionalidades que ellos NO tienen
 
@@ -37,14 +55,21 @@ La inmobiliaria cliente (idea original suya) rechazó la propuesta de licencia:
 **Superar en funcionalidades a Idealista Tools y Fotocasa Pro** para justificar el valor del producto y encontrar clientes dispuestos a pagar.
 
 ### Roadmap diferenciador
+**Completado**:
 - [x] Lead scoring inteligente (días mercado, teléfono, fotos, precio)
 - [x] Histórico de precios + alertas bajadas
 - [x] Duplicados cross-portal
 - [x] Alertas Telegram tiempo real
 - [x] Contacto automatizado (4 portales)
+
+**En desarrollo (Enero 2026)**:
+- [ ] Widget valorador embebible (Issue #33) - competir con Betipo
+- [ ] API REST v1 documentada (Issue #34) - integrar con Inmovilla/Witei
+- [ ] PWA para móviles (Issue #35) - comerciales usan móvil
+
+**Pendiente**:
 - [ ] Informe valoración PDF automático (Issue #31)
-- [ ] Integración WhatsApp (pendiente evaluar riesgo baneo)
-- [ ] API para integraciones con otros CRMs
+- [ ] WhatsApp Business API (Issue #32) - 67% leads empiezan ahí
 
 ## Stack
 - **Backend**: Django 5.x + DRF
@@ -376,6 +401,36 @@ IDEALISTA_PASSWORD=<password>           # Login automatico
 - Delay 2-5 min entre contactos (simular humano)
 - Idealista mas caro por DataDome (~$3/1000 vs $1/1000 reCAPTCHA)
 
+### WhatsApp Business API (Issue #32 - Pendiente)
+**Por qué es importante**: 67% de interacciones inmobiliarias empiezan en WhatsApp.
+El 30% de leads abandonan si no reciben respuesta en 24h.
+
+**Requisitos para implementar**:
+1. Cuenta Business verificada por Meta (~2 semanas proceso)
+2. Servidor con webhook HTTPS para recibir mensajes
+3. Templates de mensaje aprobados por Meta
+
+**Coste estimado**:
+- ~$0.05 por mensaje enviado
+- Alternativas: Twilio WhatsApp (~$0.005/msg), MessageBird
+
+**Estructura propuesta**:
+```
+backend/apps/whatsapp/
+├── models.py      # WhatsAppConversation, MessageTemplate
+├── views.py       # Webhook receiver
+├── services.py    # Send messages via Cloud API
+└── chatbot.py     # Cualificación automática de leads
+```
+
+**Flujo**:
+1. Lead contacta → Webhook recibe mensaje
+2. Chatbot cualifica (tipo inmueble, presupuesto, zona)
+3. Si cualificado → Asignar a comercial + notificar
+4. Si no → Respuesta automática con info
+
+**Dependencia**: Requiere cuenta Meta Business verificada antes de implementar.
+
 ### Fiabilidad Produccion (Enero 2026)
 - **Backup PostgreSQL**: 35 dias retencion (Azure)
 - **Health Check**: `/health/` verifica conexion BD (retorna 503 si falla)
@@ -680,31 +735,71 @@ Push a master -> GitHub Actions -> ACR -> Azure Container Apps
 
 ---
 
-## Contexto Próxima Sesión (19 Enero 2026)
+## Contexto Próxima Sesión (20 Enero 2026)
 
-### Estado actual
-- ✅ Sistema de contacto automático funcionando (4 portales)
-- ✅ Credenciales por tenant con cifrado Fernet
-- ✅ Email por comercial implementado (campos en TenantUser)
-- ✅ Admin actualizado con fieldsets para comerciales
-- ⏳ Deploys a Azure en progreso (puede tardar)
+### Estado del Sistema de Contacto Automático
 
-### Migraciones aplicadas
-- `0007_add_portal_credential.py` (leads)
-- `0008_add_comercial_contact_fields.py` (core - Tenant)
-- `0009_add_comercial_fields_to_tenantuser.py` (core - TenantUser)
+| Portal | Estado | Anti-bot | Notas |
+|--------|--------|----------|-------|
+| **Fotocasa** | ✅ FUNCIONA | Ninguno | Email confirmación recibido |
+| **Habitaclia** | ✅ LISTO | 2Captcha reCAPTCHA | Configurado, pendiente test completo |
+| **Milanuncios** | ✅ FUNCIONA | Camoufox (GeeTest) | Login verificado con Enter, no clic |
+| **Idealista** | ⚠️ PARCIAL | DataDome | Páginas OK con cookies, login bloqueado |
 
-### Issues abiertas
-- #28: Mejoras pendientes para producción (rate limiting, Key Vault, etc.)
-- #31: Informe de valoración PDF automático (baja prioridad)
+### Hallazgos Técnicos Importantes
 
-### Próximos pasos sugeridos
-1. **Probar contacto automático** - Encolar un lead real y verificar que funciona
-2. **Configurar comerciales** - Añadir datos de contacto en TenantUsers existentes
-3. **Issue #28** - Rate limiting o Key Vault si hay tiempo
+**Milanuncios**:
+- GeeTest bloquea Playwright (Firefox y Chromium)
+- Camoufox bypassa GeeTest exitosamente
+- Login funciona usando `press('Enter')` en vez de clic en botón
+- Credenciales verificadas en env vars
 
-### Archivos clave modificados hoy
-- `backend/apps/core/models.py` - TenantUser con campos comercial
-- `backend/apps/core/admin.py` - Fieldsets para comerciales
-- `dagster/casa_teva_pipeline/assets/contact_assets.py` - Prioridad comercial asignado
-- `backend/apps/leads/models.py` - PortalCredential con cifrado
+**Idealista**:
+- DataDome bloquea página de login pero NO páginas de anuncios
+- Con cookies de sesión guardadas, las páginas de anuncios cargan sin problema
+- **Fix aplicado**: `base.py` línea 103 - Usar Chromium para Idealista (no Firefox)
+- Para login se necesita proxy residencial (~$15/mes) para resolver DataDome con 2Captcha
+
+### Archivos Modificados/Creados Esta Sesión
+- `scrapers/contact_automation/base.py` - Cambio Firefox→Chromium para Idealista
+- `scrapers/contact_automation/camoufox_idealista.py` - Nuevo, intento con Camoufox (no funciona para login)
+- `scrapers/contact_automation/cookies/idealista_cookies.json` - Cookies actualizadas
+- `scrapers/contact_automation/cookies/milanuncios_cookies.json` - Cookies de login exitoso
+
+### Próximos Pasos Sugeridos
+1. **Milanuncios**: Crear módulo con auto-login via Camoufox (más robusto que cookies)
+2. **Idealista**: Decidir si invertir en proxy residencial o limitar a scraping sin contacto
+3. **Habitaclia**: Test completo de contacto con 2Captcha
+4. **Producción**: Probar todo el flujo en Azure (dagster job)
+
+### Variables de Entorno en Azure (Configuradas)
+- `CAPTCHA_API_KEY`: ✅ (para reCAPTCHA/DataDome)
+- `FOTOCASA_EMAIL/PASSWORD`: ✅
+- `MILANUNCIOS_EMAIL/PASSWORD`: ✅
+- `IDEALISTA_EMAIL/PASSWORD`: ✅
+- `CONTACT_NAME/EMAIL/PHONE`: ✅
+- `TELEGRAM_BOT_TOKEN/CHAT_ID`: ✅
+
+### Issues Abiertas
+- #28: Mejoras producción (rate limiting, Key Vault)
+- #31: Informe valoración PDF (baja prioridad)
+- #32: WhatsApp Business API (alto esfuerzo, muy alto impacto)
+- #33: Widget valorador embebible (medio esfuerzo, alto impacto)
+- #34: API REST v1 documentada (medio esfuerzo, alto impacto)
+- #35: PWA para móviles (medio esfuerzo, medio-alto impacto)
+
+### Pain Points del Mercado (Investigación Enero 2026)
+1. **Falta de propiedades** - "23% agencias cerrarán en 2025" por falta de oferta
+2. **Velocidad respuesta** - "30% leads abandonan en 24h sin respuesta"
+3. **WhatsApp** - "67% interacciones empiezan en WhatsApp"
+4. **Competencia desesperada** - "Te ofrecen lo mismo 2-3% más barato"
+
+### Precios de Mercado Reales
+| Herramienta | Precio | Función |
+|-------------|--------|---------|
+| Portales (Idealista) | 200-500€/mes | Publicación |
+| CRM (Inmovilla) | 79€/mes | Gestión |
+| Captación (Betipo) | 20-50€/mes | Valorador |
+| Chatbot WhatsApp | 30-50€/mes | Respuesta auto |
+| **Total típico** | **400-800€/mes** | |
+| **Casa Teva** | **~100€/mes** | Todo incluido |

@@ -98,16 +98,26 @@ class BaseContactAutomation(ABC):
 
         self.playwright = await async_playwright().start()
 
-        # Use Chromium - better compatibility with most sites
-        self.browser = await self.playwright.chromium.launch(
-            headless=self.headless,
-            slow_mo=50,  # Slow down actions to appear human
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-            ]
-        )
+        # Use Firefox for Milanuncios (GeeTest), Chromium for others
+        # Note: Idealista uses Chromium because cookies were captured with Chromium
+        use_firefox = self.PORTAL_NAME in ('milanuncios',)
+
+        if use_firefox:
+            self.browser = await self.playwright.firefox.launch(
+                headless=self.headless,
+                slow_mo=100,  # Slower for anti-bot evasion
+            )
+            logger.info("Using Firefox browser (anti-bot evasion)")
+        else:
+            self.browser = await self.playwright.chromium.launch(
+                headless=self.headless,
+                slow_mo=50,  # Slow down actions to appear human
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                ]
+            )
 
         # Create context with saved cookies if available
         context_options = {

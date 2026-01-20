@@ -16,8 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
 from django.db import connection
+from django.conf import settings
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from core.views import (
@@ -48,12 +49,28 @@ def health_check(request):
     return JsonResponse(health, status=status_code)
 
 
+def service_worker(request):
+    """Serve the service worker from root path for maximum scope."""
+    sw_path = settings.BASE_DIR / 'static' / 'service-worker.js'
+    return FileResponse(
+        open(sw_path, 'rb'),
+        content_type='application/javascript',
+        headers={'Service-Worker-Allowed': '/'}
+    )
+
+
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
 
     # Health check
     path('health/', health_check, name='health_check'),
+
+    # PWA Service Worker (must be at root for full scope)
+    path('service-worker.js', service_worker, name='service_worker'),
+
+    # Push notifications API
+    path('api/push/', include('notifications.urls', namespace='notifications')),
 
     # Auth
     path('login/', login_view, name='login'),
@@ -84,7 +101,14 @@ urlpatterns = [
     path('api/leads/', include('leads.api_urls')),
     path('api/core/', include('core.api_urls')),
 
+    # API v1 (para integraciones externas con API Key)
+    path('api/v1/', include('api_v1.urls', namespace='api_v1')),
+
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+
+    # Widget valorador embebible
+    path('widget/', include('widget.urls', namespace='widget')),
+    path('api/widget/', include(('widget.api_urls', 'widget_api'))),
 ]

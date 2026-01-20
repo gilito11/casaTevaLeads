@@ -65,6 +65,9 @@ INSTALLED_APPS = [
     'core',
     'leads',
     'analytics',
+    'widget',
+    'notifications',
+    'api_v1',
 ]
 
 MIDDLEWARE = [
@@ -91,6 +94,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'notifications.context_processors.vapid_public_key',
             ],
         },
     },
@@ -238,7 +242,51 @@ REST_FRAMEWORK = {
 # OpenAPI/Swagger documentation
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Casa Teva CRM API',
-    'DESCRIPTION': 'API para gestion de leads inmobiliarios',
+    'DESCRIPTION': '''
+API REST para gestion de leads inmobiliarios.
+
+## Autenticacion
+Todas las peticiones requieren una API Key en el header `X-API-Key`.
+
+## Rate Limiting
+- 100 requests/hora por tenant (configurable por API Key)
+- 10 requests/segundo burst limit
+
+## Webhooks
+Configura webhooks para recibir notificaciones de:
+- `new_lead`: Nuevo lead capturado
+- `status_change`: Cambio de estado CRM
+- `price_drop`: Bajada de precio detectada
+
+Los webhooks incluyen firma HMAC-SHA256 en el header `X-Webhook-Signature`.
+''',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SECURITY': [{'ApiKeyAuth': []}],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'ApiKeyAuth': {
+                'type': 'apiKey',
+                'in': 'header',
+                'name': 'X-API-Key',
+                'description': 'API Key para autenticacion. Formato: ctv_xxxxx...'
+            }
+        }
+    },
+}
+
+# Widget CORS - Origenes permitidos para embed del widget valorador
+# En produccion, añadir dominios especificos de los clientes
+WIDGET_ALLOWED_ORIGINS = config(
+    'WIDGET_ALLOWED_ORIGINS',
+    default='*',
+    cast=lambda v: [s.strip() for s in v.split(',')] if v != '*' else ['*']
+)
+
+# PWA / Push Notifications (VAPID keys)
+# Generate keys: python -c "from pywebpush import Vapid; v=Vapid(); v.generate_keys(); print(f'Private: {v.private_key}'); print(f'Public: {v.public_pem}')"
+VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
+VAPID_CLAIMS = {
+    'sub': config('VAPID_CLAIMS_EMAIL', default='mailto:admin@casateva.es')
 }

@@ -31,6 +31,7 @@ class FotocasaContact(BaseContactAutomation):
     LOGIN_URL = "https://www.fotocasa.es/es/usuario/acceso/"
 
     # Selectors (multiple options for robustness)
+    # Updated Jan 2026 for Schibsted UI (sui-) framework
     SELECTORS = {
         # Login page
         'login_email': 'input[name="email"], input[type="email"], #email',
@@ -42,16 +43,17 @@ class FotocasaContact(BaseContactAutomation):
         'user_avatar': '.re-UserAvatar, [class*="Avatar"]',
 
         # Phone reveal
-        'ver_telefono': 'text="Ver teléfono", button:has-text("Ver teléfono"), [class*="phone"]',
-        'phone_number': '[class*="phone-number"], [class*="Phone"], [data-testid="phone"]',
+        'ver_telefono': 'button:has-text("Ver teléfono"), text="Ver teléfono", [class*="phone"] button',
+        'phone_number': 'a[href^="tel:"], [class*="phone-number"], [class*="Phone"]',
 
-        # Contact form
-        'contact_form': 'form[class*="contact"], [class*="ContactForm"]',
-        'input_name': 'input[name="name"], input[placeholder*="nombre"]',
-        'input_email': 'input[name="email"], input[type="email"]',
-        'input_phone': 'input[name="phone"], input[placeholder*="teléfono"]',
-        'input_message': 'textarea, [class*="message"], [class*="comment"]',
-        'contact_submit': 'button:has-text("Contactar"), button[type="submit"]:has-text("Enviar")',
+        # Contact form - Fotocasa uses "Contacta con el anunciante" section
+        'contact_section': 'section:has-text("Contacta con el anunciante"), [class*="contact-form"], [class*="ContactForm"]',
+        'contact_form': 'form, [class*="contact-form"], [class*="ContactForm"]',
+        'input_name': 'input[placeholder*="nombre"], input[name="name"], input[aria-label*="nombre"]',
+        'input_email': 'input[placeholder*="mail"], input[type="email"], input[name="email"]',
+        'input_phone': 'input[placeholder*="teléfono"], input[type="tel"], input[name="phone"]',
+        'input_message': 'textarea[placeholder*="comentario"], textarea[placeholder*="mensaje"], textarea',
+        'contact_submit': 'button:has-text("Contactar"), button[type="submit"]:has-text("Contactar")',
 
         # Seller info
         'seller_name': '[class*="particular"], [class*="Advertiser"], [class*="seller"]',
@@ -300,67 +302,95 @@ class FotocasaContact(BaseContactAutomation):
                 await self.page.goto(listing_url, wait_until='networkidle')
                 await asyncio.sleep(2)
 
-            # Scroll to contact form (usually in sidebar)
-            await self.page.evaluate('window.scrollTo(0, 500)')
+            # Accept cookies if needed
+            await self.accept_cookies()
+
+            # Scroll to contact section (usually on right sidebar)
+            await self.page.evaluate('window.scrollTo(0, 300)')
             await asyncio.sleep(1)
 
-            # Look for contact form or contact button
-            contact_form = None
-            for selector in ['form[class*="contact"]', '[class*="ContactForm"]', '[class*="contactar"]']:
+            # Look for contact section first
+            contact_section = None
+            section_selectors = [
+                'section:has-text("Contacta con el anunciante")',
+                '[class*="contact-form"]',
+                '[class*="ContactForm"]',
+                '[class*="re-Contact"]',
+                'form:has(textarea)',
+            ]
+            for selector in section_selectors:
                 try:
-                    contact_form = await self.page.wait_for_selector(selector, timeout=3000)
-                    if contact_form:
+                    contact_section = await self.page.wait_for_selector(selector, timeout=3000)
+                    if contact_section:
+                        logger.info(f"Found contact section with: {selector}")
                         break
                 except:
                     continue
 
-            if not contact_form:
-                # Try clicking a "Contactar" button that opens the form
-                try:
-                    contact_btn = await self.page.wait_for_selector(
-                        'button:has-text("Contactar"), a:has-text("Contactar")', timeout=3000
-                    )
-                    if contact_btn:
-                        await contact_btn.click()
-                        await asyncio.sleep(2)
-                except:
-                    pass
+            if not contact_section:
+                logger.warning("Contact section not found, trying to scroll more...")
+                await self.page.evaluate('window.scrollTo(0, 800)')
+                await asyncio.sleep(1)
 
-            # Fill message field
-            message_field = None
-            for selector in ['textarea', 'textarea[name*="message"]', '[class*="comment"] textarea']:
+            # Fill message/comment field
+            message_filled = False
+            message_selectors = [
+                'textarea[placeholder*="comentario"]',
+                'textarea[placeholder*="mensaje"]',
+                'textarea[aria-label*="comentario"]',
+                'textarea',
+            ]
+            for selector in message_selectors:
                 try:
-                    message_field = await self.page.wait_for_selector(selector, timeout=3000)
+                    message_field = await self.page.wait_for_selector(selector, timeout=2000)
                     if message_field:
+                        await message_field.click()
+                        await asyncio.sleep(0.3)
+                        await message_field.fill('')  # Clear first
+                        await message_field.fill(message)
+                        logger.info(f"Message filled using: {selector}")
+                        message_filled = True
                         break
                 except:
                     continue
 
-            if message_field:
-                await message_field.fill('')  # Clear first
-                await self.human_type('textarea', message)
-                logger.info("Message filled")
-            else:
-                logger.warning("Message field not found")
+            if not message_filled:
+                logger.warning("Message field not found - form might use different layout")
 
-            # Fill phone if empty (our phone)
-            try:
-                phone_input = await self.page.query_selector('input[name="phone"], input[placeholder*="teléfono"]')
-                if phone_input:
-                    value = await phone_input.input_value()
-                    if not value:
-                        our_phone = os.getenv('CONTACT_PHONE', '')
-                        if our_phone:
-                            await phone_input.fill(our_phone)
-            except:
-                pass
-
-            # Submit form
-            submit_btn = None
-            for selector in ['button:has-text("Contactar")', 'button[type="submit"]', '.sui-AtomButton--primary']:
+            # Fill phone if field exists and is empty
+            phone_selectors = [
+                'input[placeholder*="teléfono"]',
+                'input[type="tel"]',
+                'input[name="phone"]',
+            ]
+            for selector in phone_selectors:
                 try:
-                    submit_btn = await self.page.wait_for_selector(selector, timeout=3000)
+                    phone_input = await self.page.query_selector(selector)
+                    if phone_input:
+                        value = await phone_input.input_value()
+                        if not value:
+                            our_phone = os.getenv('CONTACT_PHONE', '')
+                            if our_phone:
+                                await phone_input.fill(our_phone)
+                                logger.info("Phone filled")
+                        break
+                except:
+                    continue
+
+            # Submit form - look for "Contactar" button
+            submit_btn = None
+            submit_selectors = [
+                'button:has-text("Contactar")',
+                'button[type="submit"]:has-text("Contactar")',
+                'input[type="submit"][value*="Contactar"]',
+                '.sui-AtomButton--primary:has-text("Contactar")',
+                'form button[type="submit"]',
+            ]
+            for selector in submit_selectors:
+                try:
+                    submit_btn = await self.page.wait_for_selector(selector, timeout=2000)
                     if submit_btn:
+                        logger.info(f"Found submit button: {selector}")
                         break
                 except:
                     continue
@@ -368,30 +398,45 @@ class FotocasaContact(BaseContactAutomation):
             if submit_btn:
                 logger.info("Clicking submit...")
                 await submit_btn.click()
-                await asyncio.sleep(3)
+                await asyncio.sleep(4)
 
-                # Check for success message
-                try:
-                    success = await self.page.wait_for_selector(
-                        'text="enviado", text="Mensaje enviado", [class*="success"]',
-                        timeout=5000
-                    )
-                    if success:
-                        logger.info("Message sent successfully!")
-                        return True
-                except:
-                    pass
+                # Check for success indicators
+                success_selectors = [
+                    'text="Contacto enviado"',
+                    'text="enviado con éxito"',
+                    'text="enviado correctamente"',
+                    'text="Mensaje enviado"',
+                    '[class*="success"]',
+                    'text="Gracias"',
+                    'text="Entendido"',  # Button in success modal
+                ]
+                for sel in success_selectors:
+                    try:
+                        success = await self.page.wait_for_selector(sel, timeout=2000)
+                        if success:
+                            logger.info(f"Message sent successfully! (matched: {sel})")
+                            return True
+                    except:
+                        continue
 
-                # If no explicit success, assume it worked if no error
-                error = await self.page.query_selector('[class*="error"], [class*="Error"]')
-                if not error:
-                    logger.info("Message likely sent (no error detected)")
-                    return True
-                else:
-                    logger.error("Error detected after submit")
+                # If no explicit success, check for errors
+                error = await self.page.query_selector('[class*="error"], [class*="Error"], [class*="alert-danger"]')
+                if error:
+                    error_text = await error.inner_text()
+                    logger.error(f"Error detected: {error_text}")
                     return False
+
+                # If no error detected, assume success
+                logger.info("Message likely sent (no error detected)")
+                return True
             else:
                 logger.error("Submit button not found")
+                # Take screenshot for debugging
+                try:
+                    await self.page.screenshot(path='debug_contact_form.png')
+                    logger.info("Debug screenshot saved to debug_contact_form.png")
+                except:
+                    pass
                 return False
 
         except Exception as e:

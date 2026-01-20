@@ -12,3 +12,6 @@ python-decouple==3.8
 
 # Security
 cryptography>=41.0.0
+
+# PWA / Push Notifications
+pywebpush>=1.14.0
