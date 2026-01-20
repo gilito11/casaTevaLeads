@@ -247,3 +247,10 @@ publication_hours_analysis.png
 
 # Claude Code temp directories
 tmpclaude-*
+
+# Debug/test screenshots  
+debug_*.png
+test_*.png
+tmp_*.ps1
+*.debug.png
+webapp_logs.zip

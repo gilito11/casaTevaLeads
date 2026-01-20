@@ -1,805 +1,216 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 20 January 2026 (Investigación competitiva + nuevas features)
+> **Last Updated**: 20 Enero 2026
 
-## Resumen
-Sistema de captacion de leads inmobiliarios mediante scraping de 4 portales.
+## Quick Reference
 
-## Contexto de Negocio y Objetivo Competitivo
-
-### Situación (Enero 2026)
-La inmobiliaria cliente (idea original suya) rechazó la propuesta de licencia:
-- **Propuesta**: 3.000€ licencia inicial + 100€/mes
-- **Respuesta**: No aceptan porque "la idea es suya"
-
-### Competencia directa
-| Producto | Precio | Qué ofrece |
-|----------|--------|------------|
-| **Idealista Tools** | ~50€/provincia/mes | Captación temprana (valoraciones), CRM, leads multi-portal |
-| **Fotocasa Pro** | Variable | Publicación en 3 portales (FC+HA+MA), captación |
-| **Betipo** | 19.99€/mes + 9.99€/100 val | Widget valorador + captación |
-| **ClickExplora** | Variable | App + alertas tiempo real |
-| **CASAFARI** | Premium | Data + Lead Flow |
-| **Inmovilla** | 79€/mes | CRM completo + web |
-| **Witei** | 40€/mes | CRM simple |
-
-**Punto clave**: Ambos agregan leads de TODOS los portales, no solo el suyo.
-
-### Quejas Principales de Usuarios (Trustpilot Enero 2026)
-**Idealista (1.4★ - 606 reseñas)**:
-- Cobros ocultos: "Subidón 24h" 23,90€/día sin confirmación
-- No permite valorar agencias (OCU tiene demandas activas)
-- Soporte inexistente
-
-**Fotocasa (1.4★ - 48% 1 estrella)**:
-- Anuncios fraudulentos sin verificar
-- Pisos vendidos siguen publicados meses después
-- Habitaciones disfrazadas de pisos
-
-**Oportunidad**: Transparencia y soporte real son diferenciadores fáciles.
-
-### Estrategia: Funcionalidades que ellos NO tienen
-
-| Feature Casa Teva | Idealista/Fotocasa |
-|-------------------|-------------------|
-| ✅ Alertas bajada de precio en tiempo real | ❌ No |
-| ✅ Scoring inteligente de leads (0-90 pts) | ❌ No |
-| ✅ Detección duplicados cross-portal | ❌ No |
-| ✅ Alertas Telegram instantáneas | ❌ No |
-| ✅ Contacto automatizado vía portales | ❌ No |
-| ✅ Histórico de precios por anuncio | ❌ No |
-| ✅ Coste fijo ~100€/mes (todas las zonas) | 💰 Variable por zona |
-| ✅ Datos en tu propia BD | ❌ En su plataforma |
-
-### Objetivo
-**Superar en funcionalidades a Idealista Tools y Fotocasa Pro** para justificar el valor del producto y encontrar clientes dispuestos a pagar.
-
-### Roadmap diferenciador
-**Completado**:
-- [x] Lead scoring inteligente (días mercado, teléfono, fotos, precio)
-- [x] Histórico de precios + alertas bajadas
-- [x] Duplicados cross-portal
-- [x] Alertas Telegram tiempo real
-- [x] Contacto automatizado (4 portales)
-
-**En desarrollo (Enero 2026)**:
-- [ ] Widget valorador embebible (Issue #33) - competir con Betipo
-- [ ] API REST v1 documentada (Issue #34) - integrar con Inmovilla/Witei
-- [ ] PWA para móviles (Issue #35) - comerciales usan móvil
-
-**Pendiente**:
-- [ ] Informe valoración PDF automático (Issue #31)
-- [ ] WhatsApp Business API (Issue #32) - 67% leads empiezan ahí
-
-## Stack
+### Stack
 - **Backend**: Django 5.x + DRF
-- **BD**: PostgreSQL 16 (Azure PostgreSQL en prod)
+- **BD**: PostgreSQL 16 (Azure Flexible Server)
 - **Scrapers**: Botasaurus (habitaclia, fotocasa), ScrapingBee (milanuncios, idealista)
-- **Orquestacion**: Dagster (PostgreSQL storage para persistencia)
-- **ETL**: dbt (raw -> public_staging -> public_marts)
+- **Orquestacion**: Dagster
+- **ETL**: dbt (raw → staging → marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
 
-## Scrapers - Estado actual
-
-| Portal | Tecnologia | Azure | Local | Coste | Datos extraidos |
-|--------|------------|-------|-------|-------|-----------------|
-| habitaclia | Botasaurus | OK | OK | Gratis | titulo, precio, metros, fotos, telefono (de descripcion) |
-| fotocasa | Botasaurus | OK | OK | Gratis | titulo, precio, metros, fotos, telefono (de descripcion) |
-| milanuncios | ScrapingBee | OK | OK | 75 credits/req | titulo, precio, metros, fotos, telefono |
-| idealista | ScrapingBee | OK | OK | 75 credits/req | titulo, precio, metros, fotos, telefono |
-
-### Extraction Patterns (Fixed Jan 2026)
-Los scrapers extraen datos de elementos HTML especificos para evitar valores incorrectos:
-
-| Portal | Precio | Metros | Habitaciones |
-|--------|--------|--------|--------------|
-| habitaclia | `feature-container` class | `<li>Superficie X m2</li>` | `<li>X habitaciones</li>` |
-| fotocasa | `re-DetailHeader-price` class | `<span><span>N</span> m²` | `<span><span>N</span> hab` |
-| idealista | `info-data-price` class | `info-features` section | `info-features` section |
-| milanuncios | JSON-LD / data attributes | Generic (detail page only) | Generic (detail page only) |
-
-### Idealista Particulares (Fixed 14 Jan 2026)
-**IMPORTANTE**: Idealista NO tiene filtro URL publico para particulares (solo herramientas de pago).
-El scraper filtra agencias via deteccion HTML en dos niveles:
-
-**Nivel 1 - Pagina de busqueda** (pre-filtro, ahorra creditos):
-- `professional-name`, `logo-profesional`, `item-link-professional`
-- Logos de inmobiliarias en resultados
-
-**Nivel 2 - Pagina de detalle** (filtro mas especifico):
-- `data-seller-type="professional"` - Atributo vendedor (exacto)
-- `advertiser-name` con texto "inmobiliaria/agencia/fincas"
-- `professional-info` con contenido de agencia
-- JSON-LD: seller con nombre de inmobiliaria
-- Texto "contactar con la inmobiliaria"
-
-**Bug arreglado 14 Jan 2026**: Patrones anteriores eran demasiado amplios (detectaban
-logos de Idealista como agencias). Ahora solo patrones especificos con contenido real.
-
-**Selectores de extraccion**:
-- Titulo: `<span class="main-info__title-main">`
-- Descripcion: `<div class="adCommentsLanguage">`
-
-### Encoding Fix (11 Jan 2026)
-`fix_encoding()` solo corrige texto doblemente codificado (marcadores como `Ã¡`).
-Preserva UTF-8 correcto (ej: `Tàrrega` no se corrompe a `Trrega`).
-
-### Extraccion de telefonos
-- **Milanuncios/Idealista**: Busqueda en descripcion (regex)
-- **Habitaclia/Fotocasa**: Busqueda de patrones en descripcion del anuncio (regex)
-
-### Portales eliminados (Enero 2026)
-- **Pisos.com**: Eliminado - pocos leads de calidad
-- **Wallapop**: Eliminado - no relevante para inmobiliaria
-
-### Filtro de agencias (dbt staging)
-Los modelos dbt filtran automaticamente anuncios:
-
-**Por descripcion** (frases que indican agencias):
-- "abstenerse agencias/inmobiliarias"
-- "no agencias/no inmobiliarias"
-- "sin intermediarios"
-- "sin comisiones de agencia" (agencias disfrazadas de particulares)
-- "0% comision" / "cero comision"
-
-**Por nombre de vendedor** (Milanuncios - añadido 17 Jan 2026):
-- Nombres con: inmobiliaria, inmuebles, fincas, agencia, grupo
-- Sufijos empresariales: S.L., SL, S.A.
-- Otros: real estate, properties, servicios inmobiliarios
-
-### Zonas disponibles
-20+ zonas preconfiguradas en `backend/apps/core/models.py`:
-- **Lleida**: Lleida, Balaguer, Mollerussa, Tàrrega, Alcoletge, Alpicat, Torrefarrera...
-- **Costa Daurada**: Salou, Cambrils, Miami Platja, La Pineda, Vilafortuny, Mont-roig...
-- **Tarragona**: Tarragona, Reus, Valls, Montblanc
-- **Terres de l'Ebre**: Tortosa, Amposta, Deltebre, L'Ametlla de Mar
-
-**Portales por defecto**: Al agregar una zona, los 4 portales (MA+FC+HA+ID) se habilitan automaticamente.
-
-### ScrapingBee
-- API Key: configurada en Azure Container Apps y GitHub Secrets
-- Plan: 50eur/mes = 250,000 credits = ~3,333 requests
-- Stealth proxy: GeeTest (Milanuncios), DataDome (Idealista)
-- **Timeout**: 120s por request (aumentado de 60s para stealth proxy)
-- **Idealista detail pages**: 3 por pagina busqueda (reducido de 10 para evitar timeout 45min)
-
-### Idealista - Zonas pequeñas (14 Enero 2026)
-**DECISION**: Idealista desactivado para zonas pequeñas de Terres de l'Ebre.
-
-En zonas pequeñas (< 20K habitantes), el 95%+ de anuncios en Idealista son de agencias
-inmobiliarias. El filtro `only_particulares=True` devuelve 0 resultados consistentemente,
-gastando credits de ScrapingBee sin beneficio.
-
-**Zonas excluidas** (definidas en `IDEALISTA_SKIP_ZONES` en `scraping_assets.py`):
-- amposta, deltebre, ametlla_mar, hospitalet_infant, montroig_camp, sant_carles_rapita
-
-**NO reactivar Idealista para estas zonas** - simplemente no hay particulares vendiendo.
-
-### Milanuncios - Filtro de watermarks (14 Enero 2026)
-**DECISION**: Filtrar anuncios con marca de agua en la primera imagen.
-
-Las agencias inmobiliarias añaden watermarks (logo/texto) en la parte inferior de las fotos.
-El scraper ahora descarga la primera imagen y analiza si tiene watermark usando detección de bordes.
-
-**Implementación** (en `scrapers/watermark_detector.py`):
-- Descarga primera imagen del anuncio
-- Analiza el 15% inferior (donde se colocan watermarks)
-- Detecta alta densidad de bordes (indicador de texto/logos)
-- Si detecta watermark → descarta el anuncio
-
-**Parámetro**: `filter_watermarks=True` (por defecto activo en `ScrapingBeeMilanuncios`)
-
-### Schedule Optimizado (Enero 2026)
-Basado en analisis de 220 anuncios de Milanuncios:
-- **Pico manana**: 9:00-11:00 (26 anuncios a las 9:00)
-- **Pico tarde**: 16:00 (19 anuncios)
-- **Lunes mas activo** (23%), sabado casi nulo (3%)
-
-**Horario Dagster**: `0 12,18 * * *` (12:00 y 18:00 Espana)
-- 12:00: Captura pico de manana
-- 18:00: Captura pico de tarde
-- **Ahorro**: 67% creditos (de 6 a 2 scrapes/dia)
-- **Status**: Funcionando en produccion
-
-### KEDA Scale-to-Zero (ELIMINADO Enero 2026)
-~~Container Apps con KEDA cron scaler~~ - **Eliminado** porque Container Apps ya tiene
-scale-to-zero nativo sin necesidad de KEDA.
-
-**Configuracion actual**:
-- minReplicas: 1, maxReplicas: 1
-- Scale rules: ninguna (siempre 1 replica activa)
-- Container Apps cobra por uso, no por tiempo activo
-
-### Costes Azure (Enero 2026)
-Suscripción: **Azure for Students** ($100 crédito/12 meses)
-
-| Servicio | SKU | Coste/mes |
-|----------|-----|-----------|
-| PostgreSQL Flexible | B1ms (1vCPU, 2GB, 32GB) | ~$17 |
-| Web App | B1 Linux | ~$13 |
-| Container Apps | Consumption | ~$10-15 |
-| ACR | Basic | ~$5 |
-| Log Analytics | Mínimo | ~$2 |
-| **Total Azure** | | **~$47-52/mes** |
-| ScrapingBee | 250K credits | 50€/mes |
-| **TOTAL** | | **~$95-100/mes** |
-
-### Alertas Discord (Enero 2026)
-Sistema de alertas via webhook para detectar problemas de scraping:
-- **Variable de entorno**: `ALERT_WEBHOOK_URL`
-- **Deteccion de bloqueos**: Alerta si 0 resultados Y algun scraper fallo (evita falsos positivos por duplicados)
-- **Deteccion de cambios HTML**: Alerta si >50% de anuncios sin titulo/precio (estructura HTML cambiada)
-- **Reintentos automaticos**: 3 intentos con backoff exponencial antes de alertar
-- **Duracion job**: ~25 min (4 scrapers + dbt)
-
-### Alertas Telegram (19 Enero 2026)
-Alertas adicionales via Telegram Bot para notificaciones en movil.
-
-**Variables de entorno**:
-- `TELEGRAM_BOT_TOKEN`: Token del bot (obtener de @BotFather en Telegram)
-- `TELEGRAM_CHAT_ID`: ID del chat/grupo donde enviar alertas (puede ser negativo para grupos)
-
-**Como obtener el CHAT_ID**:
-1. Crear bot con @BotFather, obtener token
-2. Agregar bot al grupo deseado
-3. Enviar mensaje al grupo
-4. Visitar: `https://api.telegram.org/bot<TOKEN>/getUpdates`
-5. Buscar `"chat":{"id":-123456789}` en la respuesta
-
-**Tipos de alertas**:
-| Tipo | Trigger | Contenido |
-|------|---------|-----------|
-| Resumen diario | Nuevos leads hoy > 0 | Total leads, desglose por portal |
-| Bajada precio | precio_cambio_pct < -5% | Titulo, precio anterior/nuevo, URL |
-| Error scraping | Scraper falla/timeout | Portal, error, zonas afectadas |
-
-**Modulo**: `scrapers/utils/telegram_alerts.py`
-- `send_telegram_alert(message)` - Envio generico
-- `send_new_leads_summary(total, by_portal)` - Resumen de nuevos leads
-- `send_price_drop_alert(titulo, portal, zona, precio_ant, precio_nuevo, url)` - Bajada de precio
-- `send_scraping_error(portal, error, zones)` - Error de scraper
-
-**Asset Dagster**: `price_drop_alerts` - Detecta y alerta bajadas >5% del dia
-
-### Sistema de Contacto Automatico (18 Enero 2026)
-Sistema para contactar leads automaticamente via los portales inmobiliarios.
-
-**Auto-login y Session Cookies** (Fix 18 Enero 2026):
-- Todos los portales (excepto Habitaclia) ahora hacen auto-login si no hay sesión guardada
-- Después de login exitoso, las cookies se guardan automáticamente en `PortalSession`
-- Las cookies se reutilizan en futuros contactos para evitar re-login
-- Si las cookies expiran, se hace auto-login de nuevo
-
-**Flujo de autenticación**:
-1. Buscar sesión existente en `leads_portal_session`
-2. Si existe y es válida → usar cookies
-3. Si no existe o expiró → auto-login con credenciales
-4. Guardar nuevas cookies para futuros usos
-
-**Arquitectura**:
-```
-CRM (encolar leads) -> PostgreSQL (contact_queue)
-                            ↓
-Dagster (job diario) -> Playwright (headless)
-                            ↓
-              Fotocasa: auto-login + guardar cookies
-              Milanuncios: auto-login + guardar cookies
-              Idealista: auto-login + DataDome + guardar cookies
-              Habitaclia: requiere sesión previa (usa CAPTCHA)
-```
-
-**UI CRM**:
-- Sidebar: "Cola Contactos" - ver items pendientes/completados
-- Detalle lead (Fotocasa/Habitaclia): Boton "Contactar automaticamente"
-- Filtros por estado: PENDIENTE, EN_PROCESO, COMPLETADO, FALLIDO, CANCELADO
-
-**Modelos Django** (`leads/models.py`):
-- `ContactQueue`: Cola de leads pendientes (portal, mensaje, estado, prioridad)
-- `PortalSession`: Cookies de sesion por portal (tenant, portal, cookies JSON)
-- `PortalCredential`: Credenciales de portales por tenant (email, password cifrada)
-
-### Credenciales por Tenant (17 Enero 2026)
-Cada tenant puede configurar sus propias credenciales para los portales.
-
-**Modelo**: `PortalCredential` en `leads/models.py`
-- `tenant`: FK a Tenant
-- `portal`: fotocasa, habitaclia, milanuncios, idealista
-- `email`: Email de la cuenta del portal
-- `password_encrypted`: Password cifrada con Fernet
-- `is_active`: Si la credencial está activa
-- `last_used`: Última vez usada con éxito
-- `last_error`: Último error (para debugging)
-
-**Cifrado**: Las passwords se cifran con Fernet (AES-128-CBC)
-- Key: `CREDENTIAL_ENCRYPTION_KEY` (env var, generar con `Fernet.generate_key()`)
-- Módulo: `backend/apps/core/encryption.py`
-
-**Admin Django**: `/admin/leads/portalcredential/`
-- Formulario especial que cifra passwords automáticamente
-- Muestra `********` para passwords existentes
-
-**Fallback**: Si el tenant no tiene credenciales, se usan env vars globales:
-- `FOTOCASA_EMAIL/PASSWORD`
-- `MILANUNCIOS_EMAIL/PASSWORD`
-- `IDEALISTA_EMAIL/PASSWORD`
-
-**Uso en Dagster** (`contact_assets.py`):
-```python
-# Obtiene credenciales del tenant o fallback a env vars
-credentials = get_portal_credentials(postgres, tenant_id, portal)
-email, password = credentials
-```
-
-### Datos del Comercial por Tenant (17 Enero 2026)
-Cada tenant configura los datos del comercial que aparecen en formularios de contacto.
-
-**Campos en modelo Tenant** (`core/models.py`):
-- `comercial_nombre`: Nombre que aparece en formularios
-- `comercial_email`: Email para recibir respuestas
-- `comercial_telefono`: Teléfono de contacto
-
-**Uso**: Habitaclia y otros portales que piden datos del remitente.
-
-**Fallback**: Si el tenant no tiene datos, se usan env vars globales:
-- `CONTACT_NAME`, `CONTACT_EMAIL`, `CONTACT_PHONE`
-
-### Email por Comercial (18 Enero 2026)
-**Decisión**: Cada comercial recibe los contactos a su propio email (no email común).
-
-**Campos añadidos a TenantUser** (`core/models.py`):
-- `comercial_nombre`: Nombre en formularios (fallback: user.first_name)
-- `comercial_email`: Email para respuestas (fallback: user.email)
-- `comercial_telefono`: Teléfono de contacto
-
-**Prioridad de datos de contacto**:
-1. Si lead tiene comercial asignado → usar datos del TenantUser asignado
-2. Si no tiene asignado → usar datos del Tenant
-3. Si tampoco → usar env vars globales
-
-**Helper methods en TenantUser**:
-```python
-tenant_user.get_contact_name()   # comercial_nombre o user.full_name
-tenant_user.get_contact_email()  # comercial_email o user.email
-tenant_user.get_contact_phone()  # comercial_telefono
-```
-
-**Dagster** (`dagster/casa_teva_pipeline/assets/contact_assets.py`):
-- Asset: `process_contact_queue` (max 5 contactos/dia)
-- Job: `contact_job`
-- Schedule: `contact_schedule` (L-V 10:00 AM, desactivado por defecto)
-
-**Endpoints CRM**:
-- `POST /leads/<lead_id>/enqueue/` - Encolar un lead
-- `POST /leads/bulk-enqueue/` - Encolar multiples leads
-- `GET /leads/contact-queue/` - Ver cola de contactos
-- `POST /leads/contact-queue/<id>/cancel/` - Cancelar contacto
-
-**Variables de entorno** (configuradas en Azure Container Apps):
-```
-CAPTCHA_API_KEY=<2captcha_api_key>    # ~$3/1500 CAPTCHAs (Habitaclia)
-CONTACT_NAME=<nombre_formularios>
-CONTACT_EMAIL=<email_contacto>
-CONTACT_PHONE=<telefono_contacto>
-FOTOCASA_EMAIL=<cuenta_fotocasa>      # Login automatico
-FOTOCASA_PASSWORD=<password>          # Login automatico
-MILANUNCIOS_EMAIL=<cuenta_milanuncios>  # Login automatico (chat interno)
-MILANUNCIOS_PASSWORD=<password>         # Login automatico
-IDEALISTA_EMAIL=<cuenta_idealista>      # Login automatico (DataDome)
-IDEALISTA_PASSWORD=<password>           # Login automatico
-```
-
-**Portales soportados**:
-| Portal | Metodo | Requisitos |
-|--------|--------|------------|
-| Fotocasa | Formulario web | FOTOCASA_EMAIL/PASSWORD |
-| Habitaclia | Formulario + reCAPTCHA | CAPTCHA_API_KEY (~$1/1000) |
-| Milanuncios | Chat interno | MILANUNCIOS_EMAIL/PASSWORD |
-| Idealista | Formulario + DataDome | CAPTCHA_API_KEY (~$3/1000) + IDEALISTA_EMAIL/PASSWORD |
-
-**Limitaciones**:
-- Max 5 contactos/dia (conservador para evitar bloqueos)
-- Delay 2-5 min entre contactos (simular humano)
-- Idealista mas caro por DataDome (~$3/1000 vs $1/1000 reCAPTCHA)
-
-### WhatsApp Business API (Issue #32 - Pendiente)
-**Por qué es importante**: 67% de interacciones inmobiliarias empiezan en WhatsApp.
-El 30% de leads abandonan si no reciben respuesta en 24h.
-
-**Requisitos para implementar**:
-1. Cuenta Business verificada por Meta (~2 semanas proceso)
-2. Servidor con webhook HTTPS para recibir mensajes
-3. Templates de mensaje aprobados por Meta
-
-**Coste estimado**:
-- ~$0.05 por mensaje enviado
-- Alternativas: Twilio WhatsApp (~$0.005/msg), MessageBird
-
-**Estructura propuesta**:
-```
-backend/apps/whatsapp/
-├── models.py      # WhatsAppConversation, MessageTemplate
-├── views.py       # Webhook receiver
-├── services.py    # Send messages via Cloud API
-└── chatbot.py     # Cualificación automática de leads
-```
-
-**Flujo**:
-1. Lead contacta → Webhook recibe mensaje
-2. Chatbot cualifica (tipo inmueble, presupuesto, zona)
-3. Si cualificado → Asignar a comercial + notificar
-4. Si no → Respuesta automática con info
-
-**Dependencia**: Requiere cuenta Meta Business verificada antes de implementar.
-
-### Fiabilidad Produccion (Enero 2026)
-- **Backup PostgreSQL**: 35 dias retencion (Azure)
-- **Health Check**: `/health/` verifica conexion BD (retorna 503 si falla)
-- **Logs Centralizados**: Azure Log Analytics (`casateva-logs`)
-- **Validacion Datos**: Precio (1K-10M), telefono (9 digitos), URL, metros
-- **Logging**: JSON estructurado en produccion
-- **Rate Limiting**: ScrapingBee 1s/req, Botasaurus 2s/page
-- **API Docs**: Swagger UI en `/api/docs/`
-- **Runbooks**: `docs/RUNBOOKS.md` con procedimientos de incidentes
-- **Key Vault**: `casateva-kv` para secrets (pendiente migracion)
-
-### Bugs Arreglados (17 Enero 2026)
-
-**1. Habitaclia no extraia fotos**
-- **Problema**: Scraper de Habitaclia devuelvia 0 fotos por anuncio
-- **Causa**: Filtro `id_for_match` comparaba IDs incompatibles (anuncio vs directorio imagen)
-- **Fix**: Eliminar filtro erroneo, mantener deduplicacion por directory/filename
-- **Archivo**: `scrapers/botasaurus_habitaclia.py`
-
-**2. Dashboard 500 error - Wrong URL pattern**
-- **Problema**: Dashboard devuelvia 500 en `/analytics/dashboard/`
-- **Causa**: Template usaba `{% url 'leads:contact_detail' lead.lead_id %}` pero `contact_detail` espera integer ID, no MD5 hash
-- **Fix**: Cambiar a `{% url 'leads:detail' lead.lead_id %}` (acepta string)
-- **Archivo**: `backend/templates/analytics/dashboard.html`
-
-### Bugs Arreglados (15 Enero 2026)
-
-**1. DATABASE_URL parsing en runners Botasaurus**
-- **Problema**: Habitaclia/Fotocasa guardaban 0 leads en Azure (20-50 encontrados, 0 saved)
-- **Causa**: `if 'azure' in db_url` no detectaba hostname `inmoleads-db.postgres.database.azure.com`
-- **Fix**: Cambio a `if parsed.hostname and 'azure' in parsed.hostname.lower()`
-- **Archivos**: `run_habitaclia_scraper.py`, `run_fotocasa_scraper.py`
-
-**2. scraping_stats columna inexistente**
-- **Problema**: Error `column "created_at" does not exist` en asset scraping_stats
-- **Causa**: dbt usa `fecha_primera_captura`, no `created_at`
-- **Fix**: Cambiar query a usar `fecha_primera_captura`
-- **Archivo**: `dagster/casa_teva_pipeline/assets/scraping_assets.py`
-
-**3. dbt dim_leads falla por tabla inexistente**
-- **Problema**: dbt fallaba con error de tabla `public.lead_image_scores` no existe
-- **Causa**: La tabla se crea en asset `image_analysis` que corre DESPUES de dbt
-- **Fix**: Nuevo modelo `stg_lead_image_scores.sql` con pre_hook que crea la tabla
-- **Archivo**: `dbt_project/models/staging/stg_lead_image_scores.sql`
-
-### Dashboard Analytics (17 Enero 2026)
-Mejoras en `/analytics/`:
-
-**Filtros interactivos**:
-- Portal (habitaclia, fotocasa, milanuncios, idealista)
-- Zona geografica
-- Periodo (7, 30, 90 dias)
-
-**KPIs arreglados**:
-- `score_medio`: Ahora calcula AVG(lead_score) real
-- `dias_medio_primer_contacto`: Calcula dias desde captura hasta primer contacto
-
-**Nueva seccion "Ultimos Leads"**:
-- Tabla con 10 leads mas recientes
-- Muestra: titulo, portal, zona, precio, score, estado, fecha
-- Links directos a detalle del lead
-
-### Idealista - Estado actual (15 Enero 2026)
-**⚠️ Idealista sigue con bloqueos intermitentes de DataDome** en algunas zonas.
-- Zona `vendrell`: Bloqueado consistentemente (3 requests, 0 pages scraped)
-- Otras zonas pequeñas: Skip automatico via `IDEALISTA_SKIP_ZONES`
-- **No es bug del codigo** - es proteccion anti-bot de Idealista
-- ScrapingBee stealth proxy funciona ~70% del tiempo
-
-### Verificador de ofertas eliminadas (15 Enero 2026)
-Script para detectar anuncios que ya no existen en los portales.
-
-**Archivo**: `scrapers/listing_checker.py`
-
-**Deteccion**:
-- HTTP 404/410
-- Redireccion a homepage
-- Texto "anuncio no disponible/eliminado" en HTML
-
-**Uso**:
-```bash
-# Django management command
-python manage.py check_removed_listings --limit 50 --dry-run
-python manage.py check_removed_listings --portal habitaclia
-
-# Script directo
-python scrapers/listing_checker.py --limit 100
-```
-
-**Accion**: Marca leads eliminados como `YA_VENDIDO` automaticamente.
-
-### CRM - Asignatarios (15 Enero 2026)
-Los usuarios admin (`is_superuser=True` o `is_staff=True`) ya no aparecen
-en el dropdown de asignatarios. Solo usuarios normales del tenant.
-
-## Debugging - Regla Importante
-
-**REGLA**: Si un bug/error NO se resuelve en el PRIMER intento, crear inmediatamente un endpoint de debug temporal.
-
-**Patron recomendado**:
-1. Primer intento: Analizar codigo y probar fix obvio
-2. Si falla: Crear `/analytics/debug/` o similar que:
-   - Ejecute queries sospechosas individualmente
-   - Muestre tipos de datos (pg_typeof, type())
-   - Pruebe imports de modelos
-   - Devuelva JSON con errores detallados
-3. Desplegar y analizar output del debug endpoint
-4. Arreglar el problema real
-5. Eliminar endpoint de debug
-
-**Ejemplo de debug endpoint**:
-```python
-def debug_view(request):
-    errors = []
-    results = {}
-    try:
-        # Test queries individuales
-        cursor.execute("SELECT COUNT(*) FROM tabla")
-        results['count'] = cursor.fetchone()[0]
-    except Exception as e:
-        errors.append(f"query: {e}")
-    return JsonResponse({'errors': errors, 'results': results})
-```
-
-**Ventaja**: Evita ciclos largos de deploy->error->analizar->deploy. Un debug endpoint bien hecho identifica el problema en 1 deploy.
-
-## Onboarding de Inmobiliaria (Checklist)
-
-Cuando una nueva inmobiliaria quiera usar el sistema:
-
-### 1. Crear Tenant
-- [ ] Crear Tenant en `/admin/core/tenant/`
-- [ ] Nombre, slug, email contacto
-- [ ] Datos comercial: comercial_nombre, comercial_email, comercial_telefono
-
-### 2. Crear Usuario
-- [ ] Crear User en `/admin/auth/user/`
-- [ ] Crear TenantUser en `/admin/core/tenantuser/` (rol: admin)
-
-### 2b. Configurar Datos de Comerciales (para contacto automático)
-- [ ] En cada TenantUser configurar:
-  - `comercial_nombre`: Nombre en formularios (fallback: User.first_name)
-  - `comercial_email`: Email para respuestas (fallback: User.email)
-  - `comercial_telefono`: Teléfono de contacto
-
-### 3. Configurar Zonas
-- [ ] Añadir zonas en `/admin/core/zonageografica/`
-- [ ] Activar portales por zona (MA, FC, HA, ID)
-
-### 4. Credenciales de Portales (si usa contacto automático)
-- [ ] Generar `CREDENTIAL_ENCRYPTION_KEY` si no existe:
-  ```python
-  from cryptography.fernet import Fernet
-  print(Fernet.generate_key().decode())
-  ```
-- [ ] Añadir key a Azure Container Apps
-- [ ] Crear credenciales en `/admin/leads/portalcredential/`
-  - Fotocasa: email + password
-  - Milanuncios: email + password
-  - Idealista: email + password
-  - Habitaclia: solo necesita CAPTCHA_API_KEY global
-
-### 5. Verificar
-- [ ] Usuario puede hacer login en CRM
-- [ ] Ve sus zonas en el dashboard
-- [ ] Scraping funciona (ejecutar job manual)
-
-## Comandos
-
-```bash
-# === LOCAL ===
-python run_all_scrapers.py --portals habitaclia fotocasa --zones salou
-python run_all_scrapers.py --portals milanuncios idealista --zones salou --postgres
-
-# === AZURE LOGS ===
-az containerapp logs show -n dagster-scrapers -g inmoleads-crm --type console --tail 100
-
-# === KEDA / SCALING ===
-az containerapp show -g inmoleads-crm -n dagster-scrapers --query "properties.template.scale" -o json
-az containerapp replica list -g inmoleads-crm -n dagster-scrapers -o table
-```
-
-## Entornos
-
+### Entornos
 | Servicio | Local | Azure |
 |----------|-------|-------|
 | Web | localhost:8000 | inmoleads-crm.azurewebsites.net |
 | Dagster | localhost:3000 | dagster-scrapers.happysky-957a1351.spaincentral.azurecontainerapps.io |
 | PostgreSQL | localhost:5432 | inmoleads-db.postgres.database.azure.com |
 
-## Credenciales
+### Comandos Frecuentes
+```bash
+# Local scraping
+python run_all_scrapers.py --portals habitaclia fotocasa --zones salou
 
-- **Local**: casa_teva / [REDACTED] / casa_teva_db
-- **Azure**: inmoleadsadmin / [REDACTED] / inmoleadsdb (sslmode=require)
+# Azure logs
+az containerapp logs show -n dagster-scrapers -g inmoleads-crm --type console --tail 100
 
-## Portal names para BD
+# dbt
+cd dbt_project && dbt run --select staging.* && dbt run --select dim_leads
+```
+
+### Portal Names (BD constraint)
 `habitaclia`, `fotocasa`, `milanuncios`, `idealista`
 
-## Estados de Lead (Django ESTADO_CHOICES)
+### Estados de Lead
 `NUEVO`, `EN_PROCESO`, `CONTACTADO_SIN_RESPUESTA`, `INTERESADO`, `NO_INTERESADO`, `EN_ESPERA`, `NO_CONTACTAR`, `CLIENTE`, `YA_VENDIDO`
-
-## dbt Pipeline
-```
-raw.raw_listings (JSONB) -> public_staging.stg_* -> public_marts.dim_leads
-```
-
-### Modelos dbt
-- **public_staging/**: `stg_habitaclia`, `stg_fotocasa`, `stg_milanuncios`, `stg_idealista` (views)
-- **public_marts/**: `dim_leads` (incremental), `dim_lead_duplicates` (duplicados cross-portal)
-
-### Duplicados Cross-Portal (19 Enero 2026)
-Detecta cuando el mismo inmueble aparece en multiples portales.
-
-**Modelo**: `public_marts.dim_lead_duplicates`
-
-**Estrategia de matching**:
-1. Por telefono normalizado (match exacto) - prioritario
-2. Por ubicacion + precio (+-10%) + metros (+-5%) - fallback
-
-**Campos**:
-- `duplicate_group_id`: ID del grupo de duplicados
-- `num_portales`: Cuantos portales tienen este inmueble
-- `portales`: Lista de portales (ej: "fotocasa, milanuncios")
-
-**UI**: Badge morado "En X portales" en detalle del lead (si num_portales > 1)
-
-### Historico de Precios (19 Enero 2026)
-Detecta bajadas de precio para identificar vendedores motivados.
-
-**Tabla**: `raw.listing_price_history`
-- `tenant_id`, `portal`, `anuncio_id`: Identificador del anuncio
-- `precio`: Precio en ese momento
-- `fecha_captura`: Cuando se capturo el precio
-
-**Flujo**:
-1. Scrapers (Botasaurus/ScrapingBee) guardan precio en `listing_price_history` cada scrape
-2. dbt calcula `precio_anterior` y `precio_cambio_pct` en `dim_leads`
-3. Si precio baja, se suma +15 al `lead_score_total` (vendedor motivado)
-
-**Campos en dim_leads**:
-- `precio_anterior`: Ultimo precio antes del actual
-- `precio_cambio_pct`: Porcentaje de cambio (negativo = bajada)
-- `dias_en_mercado`: Dias desde primera captura
-
-**UI**:
-- Lista leads: Flecha verde con % si baja, roja si sube
-- Detalle lead: Precio anterior mostrado junto al actual
-
-**Migracion**: `migrations/001_create_price_history.sql`
-
-### Campos importantes
-- `fotos`: Array de URLs de imagenes (JSONB)
-- `telefono_norm`: Telefono normalizado (sin espacios ni prefijo)
-- `source_portal`: Portal de origen
-
-### Django Lead model
-El modelo Lead apunta a `public_marts.dim_leads` (vista de solo lectura de dbt).
-Los estados CRM se guardan en `leads_lead_estado` (tabla gestionada por Django).
-
-### Column Name Mapping (Django → dbt)
-**IMPORTANTE**: En raw SQL queries usar nombres de columna dbt, no Django:
-
-| Django Field | dbt Column | Uso |
-|--------------|------------|-----|
-| `updated_at` | `ultima_actualizacion` | Fecha última actualización |
-| `fecha_scraping` | `fecha_primera_captura` | Fecha primer scrape |
-| `portal` | `source_portal` | Portal de origen |
-| `url_anuncio` | `listing_url` | URL del anuncio |
-| `metros` | `superficie_m2` | Superficie en m² |
-| `nombre` | `nombre_contacto` | Nombre del contacto |
-| `direccion` | `ubicacion` | Ubicación/dirección |
-| `zona_geografica` | `zona_clasificada` | Zona geográfica |
-| `tipo_inmueble` | `tipo_propiedad` | Tipo de propiedad |
-| `anuncio_id` | `source_listing_id` | ID original del anuncio |
-
-### Ejecutar dbt
-```bash
-cd dbt_project
-dbt run --select staging.*
-dbt run --select dim_leads
-dbt test
-```
-
-## Analytics API Endpoints
-```
-GET /analytics/api/kpis/              # KPIs globales
-GET /analytics/api/embudo/            # Embudo de conversion
-GET /analytics/api/leads-por-dia/     # Tendencia diaria
-GET /analytics/api/comparativa-portales/ # Comparativa entre portales
-GET /analytics/api/precios-por-zona/  # Precios por zona
-GET /analytics/api/filter-options/    # Opciones para filtros
-GET /analytics/api/export/            # Exportar CSV
-```
-
-## CI/CD
-Push a master -> GitHub Actions -> ACR -> Azure Container Apps
-
-## Claude Code Preferences
-- Ejecutar comandos largos en background
-- Tomar decisiones sin preguntar
-- Ser conciso
 
 ---
 
-## Contexto Próxima Sesión (20 Enero 2026)
+## Features Implementadas (Enero 2026)
 
-### Estado del Sistema de Contacto Automático
+### Core
+- [x] Lead scoring (0-90 pts): días mercado, teléfono, fotos, precio
+- [x] Histórico precios + alertas bajadas (>5%)
+- [x] Duplicados cross-portal (teléfono + ubicación+precio+metros)
+- [x] Alertas Telegram (resumen diario, bajadas, errores)
+- [x] Contacto automatizado (4 portales)
 
-| Portal | Estado | Anti-bot | Notas |
-|--------|--------|----------|-------|
-| **Fotocasa** | ✅ FUNCIONA | Ninguno | Email confirmación recibido |
-| **Habitaclia** | ✅ LISTO | 2Captcha reCAPTCHA | Configurado, pendiente test completo |
-| **Milanuncios** | ✅ FUNCIONA | Camoufox (GeeTest) | Login verificado con Enter, no clic |
-| **Idealista** | ⚠️ PARCIAL | DataDome | Páginas OK con cookies, login bloqueado |
+### Nuevas (20 Enero 2026)
+- [x] **Widget Valorador** - `/api/widget/valorar/`, JS embebible
+- [x] **API REST v1** - `/api/v1/leads/`, autenticación X-API-Key
+- [x] **PWA** - Service Worker, Push Notifications, manifest.json
+- [x] **PDF Valoración** - `/leads/<id>/valuation-pdf/`
+- [x] **ACM** - `/acm/api/generate/<id>/`, comparables + confianza
+- [x] **Task Agenda** - `/leads/agenda/`, tareas por comercial
 
-### Hallazgos Técnicos Importantes
+### Pendiente
+- [ ] WhatsApp Business API (Issue #32) - requiere cuenta Meta verificada
 
-**Milanuncios**:
-- GeeTest bloquea Playwright (Firefox y Chromium)
-- Camoufox bypassa GeeTest exitosamente
-- Login funciona usando `press('Enter')` en vez de clic en botón
-- Credenciales verificadas en env vars
+---
 
-**Idealista**:
-- DataDome bloquea página de login pero NO páginas de anuncios
-- Con cookies de sesión guardadas, las páginas de anuncios cargan sin problema
-- **Fix aplicado**: `base.py` línea 103 - Usar Chromium para Idealista (no Firefox)
-- Para login se necesita proxy residencial (~$15/mes) para resolver DataDome con 2Captcha
+## API Endpoints
 
-### Archivos Modificados/Creados Esta Sesión
-- `scrapers/contact_automation/base.py` - Cambio Firefox→Chromium para Idealista
-- `scrapers/contact_automation/camoufox_idealista.py` - Nuevo, intento con Camoufox (no funciona para login)
-- `scrapers/contact_automation/cookies/idealista_cookies.json` - Cookies actualizadas
-- `scrapers/contact_automation/cookies/milanuncios_cookies.json` - Cookies de login exitoso
+### REST API v1 (`/api/v1/`)
+```
+GET  /api/v1/leads/              # Listar leads (paginado)
+GET  /api/v1/leads/{id}/         # Detalle lead
+GET  /api/v1/zones/              # Zonas activas
+POST /api/v1/webhooks/           # Crear webhook
+GET  /api/v1/docs/               # Swagger UI
+```
+**Auth**: Header `X-API-Key: <key>` (crear en admin)
 
-### Próximos Pasos Sugeridos
-1. **Milanuncios**: Crear módulo con auto-login via Camoufox (más robusto que cookies)
-2. **Idealista**: Decidir si invertir en proxy residencial o limitar a scraping sin contacto
-3. **Habitaclia**: Test completo de contacto con 2Captcha
-4. **Producción**: Probar todo el flujo en Azure (dagster job)
+### Widget
+```
+GET  /widget/valorador.js        # JS para embed
+POST /api/widget/valorar/        # Calcular valoración
+POST /api/widget/lead/           # Crear lead desde widget
+```
 
-### Variables de Entorno en Azure (Configuradas)
-- `CAPTCHA_API_KEY`: ✅ (para reCAPTCHA/DataDome)
-- `FOTOCASA_EMAIL/PASSWORD`: ✅
-- `MILANUNCIOS_EMAIL/PASSWORD`: ✅
-- `IDEALISTA_EMAIL/PASSWORD`: ✅
-- `CONTACT_NAME/EMAIL/PHONE`: ✅
-- `TELEGRAM_BOT_TOKEN/CHAT_ID`: ✅
+### ACM
+```
+POST /acm/api/generate/{lead_id}/  # Generar informe ACM
+GET  /acm/api/report/{lead_id}/    # Obtener último ACM
+```
 
-### Issues Abiertas
-- #28: Mejoras producción (rate limiting, Key Vault)
-- #31: Informe valoración PDF (baja prioridad)
-- #32: WhatsApp Business API (alto esfuerzo, muy alto impacto)
-- #33: Widget valorador embebible (medio esfuerzo, alto impacto)
-- #34: API REST v1 documentada (medio esfuerzo, alto impacto)
-- #35: PWA para móviles (medio esfuerzo, medio-alto impacto)
+### Analytics
+```
+GET /analytics/api/kpis/
+GET /analytics/api/leads-por-dia/
+GET /analytics/api/export/
+```
 
-### Pain Points del Mercado (Investigación Enero 2026)
-1. **Falta de propiedades** - "23% agencias cerrarán en 2025" por falta de oferta
-2. **Velocidad respuesta** - "30% leads abandonan en 24h sin respuesta"
-3. **WhatsApp** - "67% interacciones empiezan en WhatsApp"
-4. **Competencia desesperada** - "Te ofrecen lo mismo 2-3% más barato"
+---
 
-### Precios de Mercado Reales
-| Herramienta | Precio | Función |
-|-------------|--------|---------|
-| Portales (Idealista) | 200-500€/mes | Publicación |
-| CRM (Inmovilla) | 79€/mes | Gestión |
-| Captación (Betipo) | 20-50€/mes | Valorador |
-| Chatbot WhatsApp | 30-50€/mes | Respuesta auto |
-| **Total típico** | **400-800€/mes** | |
-| **Casa Teva** | **~100€/mes** | Todo incluido |
+## Scrapers
+
+| Portal | Tecnología | Coste | Anti-bot |
+|--------|------------|-------|----------|
+| habitaclia | Botasaurus | Gratis | Ninguno |
+| fotocasa | Botasaurus | Gratis | Ninguno |
+| milanuncios | ScrapingBee | 75 cr/req | GeeTest |
+| idealista | ScrapingBee | 75 cr/req | DataDome |
+
+### Schedule Actual (TEMPORAL)
+- **Cron**: `0 12 * * 1,3,5` (12:00, solo L-X-V)
+- **Normal**: `0 12,18 * * *` (12:00 y 18:00 diario)
+
+### Zonas sin Idealista
+Idealista desactivado para zonas pequeñas (95%+ agencias):
+`amposta, deltebre, ametlla_mar, hospitalet_infant, montroig_camp, sant_carles_rapita`
+
+---
+
+## Contacto Automático
+
+| Portal | Estado | Método |
+|--------|--------|--------|
+| Fotocasa | ✅ OK | Auto-login + formulario |
+| Habitaclia | ✅ OK | 2Captcha reCAPTCHA |
+| Milanuncios | ✅ OK | Camoufox + chat interno |
+| Idealista | ⚠️ Parcial | DataDome bloquea login |
+
+**Modelos**: `ContactQueue`, `PortalSession`, `PortalCredential`
+**Límite**: 5 contactos/día, delay 2-5min entre contactos
+
+---
+
+## Arquitectura de Datos
+
+```
+raw.raw_listings (JSONB)
+        ↓
+public_staging.stg_* (views por portal)
+        ↓
+public_marts.dim_leads (incremental)
+public_marts.dim_lead_duplicates
+```
+
+### Mapping Django → dbt
+| Django | dbt | Uso |
+|--------|-----|-----|
+| `updated_at` | `ultima_actualizacion` | Última actualización |
+| `portal` | `source_portal` | Portal origen |
+| `metros` | `superficie_m2` | Superficie |
+| `zona_geografica` | `zona_clasificada` | Zona |
+
+---
+
+## Variables de Entorno (Azure)
+
+**Scraping**:
+- `SCRAPINGBEE_API_KEY`
+
+**Contacto**:
+- `FOTOCASA_EMAIL/PASSWORD`
+- `MILANUNCIOS_EMAIL/PASSWORD`
+- `IDEALISTA_EMAIL/PASSWORD`
+- `CAPTCHA_API_KEY` (2Captcha)
+- `CONTACT_NAME/EMAIL/PHONE`
+
+**Alertas**:
+- `TELEGRAM_BOT_TOKEN/CHAT_ID`
+- `ALERT_WEBHOOK_URL` (Discord)
+
+**PWA**:
+- `VAPID_PUBLIC_KEY/PRIVATE_KEY`
+- `VAPID_CLAIMS_EMAIL`
+
+---
+
+## Costes Mensuales
+
+| Servicio | Coste |
+|----------|-------|
+| Azure (DB + Web + Container) | ~$50 |
+| ScrapingBee | 50€ |
+| **Total** | **~100€/mes** |
+
+---
+
+## Debugging
+
+Si un bug no se resuelve al primer intento → crear endpoint de debug temporal:
+
+```python
+# views.py
+def debug_view(request):
+    results = {}
+    try:
+        cursor.execute("SELECT COUNT(*) FROM tabla")
+        results['count'] = cursor.fetchone()[0]
+    except Exception as e:
+        results['error'] = str(e)
+    return JsonResponse(results)
+```
+
+Desplegar → analizar output → arreglar → eliminar endpoint.
+
+---
+
+## Onboarding Inmobiliaria
+
+1. Crear Tenant en `/admin/core/tenant/`
+2. Crear User + TenantUser (rol: admin)
+3. Configurar zonas en `/admin/core/zonageografica/`
+4. (Opcional) Credenciales portales en `/admin/leads/portalcredential/`
+5. Verificar login y scraping
+
+---
+
+## CI/CD
+
+Push a master → GitHub Actions → ACR → Azure (Web App + Container Apps)
