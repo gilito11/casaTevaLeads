@@ -15,7 +15,7 @@ from django.db.models import Q
 from django.db import connection, IntegrityError
 from django.views.decorators.http import require_POST
 
-from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction
+from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction, Task
 from core.models import TenantUser, Tenant
 
 logger = logging.getLogger(__name__)
@@ -217,6 +217,12 @@ def lead_detail_view(request, lead_id):
     except Exception:
         pass  # Tabla puede no existir aun
 
+    # Obtener tareas asociadas a este lead
+    lead_tasks = Task.objects.filter(
+        tenant_id=tenant_id,
+        lead_id=str(lead.lead_id)
+    ).order_by('completada', 'fecha_vencimiento')
+
     context = {
         'lead': lead,
         'notas': notas,
@@ -225,6 +231,7 @@ def lead_detail_view(request, lead_id):
         'lead_estado': lead_estado,
         'team_users': team_users,
         'duplicate_info': duplicate_info,
+        'lead_tasks': lead_tasks,
     }
 
     return render(request, 'leads/detail.html', context)
@@ -1313,3 +1320,42 @@ def task_delete_view(request, task_id):
         return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
 
     return JsonResponse({'status': 'deleted'})
+
+
+# ============================================================================
+# PDF Valuation Report
+# ============================================================================
+
+@login_required
+def valuation_pdf_view(request, lead_id):
+    """
+    Generate and download a PDF valuation report for a lead.
+    GET /leads/<lead_id>/valuation-pdf/
+    """
+    from leads.pdf_service import generate_valuation_pdf
+
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    # Verify lead belongs to user's tenant
+    if tenant_id and lead.tenant_id != tenant_id:
+        return HttpResponse(status=403)
+
+    tenant = get_object_or_404(Tenant, tenant_id=tenant_id)
+
+    try:
+        pdf_bytes = generate_valuation_pdf(lead, tenant)
+
+        # Generate filename
+        zona = lead.zona_geografica or 'desconocida'
+        zona_slug = zona.lower().replace(' ', '_')[:20]
+        fecha = timezone.now().strftime('%Y%m%d')
+        filename = f"valoracion_{zona_slug}_{fecha}.pdf"
+
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        logger.error(f"Error generating PDF for lead {lead_id}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)

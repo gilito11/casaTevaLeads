@@ -14,6 +14,7 @@ urlpatterns = [
     path('calendar/', views.calendar_view, name='calendar'),
 
     # Tareas / Agenda
+    path('agenda/', views.task_list_view, name='agenda'),  # Alias para /leads/agenda/
     path('tareas/', views.task_list_view, name='task_list'),
     path('tareas/nueva/', views.task_create_view, name='task_create'),
     path('tareas/<int:task_id>/completar/', views.task_complete_view, name='task_complete'),
@@ -40,4 +41,5 @@ urlpatterns = [
     path('<str:lead_id>/contact/', views.contact_from_lead_view, name='contact_from_lead'),
     path('<str:lead_id>/assign/', views.assign_lead_view, name='assign'),
     path('<str:lead_id>/enqueue/', views.enqueue_contact_view, name='enqueue_contact'),
+    path('<str:lead_id>/valuation-pdf/', views.valuation_pdf_view, name='valuation_pdf'),
 ]

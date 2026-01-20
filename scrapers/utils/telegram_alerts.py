@@ -124,3 +124,101 @@ def send_scraping_error(
     message += f"<code>{error_truncated}</code>"
 
     return send_telegram_alert(message)
+
+
+def send_task_reminder(
+    task_titulo: str,
+    task_tipo: str,
+    fecha_vencimiento: str,
+    lead_titulo: Optional[str] = None,
+    lead_url: Optional[str] = None,
+    asignado_a: Optional[str] = None,
+) -> bool:
+    """
+    Send reminder for task due today or overdue.
+
+    Args:
+        task_titulo: Task title
+        task_tipo: Task type (llamar, visitar, etc)
+        fecha_vencimiento: Due date/time
+        lead_titulo: Associated lead title (optional)
+        lead_url: URL to lead in portal (optional)
+        asignado_a: Name of assigned user (optional)
+    """
+    lines = [
+        f"<b>Recordatorio de tarea</b>",
+        f"",
+        f"{task_titulo}",
+        f"Tipo: {task_tipo}",
+        f"Vence: {fecha_vencimiento}",
+    ]
+
+    if asignado_a:
+        lines.append(f"Asignado a: {asignado_a}")
+
+    if lead_titulo:
+        lines.append(f"")
+        lines.append(f"Lead: {lead_titulo}")
+
+    if lead_url:
+        lines.append(f"<a href=\"{lead_url}\">Ver anuncio</a>")
+
+    return send_telegram_alert("\n".join(lines))
+
+
+def send_tasks_daily_summary(
+    total_hoy: int,
+    total_vencidas: int,
+    tareas_hoy: list,
+) -> bool:
+    """
+    Send daily summary of tasks due today.
+
+    Args:
+        total_hoy: Number of tasks due today
+        total_vencidas: Number of overdue tasks
+        tareas_hoy: List of dicts with task info (titulo, tipo, fecha_vencimiento)
+    """
+    if total_hoy == 0 and total_vencidas == 0:
+        return False
+
+    lines = [
+        f"<b>Resumen de tareas</b>",
+        f"",
+    ]
+
+    if total_vencidas > 0:
+        lines.append(f"Vencidas: <b>{total_vencidas}</b>")
+
+    lines.append(f"Para hoy: <b>{total_hoy}</b>")
+
+    if tareas_hoy:
+        lines.append("")
+        for tarea in tareas_hoy[:5]:  # Max 5 tasks in summary
+            tipo_emoji = {
+                'llamar': 'Tel',
+                'visitar': 'Visita',
+                'enviar_info': 'Info',
+                'seguimiento': 'Seguim',
+                'reunion': 'Reunion',
+                'otro': 'Otro',
+            }.get(tarea.get('tipo', ''), '')
+
+            hora = tarea.get('fecha_vencimiento', '')
+            if hora:
+                try:
+                    from datetime import datetime
+                    if isinstance(hora, str):
+                        dt = datetime.fromisoformat(hora.replace('Z', '+00:00'))
+                    else:
+                        dt = hora
+                    hora = dt.strftime('%H:%M')
+                except Exception:
+                    hora = ''
+
+            lines.append(f"  {hora} [{tipo_emoji}] {tarea.get('titulo', '')[:40]}")
+
+        if len(tareas_hoy) > 5:
+            lines.append(f"  ...y {len(tareas_hoy) - 5} mas")
+
+    return send_telegram_alert("\n".join(lines))

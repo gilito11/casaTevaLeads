@@ -111,4 +111,7 @@ urlpatterns = [
     # Widget valorador embebible
     path('widget/', include('widget.urls', namespace='widget')),
     path('api/widget/', include(('widget.api_urls', 'widget_api'))),
+
+    # ACM - Analisis Comparativo de Mercado
+    path('acm/', include('acm.urls', namespace='acm')),
 ]

@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'widget',
     'notifications',
     'api_v1',
+    'acm',
 ]
 
 MIDDLEWARE = [
@@ -95,6 +96,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'notifications.context_processors.vapid_public_key',
+                'core.context_processors.tasks_context',
             ],
         },
     },

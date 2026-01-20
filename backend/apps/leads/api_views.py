@@ -8,12 +8,14 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 
-from leads.models import Lead, Nota
+from leads.models import Lead, Nota, Task
 from leads.serializers import (
     LeadListSerializer,
     LeadDetailSerializer,
     LeadUpdateSerializer,
-    NotaSerializer
+    NotaSerializer,
+    TaskSerializer,
+    TaskCreateSerializer
 )
 from core.models import TenantUser
 
@@ -181,4 +183,149 @@ class LeadViewSet(viewsets.ModelViewSet):
             'estados': stats,
             'por_portal': por_portal,
             'por_zona': por_zona,
+        })
+
+
+class TaskViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet para gestionar tareas/agenda.
+
+    list: Lista todas las tareas del tenant
+    retrieve: Obtiene detalle de una tarea
+    create: Crea una nueva tarea
+    update/partial_update: Actualiza una tarea
+    destroy: Elimina una tarea
+    """
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['tipo', 'prioridad', 'completada', 'lead_id', 'asignado_a']
+    search_fields = ['titulo', 'descripcion']
+    ordering_fields = ['fecha_vencimiento', 'prioridad', 'created_at']
+    ordering = ['completada', 'fecha_vencimiento']
+
+    def get_tenant_id(self):
+        """Obtiene el tenant_id del usuario actual"""
+        user = self.request.user
+        tenant_id = self.request.session.get('tenant_id')
+
+        if not tenant_id:
+            tenant_user = TenantUser.objects.filter(user=user).first()
+            if tenant_user:
+                tenant_id = tenant_user.tenant.tenant_id
+
+        return tenant_id
+
+    def get_queryset(self):
+        """Filtra tareas por tenant del usuario"""
+        tenant_id = self.get_tenant_id()
+
+        queryset = Task.objects.all()
+        if tenant_id:
+            queryset = queryset.filter(tenant_id=tenant_id)
+
+        # Filtro opcional por fecha
+        fecha_desde = self.request.query_params.get('fecha_desde')
+        fecha_hasta = self.request.query_params.get('fecha_hasta')
+
+        if fecha_desde:
+            queryset = queryset.filter(fecha_vencimiento__gte=fecha_desde)
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_vencimiento__lte=fecha_hasta)
+
+        # Filtro para tareas de hoy
+        hoy = self.request.query_params.get('hoy')
+        if hoy and hoy.lower() == 'true':
+            from datetime import date
+            queryset = queryset.filter(
+                fecha_vencimiento__date=date.today(),
+                completada=False
+            )
+
+        # Filtro para tareas vencidas
+        vencidas = self.request.query_params.get('vencidas')
+        if vencidas and vencidas.lower() == 'true':
+            queryset = queryset.filter(
+                fecha_vencimiento__lt=timezone.now(),
+                completada=False
+            )
+
+        return queryset
+
+    def get_serializer_class(self):
+        """Usa diferentes serializers segun la accion"""
+        if self.action == 'create':
+            return TaskCreateSerializer
+        return TaskSerializer
+
+    def get_serializer_context(self):
+        """Agrega tenant_id al contexto del serializer"""
+        context = super().get_serializer_context()
+        context['tenant_id'] = self.get_tenant_id()
+        return context
+
+    @action(detail=True, methods=['post'])
+    def completar(self, request, pk=None):
+        """
+        Marca una tarea como completada.
+        POST /api/tasks/{id}/completar/
+        """
+        task = self.get_object()
+        task.marcar_completada()
+
+        serializer = TaskSerializer(task)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def reabrir(self, request, pk=None):
+        """
+        Reabre una tarea completada.
+        POST /api/tasks/{id}/reabrir/
+        """
+        task = self.get_object()
+        task.completada = False
+        task.fecha_completada = None
+        task.save(update_fields=['completada', 'fecha_completada', 'updated_at'])
+
+        serializer = TaskSerializer(task)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Estadisticas de tareas.
+        GET /api/tasks/stats/
+        """
+        queryset = self.get_queryset()
+        from django.db.models import Count, Q
+        from datetime import date, timedelta
+
+        hoy = date.today()
+        fin_semana = hoy + timedelta(days=7)
+
+        stats = queryset.aggregate(
+            total=Count('id'),
+            pendientes=Count('id', filter=Q(completada=False)),
+            completadas=Count('id', filter=Q(completada=True)),
+            hoy=Count('id', filter=Q(fecha_vencimiento__date=hoy, completada=False)),
+            semana=Count('id', filter=Q(
+                fecha_vencimiento__date__lte=fin_semana,
+                completada=False
+            )),
+            vencidas=Count('id', filter=Q(
+                fecha_vencimiento__lt=timezone.now(),
+                completada=False
+            )),
+            urgentes=Count('id', filter=Q(prioridad='urgente', completada=False)),
+        )
+
+        # Tareas por tipo
+        por_tipo = list(
+            queryset.filter(completada=False)
+            .values('tipo')
+            .annotate(count=Count('id'))
+        )
+
+        return Response({
+            'contadores': stats,
+            'por_tipo': por_tipo,
         })

@@ -15,3 +15,6 @@ cryptography>=41.0.0
 
 # PWA / Push Notifications
 pywebpush>=1.14.0
+
+# PDF Generation
+reportlab>=4.0.0

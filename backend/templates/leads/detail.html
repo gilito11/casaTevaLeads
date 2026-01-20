@@ -57,6 +57,16 @@
                 Ver Anuncio
             </a>
             {% endif %}
+
+            <!-- Download Valuation PDF -->
+            <a href="{% url 'leads:valuation_pdf' lead.lead_id %}"
+               class="inline-flex items-center px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+               title="Descargar informe de valoracion en PDF">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Informe PDF
+            </a>
         </div>
     </div>
 
@@ -203,6 +213,87 @@
                         </div>
                         {% endif %}
                     </div>
+                </div>
+            </div>
+
+            <!-- Tasks Section -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Tareas</h2>
+                    <button onclick="document.getElementById('modal-nueva-tarea-lead').classList.remove('hidden')"
+                            class="inline-flex items-center px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Nueva Tarea
+                    </button>
+                </div>
+
+                <div id="tasks-list" class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for task in lead_tasks %}
+                    <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <div class="flex items-start gap-3">
+                            {% if not task.completada %}
+                            <form hx-post="{% url 'leads:task_complete' task.id %}" hx-swap="none">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="mt-0.5 w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 hover:border-primary-500 transition-colors flex-shrink-0">
+                                </button>
+                            </form>
+                            {% else %}
+                            <div class="mt-0.5 w-5 h-5 rounded bg-green-500 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            {% endif %}
+
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-medium text-gray-900 dark:text-white text-sm {% if task.completada %}line-through text-gray-500{% endif %}">
+                                        {{ task.titulo }}
+                                    </span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                        {% if task.tipo == 'llamar' %}bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300
+                                        {% elif task.tipo == 'visitar' %}bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300
+                                        {% elif task.tipo == 'enviar_info' %}bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300
+                                        {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+                                        {{ task.get_tipo_display }}
+                                    </span>
+                                    {% if task.prioridad == 'urgente' %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                        URGENTE
+                                    </span>
+                                    {% elif task.prioridad == 'alta' %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                                        Alta
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 {% if task.esta_vencida %}text-red-600 dark:text-red-400 font-medium{% endif %}">
+                                    {{ task.fecha_vencimiento|date:"d M H:i" }}
+                                    {% if task.esta_vencida %}(Vencida){% endif %}
+                                </p>
+                            </div>
+
+                            <form hx-post="{% url 'leads:task_delete' task.id %}" hx-swap="none" hx-confirm="Eliminar esta tarea?">
+                                {% csrf_token %}
+                                <button type="submit" class="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="p-6 text-center text-gray-500 dark:text-gray-400">
+                        <svg class="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                        <p class="text-sm">No hay tareas para este lead</p>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
 
@@ -446,6 +537,266 @@
                     {% endif %}
                 </dl>
             </div>
+
+            <!-- ACM - Analisis Comparativo de Mercado -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6"
+                 x-data="{
+                     loading: false,
+                     acm: null,
+                     error: null,
+                     async loadAcm() {
+                         try {
+                             const res = await fetch('{% url 'acm:htmx_get' lead.lead_id %}');
+                             const data = await res.json();
+                             if (data.exists) this.acm = data;
+                         } catch (e) {
+                             console.error('Error loading ACM:', e);
+                         }
+                     },
+                     async generateAcm() {
+                         this.loading = true;
+                         this.error = null;
+                         try {
+                             const res = await fetch('{% url 'acm:htmx_generate' lead.lead_id %}', {
+                                 method: 'POST',
+                                 headers: {
+                                     'X-CSRFToken': '{{ csrf_token }}',
+                                     'Content-Type': 'application/json'
+                                 }
+                             });
+                             const data = await res.json();
+                             if (data.success) {
+                                 await this.loadAcm();
+                             } else {
+                                 this.error = data.error;
+                             }
+                         } catch (e) {
+                             this.error = e.message;
+                         }
+                         this.loading = false;
+                     }
+                 }"
+                 x-init="loadAcm()">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Analisis de Mercado
+                    </h2>
+                    <button @click="generateAcm()"
+                            :disabled="loading"
+                            class="text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50 flex items-center">
+                        <template x-if="loading">
+                            <svg class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </template>
+                        <template x-if="!loading">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </template>
+                        <span x-text="acm ? 'Regenerar' : 'Generar ACM'"></span>
+                    </button>
+                </div>
+
+                <!-- Error message -->
+                <template x-if="error">
+                    <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-700 dark:text-red-300">
+                        <span x-text="error"></span>
+                    </div>
+                </template>
+
+                <!-- ACM Results -->
+                <template x-if="acm">
+                    <div class="space-y-4">
+                        <!-- Valoracion estimada -->
+                        <div class="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg p-4">
+                            <p class="text-sm text-amber-800 dark:text-amber-300 mb-1">Valoracion estimada</p>
+                            <p class="text-2xl font-bold text-amber-900 dark:text-amber-100">
+                                <span x-text="acm.valoracion_media.toLocaleString('es-ES')"></span> EUR
+                            </p>
+                            <p class="text-sm text-amber-700 dark:text-amber-400">
+                                Rango: <span x-text="acm.valoracion_min.toLocaleString('es-ES')"></span> - <span x-text="acm.valoracion_max.toLocaleString('es-ES')"></span> EUR
+                            </p>
+                        </div>
+
+                        <!-- Diferencia con precio anuncio -->
+                        <template x-if="acm.diferencia_pct !== null">
+                            <div class="p-3 rounded-lg"
+                                 :class="acm.diferencia_pct > 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'">
+                                <p class="text-sm"
+                                   :class="acm.diferencia_pct > 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'">
+                                    <template x-if="acm.diferencia_pct > 0">
+                                        <span>Precio del anuncio <strong x-text="acm.diferencia_pct + '%'"></strong> por encima de la valoracion (oportunidad de negociacion)</span>
+                                    </template>
+                                    <template x-if="acm.diferencia_pct <= 0">
+                                        <span>Precio del anuncio <strong x-text="Math.abs(acm.diferencia_pct) + '%'"></strong> por debajo de la valoracion (buen precio)</span>
+                                    </template>
+                                </p>
+                            </div>
+                        </template>
+
+                        <!-- Stats -->
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400">Precio/m2 medio</p>
+                                <p class="font-medium text-gray-900 dark:text-white">
+                                    <span x-text="acm.precio_m2_medio ? acm.precio_m2_medio.toLocaleString('es-ES', {maximumFractionDigits: 0}) + ' EUR/m2' : '-'"></span>
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400">Comparables usados</p>
+                                <p class="font-medium text-gray-900 dark:text-white" x-text="acm.num_comparables"></p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400">Confianza</p>
+                                <div class="flex items-center">
+                                    <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full mr-2">
+                                        <div class="h-2 rounded-full"
+                                             :class="acm.confianza >= 70 ? 'bg-green-500' : acm.confianza >= 40 ? 'bg-yellow-500' : 'bg-red-500'"
+                                             :style="'width: ' + acm.confianza + '%'"></div>
+                                    </div>
+                                    <span class="text-xs font-medium" x-text="acm.confianza + '%'"></span>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400">Generado</p>
+                                <p class="font-medium text-gray-900 dark:text-white text-xs" x-text="acm.created_at"></p>
+                            </div>
+                        </div>
+
+                        <!-- Comparables (collapsible) -->
+                        <template x-if="acm.comparables && acm.comparables.length > 0">
+                            <div x-data="{ showComparables: false }">
+                                <button @click="showComparables = !showComparables"
+                                        class="w-full flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white py-2">
+                                    <span>Ver comparables usados</span>
+                                    <svg class="w-4 h-4 transition-transform" :class="showComparables && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                <div x-show="showComparables" x-transition class="space-y-2 mt-2">
+                                    <template x-for="comp in acm.comparables" :key="comp.lead_id">
+                                        <a :href="comp.url" target="_blank"
+                                           class="block p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-xs">
+                                            <div class="flex justify-between items-start">
+                                                <div class="flex-1 min-w-0 mr-2">
+                                                    <p class="font-medium text-gray-900 dark:text-white truncate" x-text="comp.titulo || 'Sin titulo'"></p>
+                                                    <p class="text-gray-500 dark:text-gray-400" x-text="comp.portal"></p>
+                                                </div>
+                                                <div class="text-right">
+                                                    <p class="font-medium text-primary-600 dark:text-primary-400" x-text="comp.precio.toLocaleString('es-ES') + ' EUR'"></p>
+                                                    <p class="text-gray-500 dark:text-gray-400" x-text="comp.superficie_m2 + ' m2'"></p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- No ACM yet -->
+                <template x-if="!acm && !loading && !error">
+                    <div class="text-center py-4">
+                        <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Sin analisis de mercado</p>
+                        <button @click="generateAcm()"
+                                :disabled="loading"
+                                class="inline-flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg transition-colors">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Generar ACM
+                        </button>
+                    </div>
+                </template>
+
+                <!-- Loading state -->
+                <template x-if="loading && !acm">
+                    <div class="text-center py-4">
+                        <svg class="w-8 h-8 mx-auto text-amber-500 animate-spin mb-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Analizando mercado...</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nueva Tarea desde Lead -->
+<div id="modal-nueva-tarea-lead" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('modal-nueva-tarea-lead').classList.add('hidden')"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Nueva Tarea para este Lead</h3>
+            <form hx-post="{% url 'leads:task_create' %}" hx-swap="none">
+                {% csrf_token %}
+                <input type="hidden" name="lead_id" value="{{ lead.lead_id }}">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titulo *</label>
+                        <input type="text" name="titulo" required
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                               placeholder="Ej: Llamar para agendar visita">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripcion</label>
+                        <textarea name="descripcion" rows="2"
+                                  class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                  placeholder="Detalles adicionales..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
+                            <select name="tipo"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                <option value="llamar">Llamar</option>
+                                <option value="visitar">Visitar</option>
+                                <option value="enviar_info">Enviar informacion</option>
+                                <option value="seguimiento" selected>Seguimiento</option>
+                                <option value="reunion">Reunion</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prioridad</label>
+                            <select name="prioridad"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                                <option value="baja">Baja</option>
+                                <option value="media" selected>Media</option>
+                                <option value="alta">Alta</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha y hora</label>
+                        <input type="datetime-local" name="fecha_vencimiento"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button"
+                            onclick="document.getElementById('modal-nueva-tarea-lead').classList.add('hidden')"
+                            class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                        Crear Tarea
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
