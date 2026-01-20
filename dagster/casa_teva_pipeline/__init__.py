@@ -36,17 +36,16 @@ scraping_job = define_asset_job(
     }
 )
 
-# Schedule optimizado basado en análisis de 220 anuncios de Milanuncios
-# Picos de publicación: 9:00-11:00 (mañana) y 16:00 (tarde)
-# Scraping 1-2h después de picos para captar anuncios frescos
-# Cron: 0 12,18 * * * = A las 12:00 y 18:00 hora española
+# Schedule TEMPORAL: L-X-V a las 12:00 (1 vez/día)
+# NOTA: Cuando el usuario avise, volver a: 0 12,18 * * * (12:00 y 18:00 diario)
+# Cron: 0 12 * * 1,3,5 = A las 12:00 hora española, solo Lunes-Miércoles-Viernes
 scraping_schedule_optimized = ScheduleDefinition(
     name="scraping_schedule_optimized",
-    cron_schedule="0 12,18 * * *",
+    cron_schedule="0 12 * * 1,3,5",
     job=scraping_job,
     execution_timezone="Europe/Madrid",
-    default_status=DefaultScheduleStatus.RUNNING,  # ACTIVO - horario optimizado
-    description="Scraping optimizado: 12:00 (tras pico mañana) y 18:00 (tras pico tarde)",
+    default_status=DefaultScheduleStatus.RUNNING,  # ACTIVO - horario temporal L-X-V
+    description="Scraping temporal: 12:00 solo L-X-V (hasta nuevo aviso)",
 )
 
 # Schedule de backup: 2 AM diario
