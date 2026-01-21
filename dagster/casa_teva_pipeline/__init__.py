@@ -44,8 +44,8 @@ scraping_schedule_optimized = ScheduleDefinition(
     cron_schedule="0 12 * * 1,3,5",
     job=scraping_job,
     execution_timezone="Europe/Madrid",
-    default_status=DefaultScheduleStatus.RUNNING,  # ACTIVO - horario temporal L-X-V
-    description="Scraping temporal: 12:00 solo L-X-V (hasta nuevo aviso)",
+    default_status=DefaultScheduleStatus.STOPPED,  # PAUSADO - suscripción Azure deshabilitada
+    description="Scraping temporal: 12:00 solo L-X-V (PAUSADO hasta reactivar Azure)",
 )
 
 # Schedule de backup: 2 AM diario
