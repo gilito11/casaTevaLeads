@@ -55,7 +55,7 @@ class Lead(models.Model):
     fotos = models.JSONField(null=True, blank=True, db_column='fotos_json')
 
     class Meta:
-        db_table = 'public_marts"."dim_leads'
+        db_table = '"public_marts"."dim_leads"'
         managed = False
         verbose_name = 'Lead'
         verbose_name_plural = 'Leads'
