@@ -1375,10 +1375,7 @@ def image_proxy_view(request):
     from urllib.parse import urlparse
 
     url_b64 = request.GET.get('url', '')
-    logger.info(f"Image proxy: received url_b64 len={len(url_b64)}")
-
     if not url_b64:
-        logger.warning("Image proxy: no url param")
         return HttpResponse(status=400)
 
     try:
@@ -1387,9 +1384,8 @@ def image_proxy_view(request):
         if padding != 4:
             url_b64 += '=' * padding
         url = base64.urlsafe_b64decode(url_b64.encode()).decode('utf-8')
-        logger.info(f"Image proxy: decoded url={url[:50]}...")
     except Exception as e:
-        logger.warning(f"Image proxy base64 decode error: {e}, input: {url_b64[:50]}...")
+        logger.warning(f"Image proxy decode error: {e}")
         return HttpResponse(status=400)
 
     # Validate URL domain
@@ -1415,7 +1411,6 @@ def image_proxy_view(request):
     referer = referers.get(parsed.netloc, '')
 
     try:
-        logger.info(f"Image proxy: fetching {url}")
         resp = requests.get(
             url,
             headers={
@@ -1425,7 +1420,6 @@ def image_proxy_view(request):
             timeout=10,
             stream=True,
         )
-        logger.info(f"Image proxy: got response {resp.status_code}")
         if resp.status_code != 200:
             return HttpResponse(status=resp.status_code)
 
@@ -1434,8 +1428,5 @@ def image_proxy_view(request):
         response['Cache-Control'] = 'public, max-age=86400'  # Cache 1 day
         return response
     except requests.RequestException as e:
-        logger.warning(f"Image proxy request error for {url}: {e}")
+        logger.warning(f"Image proxy error: {e}")
         return HttpResponse(status=502)
-    except Exception as e:
-        logger.error(f"Image proxy unexpected error for {url}: {e}")
-        return HttpResponse(status=500)
