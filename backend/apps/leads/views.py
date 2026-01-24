@@ -1368,7 +1368,7 @@ def image_proxy_view(request):
     Evita bloqueo por hotlink protection (habitaclia, fotocasa, etc.)
 
     Query params:
-        url: URL de imagen codificada en base64
+        url: URL de imagen codificada en base64 (urlsafe, sin padding)
     """
     import base64
     import requests
@@ -1379,8 +1379,13 @@ def image_proxy_view(request):
         return HttpResponse(status=400)
 
     try:
+        # Add padding if needed (base64 requires length multiple of 4)
+        padding = 4 - len(url_b64) % 4
+        if padding != 4:
+            url_b64 += '=' * padding
         url = base64.urlsafe_b64decode(url_b64.encode()).decode('utf-8')
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Image proxy base64 decode error: {e}, input: {url_b64[:50]}...")
         return HttpResponse(status=400)
 
     # Validate URL domain

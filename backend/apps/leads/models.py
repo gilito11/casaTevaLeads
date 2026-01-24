@@ -83,7 +83,6 @@ class Lead(models.Model):
     def fotos_proxied(self):
         """Return photo URLs through proxy to avoid hotlink protection."""
         import base64
-        from django.urls import reverse
 
         fotos = self.fotos_list
         if not fotos:
@@ -91,7 +90,8 @@ class Lead(models.Model):
 
         proxied = []
         for url in fotos:
-            url_b64 = base64.urlsafe_b64encode(url.encode()).decode()
+            # Use urlsafe base64 without padding for cleaner URLs
+            url_b64 = base64.urlsafe_b64encode(url.encode()).decode().rstrip('=')
             proxy_url = f"/leads/img/?url={url_b64}"
             proxied.append(proxy_url)
         return proxied
