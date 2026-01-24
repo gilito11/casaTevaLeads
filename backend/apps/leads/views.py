@@ -21,6 +21,35 @@ from core.models import TenantUser, Tenant
 logger = logging.getLogger(__name__)
 
 
+def debug_db_view(request):
+    """DEBUG: Verificar estado de la BD - ELIMINAR DESPUES"""
+    from django.db import connection
+    results = {}
+
+    try:
+        with connection.cursor() as cursor:
+            # Check raw listings
+            cursor.execute("SELECT COUNT(*) FROM raw.raw_listings")
+            results['raw_listings'] = cursor.fetchone()[0]
+
+            # Check dim_leads
+            cursor.execute('SELECT COUNT(*) FROM "public_marts"."dim_leads"')
+            results['dim_leads'] = cursor.fetchone()[0]
+
+            # Sample lead
+            cursor.execute('SELECT lead_id, tenant_id, titulo FROM "public_marts"."dim_leads" LIMIT 3')
+            results['sample_leads'] = [{'id': r[0], 'tenant': r[1], 'titulo': r[2]} for r in cursor.fetchall()]
+
+            # Check tenants
+            cursor.execute("SELECT tenant_id, nombre FROM core_tenant")
+            results['tenants'] = [{'id': r[0], 'nombre': r[1]} for r in cursor.fetchall()]
+
+    except Exception as e:
+        results['error'] = str(e)
+
+    return JsonResponse(results)
+
+
 def get_user_tenant(request):
     """Obtiene el tenant del usuario actual"""
     tenant_id = request.session.get('tenant_id')

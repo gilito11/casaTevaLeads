@@ -27,10 +27,10 @@ import psycopg2
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Apify actor for Idealista
-ACTOR_ID = "igolaizola/idealista-scraper"
+# Apify actor - Smart Idealista (free tier ~200/month)
+ACTOR_ID = "sian.agency/smart-idealista-scraper"
 
-# Zone to Idealista URL mapping
+# Zone to Idealista search URL mapping
 ZONE_URLS = {
     "salou": "https://www.idealista.com/venta-viviendas/salou-tarragona/",
     "cambrils": "https://www.idealista.com/venta-viviendas/cambrils-tarragona/",
@@ -49,10 +49,14 @@ def run_apify_actor(api_token: str, zone: str, max_items: int = 50) -> list:
 
     url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/runs?token={api_token}"
 
+    # Smart Idealista Scraper input format
     input_data = {
-        "startUrls": [{"url": ZONE_URLS[zone]}],
-        "maxItems": max_items,
-        "proxyConfiguration": {"useApifyProxy": True},
+        "urls": [ZONE_URLS[zone]],
+        "maxResults": max_items,
+        "proxy": {
+            "useApifyProxy": True,
+            "apifyProxyGroups": ["RESIDENTIAL"]
+        },
     }
 
     logger.info(f"Starting Apify actor for zone: {zone}")

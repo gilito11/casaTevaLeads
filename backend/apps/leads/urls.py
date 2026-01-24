@@ -4,6 +4,9 @@ from leads import views
 app_name = 'leads'
 
 urlpatterns = [
+    # DEBUG - ELIMINAR DESPUES
+    path('debug-db/', views.debug_db_view, name='debug_db'),
+
     # Leads
     path('', views.lead_list_view, name='list'),
     path('bulk-change-status/', views.bulk_change_status_view, name='bulk_change_status'),
