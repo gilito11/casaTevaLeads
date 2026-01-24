@@ -1,34 +1,34 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 20 Enero 2026
+> **Last Updated**: 24 Enero 2026
 
 ## Quick Reference
 
 ### Stack
 - **Backend**: Django 5.x + DRF
-- **BD**: PostgreSQL 16 (Azure Flexible Server)
+- **BD**: PostgreSQL 16 (Neon - serverless)
 - **Scrapers**: Botasaurus (habitaclia, fotocasa), ScrapingBee (milanuncios, idealista)
-- **Orquestacion**: Dagster
+- **Orquestacion**: GitHub Actions (L-X-V 12:00 UTC)
 - **ETL**: dbt (raw → staging → marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
 
 ### Entornos
-| Servicio | Local | Azure |
-|----------|-------|-------|
-| Web | localhost:8000 | inmoleads-crm.azurewebsites.net |
-| Dagster | localhost:3000 | dagster-scrapers.happysky-957a1351.spaincentral.azurecontainerapps.io |
-| PostgreSQL | localhost:5432 | inmoleads-db.postgres.database.azure.com |
+| Servicio | Local | Produccion |
+|----------|-------|------------|
+| Web | localhost:8000 | casatevaleads.fly.dev |
+| BD | localhost:5432 | Neon (ep-ancient-darkness-*.neon.tech) |
+| Scrapers | manual | GitHub Actions |
 
 ### Comandos Frecuentes
 ```bash
 # Local scraping
-python run_all_scrapers.py --portals habitaclia fotocasa --zones salou
+python run_habitaclia_scraper.py --zones salou --postgres
 
-# Azure logs
-az containerapp logs show -n dagster-scrapers -g inmoleads-crm --type console --tail 100
+# Trigger GitHub Actions scraping
+gh workflow run scrape-neon.yml -f portals="habitaclia,fotocasa" -f zones="salou"
 
-# dbt
-cd dbt_project && dbt run --select staging.* && dbt run --select dim_leads
+# dbt (local con Neon)
+cd dbt_project && dbt run --profiles-dir /tmp/dbt_profiles --select staging marts
 ```
 
 ### Portal Names (BD constraint)
@@ -39,7 +39,33 @@ cd dbt_project && dbt run --select staging.* && dbt run --select dim_leads
 
 ---
 
-## Features Implementadas (Enero 2026)
+## Arquitectura (Enero 2026)
+
+```
+GitHub Actions (scraping)     Fly.io (Django)
+         ↓                         ↓
+    ScrapingBee              casatevaleads.fly.dev
+         ↓                         ↓
+    ┌─────────────────────────────────┐
+    │   Neon PostgreSQL (serverless)  │
+    │   ep-ancient-darkness-*.neon.tech│
+    └─────────────────────────────────┘
+         ↓
+    dbt (staging → marts)
+```
+
+### Costes Mensuales
+| Servicio | Coste |
+|----------|-------|
+| Fly.io | GRATIS |
+| Neon PostgreSQL | GRATIS |
+| GitHub Actions | GRATIS |
+| ScrapingBee | ~€50/mes |
+| **Total** | **~€50/mes** |
+
+---
+
+## Features Implementadas
 
 ### Core
 - [x] Lead scoring (0-90 pts): días mercado, teléfono, fotos, precio
@@ -48,7 +74,7 @@ cd dbt_project && dbt run --select staging.* && dbt run --select dim_leads
 - [x] Alertas Telegram (resumen diario, bajadas, errores)
 - [x] Contacto automatizado (4 portales)
 
-### Nuevas (20 Enero 2026)
+### CRM
 - [x] **Widget Valorador** - `/api/widget/valorar/`, JS embebible
 - [x] **API REST v1** - `/api/v1/leads/`, autenticación X-API-Key
 - [x] **PWA** - Service Worker, Push Notifications, manifest.json
@@ -57,41 +83,9 @@ cd dbt_project && dbt run --select staging.* && dbt run --select dim_leads
 - [x] **Task Agenda** - `/leads/agenda/`, tareas por comercial
 
 ### Pendiente
-- [ ] WhatsApp Business API (Issue #32) - requiere cuenta Meta verificada
-
----
-
-## API Endpoints
-
-### REST API v1 (`/api/v1/`)
-```
-GET  /api/v1/leads/              # Listar leads (paginado)
-GET  /api/v1/leads/{id}/         # Detalle lead
-GET  /api/v1/zones/              # Zonas activas
-POST /api/v1/webhooks/           # Crear webhook
-GET  /api/v1/docs/               # Swagger UI
-```
-**Auth**: Header `X-API-Key: <key>` (crear en admin)
-
-### Widget
-```
-GET  /widget/valorador.js        # JS para embed
-POST /api/widget/valorar/        # Calcular valoración
-POST /api/widget/lead/           # Crear lead desde widget
-```
-
-### ACM
-```
-POST /acm/api/generate/{lead_id}/  # Generar informe ACM
-GET  /acm/api/report/{lead_id}/    # Obtener último ACM
-```
-
-### Analytics
-```
-GET /analytics/api/kpis/
-GET /analytics/api/leads-por-dia/
-GET /analytics/api/export/
-```
+- [ ] UI para contacto desde app (cola → GitHub Actions)
+- [ ] WhatsApp Business API (Issue #32)
+- [ ] Integrar Ollama image scoring en producción
 
 ---
 
@@ -104,13 +98,10 @@ GET /analytics/api/export/
 | milanuncios | ScrapingBee | 75 cr/req | GeeTest |
 | idealista | ScrapingBee | 75 cr/req | DataDome |
 
-### Schedule Actual (TEMPORAL)
-- **Cron**: `0 12 * * 1,3,5` (12:00, solo L-X-V)
-- **Normal**: `0 12,18 * * *` (12:00 y 18:00 diario)
-
-### Zonas sin Idealista
-Idealista desactivado para zonas pequeñas (95%+ agencias):
-`amposta, deltebre, ametlla_mar, hospitalet_infant, montroig_camp, sant_carles_rapita`
+### Schedule
+- **Workflow**: `.github/workflows/scrape-neon.yml`
+- **Cron**: `0 12 * * 1,3,5` (12:00 UTC, L-X-V)
+- **Manual**: `gh workflow run scrape-neon.yml`
 
 ---
 
@@ -118,13 +109,32 @@ Idealista desactivado para zonas pequeñas (95%+ agencias):
 
 | Portal | Estado | Método |
 |--------|--------|--------|
-| Fotocasa | ✅ OK | Auto-login + formulario |
-| Habitaclia | ✅ OK | 2Captcha reCAPTCHA |
-| Milanuncios | ✅ OK | Camoufox + chat interno |
-| Idealista | ⚠️ Parcial | DataDome bloquea login |
+| Fotocasa | OK | Auto-login + formulario |
+| Habitaclia | OK | 2Captcha reCAPTCHA |
+| Milanuncios | OK | Camoufox + chat interno |
+| Idealista | Parcial | DataDome bloquea login |
 
 **Modelos**: `ContactQueue`, `PortalSession`, `PortalCredential`
 **Límite**: 5 contactos/día, delay 2-5min entre contactos
+**Código**: `scrapers/contact_automation/`
+
+---
+
+## Ollama (PoC)
+
+Análisis de imágenes de inmuebles con Llama 3.2 Vision.
+
+**Archivo**: `ai_agents/vision_analyzer.py`
+
+**Uso**:
+```bash
+ollama pull llama3.2-vision
+ollama serve
+python ai_agents/vision_analyzer.py --test
+```
+
+**Output**: Score 0-30 pts para sumar a lead_score
+**Estado**: PoC local, no integrado en producción
 
 ---
 
@@ -149,35 +159,35 @@ public_marts.dim_lead_duplicates
 
 ---
 
-## Variables de Entorno (Azure)
+## GitHub Secrets
 
 **Scraping**:
+- `NEON_DATABASE_URL` - Connection string Neon
+- `NEON_DB_PASSWORD` - Password para dbt
 - `SCRAPINGBEE_API_KEY`
 
-**Contacto**:
+**Contacto** (futuro):
 - `FOTOCASA_EMAIL/PASSWORD`
-- `MILANUNCIOS_EMAIL/PASSWORD`
-- `IDEALISTA_EMAIL/PASSWORD`
 - `CAPTCHA_API_KEY` (2Captcha)
 - `CONTACT_NAME/EMAIL/PHONE`
 
 **Alertas**:
 - `TELEGRAM_BOT_TOKEN/CHAT_ID`
-- `ALERT_WEBHOOK_URL` (Discord)
-
-**PWA**:
-- `VAPID_PUBLIC_KEY/PRIVATE_KEY`
-- `VAPID_CLAIMS_EMAIL`
 
 ---
 
-## Costes Mensuales
+## CI/CD
 
-| Servicio | Coste |
-|----------|-------|
-| Azure (DB + Web + Container) | ~$50 |
-| ScrapingBee | 50€ |
-| **Total** | **~100€/mes** |
+### Scraping
+Push a master → GitHub Actions build
+Manual: `gh workflow run scrape-neon.yml`
+
+### Web (Fly.io)
+```bash
+fly deploy
+fly logs
+fly ssh console
+```
 
 ---
 
@@ -186,7 +196,6 @@ public_marts.dim_lead_duplicates
 Si un bug no se resuelve al primer intento → crear endpoint de debug temporal:
 
 ```python
-# views.py
 def debug_view(request):
     results = {}
     try:
@@ -198,19 +207,3 @@ def debug_view(request):
 ```
 
 Desplegar → analizar output → arreglar → eliminar endpoint.
-
----
-
-## Onboarding Inmobiliaria
-
-1. Crear Tenant en `/admin/core/tenant/`
-2. Crear User + TenantUser (rol: admin)
-3. Configurar zonas en `/admin/core/zonageografica/`
-4. (Opcional) Credenciales portales en `/admin/leads/portalcredential/`
-5. Verificar login y scraping
-
----
-
-## CI/CD
-
-Push a master → GitHub Actions → ACR → Azure (Web App + Container Apps)
