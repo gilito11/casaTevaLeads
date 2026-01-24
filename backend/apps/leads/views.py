@@ -48,6 +48,20 @@ def debug_db_view(request):
             cursor.execute('SELECT COUNT(*) FROM "public_marts"."dim_leads"')
             results['dim_leads'] = cursor.fetchone()[0]
 
+            # Sample lead with photos
+            cursor.execute('''
+                SELECT lead_id, source_portal, titulo, fotos_json::text
+                FROM "public_marts"."dim_leads"
+                WHERE source_portal = 'habitaclia'
+                LIMIT 1
+            ''')
+            row = cursor.fetchone()
+            if row:
+                results['sample_lead'] = {
+                    'id': row[0], 'portal': row[1], 'titulo': row[2],
+                    'fotos': row[3][:200] if row[3] else None
+                }
+
     except Exception as e:
         results['error'] = str(e)
 
