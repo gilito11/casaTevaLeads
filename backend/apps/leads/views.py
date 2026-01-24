@@ -33,7 +33,7 @@ def debug_db_view(request):
             results['raw_listings'] = cursor.fetchone()[0]
 
             # Sample raw listing
-            cursor.execute("SELECT portal, tenant_id, data->>'listing_id' as listing_id FROM raw.raw_listings LIMIT 2")
+            cursor.execute("SELECT portal, tenant_id, raw_data->>'anuncio_id' as listing_id FROM raw.raw_listings LIMIT 2")
             results['raw_sample'] = [{'portal': r[0], 'tenant': r[1], 'listing_id': r[2]} for r in cursor.fetchall()]
 
             # Check staging views
