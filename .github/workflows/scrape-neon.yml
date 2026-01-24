@@ -78,8 +78,8 @@ jobs:
       - name: Run dbt transformations
         run: |
           cd dbt_project
-          mkdir -p ~/.dbt
-          cat > ~/.dbt/profiles.yml << EOF
+          mkdir -p /tmp/dbt_profiles
+          cat > /tmp/dbt_profiles/profiles.yml << EOF
           casa_teva:
             target: prod
             outputs:
@@ -88,15 +88,15 @@ jobs:
                 host: ep-ancient-darkness-agqilf7l-pooler.c-2.eu-central-1.aws.neon.tech
                 port: 5432
                 user: neondb_owner
-                password: "${DBT_PASSWORD}"
+                password: "$DBT_PASSWORD"
                 dbname: neondb
                 schema: public
                 threads: 4
                 sslmode: require
           EOF
-          dbt deps || true
-          dbt run --select staging || true
-          dbt run --select marts || true
+          dbt deps --profiles-dir /tmp/dbt_profiles
+          dbt run --select staging --profiles-dir /tmp/dbt_profiles
+          dbt run --select marts --profiles-dir /tmp/dbt_profiles
         env:
           DBT_PASSWORD: ${{ secrets.NEON_DB_PASSWORD }}
 
