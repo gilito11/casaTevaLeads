@@ -1391,11 +1391,12 @@ def image_proxy_view(request):
     # Validate URL domain
     parsed = urlparse(url)
     allowed_domains = [
-        'images.habimg.com',
-        'static.fotocasa.es',
-        'img3.idealista.com',
-        'img4.idealista.com',
-        'cdn.milanuncios.com',
+        'images.habimg.com',        # habitaclia
+        'static.fotocasa.es',       # fotocasa
+        'img3.idealista.com',       # idealista
+        'img4.idealista.com',       # idealista
+        'images.milanuncios.com',   # milanuncios (new API format)
+        'images-re.milanuncios.com',  # milanuncios (legacy)
     ]
     if parsed.netloc not in allowed_domains:
         return HttpResponse(status=403)
@@ -1406,7 +1407,8 @@ def image_proxy_view(request):
         'static.fotocasa.es': 'https://www.fotocasa.es/',
         'img3.idealista.com': 'https://www.idealista.com/',
         'img4.idealista.com': 'https://www.idealista.com/',
-        'cdn.milanuncios.com': 'https://www.milanuncios.com/',
+        'images.milanuncios.com': 'https://www.milanuncios.com/',
+        'images-re.milanuncios.com': 'https://www.milanuncios.com/',
     }
     referer = referers.get(parsed.netloc, '')
 
