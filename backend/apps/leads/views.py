@@ -32,17 +32,21 @@ def debug_db_view(request):
             cursor.execute("SELECT COUNT(*) FROM raw.raw_listings")
             results['raw_listings'] = cursor.fetchone()[0]
 
+            # Sample raw listing
+            cursor.execute("SELECT portal, tenant_id, data->>'listing_id' as listing_id FROM raw.raw_listings LIMIT 2")
+            results['raw_sample'] = [{'portal': r[0], 'tenant': r[1], 'listing_id': r[2]} for r in cursor.fetchall()]
+
+            # Check staging views
+            for stg in ['stg_habitaclia', 'stg_fotocasa', 'stg_idealista', 'stg_milanuncios']:
+                try:
+                    cursor.execute(f'SELECT COUNT(*) FROM "public_staging"."{stg}"')
+                    results[stg] = cursor.fetchone()[0]
+                except Exception as e:
+                    results[stg] = f"ERROR: {str(e)[:100]}"
+
             # Check dim_leads
             cursor.execute('SELECT COUNT(*) FROM "public_marts"."dim_leads"')
             results['dim_leads'] = cursor.fetchone()[0]
-
-            # Sample lead
-            cursor.execute('SELECT lead_id, tenant_id, titulo FROM "public_marts"."dim_leads" LIMIT 3')
-            results['sample_leads'] = [{'id': r[0], 'tenant': r[1], 'titulo': r[2]} for r in cursor.fetchall()]
-
-            # Check tenants
-            cursor.execute("SELECT tenant_id, nombre FROM core_tenant")
-            results['tenants'] = [{'id': r[0], 'nombre': r[1]} for r in cursor.fetchall()]
 
     except Exception as e:
         results['error'] = str(e)
