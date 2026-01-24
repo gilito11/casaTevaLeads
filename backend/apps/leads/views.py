@@ -953,9 +953,10 @@ def enqueue_contact_view(request, lead_id):
 
     # Verificar que el portal soporta contacto automatico
     portal = lead.portal
-    if portal not in ['fotocasa', 'habitaclia']:
+    supported_portals = ['fotocasa', 'habitaclia', 'milanuncios']
+    if portal not in supported_portals:
         return JsonResponse({
-            'error': f'Contacto automatico no soportado para {portal}'
+            'error': f'Contacto automatico no soportado para {portal}. Soportados: {", ".join(supported_portals)}'
         }, status=400)
 
     # Verificar que tiene URL
