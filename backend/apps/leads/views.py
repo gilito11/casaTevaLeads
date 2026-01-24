@@ -231,8 +231,9 @@ def lead_detail_view(request, lead_id):
     if tenant_id and lead.tenant_id != tenant_id:
         return redirect('leads:list')
 
-    # Obtener notas del lead
-    notas = lead.notas.select_related('autor').all()
+    # Notas: skip para leads de dbt (tienen lead_id como MD5 hash)
+    # La tabla leads_nota tiene lead_id como integer, incompatible con lead_id string
+    notas = []
 
     # Obtener estado de LeadEstado (tabla gestionada por Django)
     lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()
