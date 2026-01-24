@@ -4,6 +4,9 @@ from leads import views
 app_name = 'leads'
 
 urlpatterns = [
+    # Image proxy (public, no auth)
+    path('img/', views.image_proxy_view, name='image_proxy'),
+
     # Leads
     path('', views.lead_list_view, name='list'),
     path('bulk-change-status/', views.bulk_change_status_view, name='bulk_change_status'),

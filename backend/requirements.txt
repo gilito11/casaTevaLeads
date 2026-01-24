@@ -18,3 +18,6 @@ pywebpush>=1.14.0
 
 # PDF Generation
 reportlab>=4.0.0
+
+# HTTP Client (image proxy)
+requests>=2.31.0

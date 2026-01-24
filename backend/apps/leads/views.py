@@ -1360,3 +1360,68 @@ def valuation_pdf_view(request, lead_id):
     except Exception as e:
         logger.error(f"Error generating PDF for lead {lead_id}: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def image_proxy_view(request):
+    """
+    Proxy para servir imágenes de portales inmobiliarios.
+    Evita bloqueo por hotlink protection (habitaclia, fotocasa, etc.)
+
+    Query params:
+        url: URL de imagen codificada en base64
+    """
+    import base64
+    import requests
+    from urllib.parse import urlparse
+
+    url_b64 = request.GET.get('url', '')
+    if not url_b64:
+        return HttpResponse(status=400)
+
+    try:
+        url = base64.urlsafe_b64decode(url_b64.encode()).decode('utf-8')
+    except Exception:
+        return HttpResponse(status=400)
+
+    # Validate URL domain
+    parsed = urlparse(url)
+    allowed_domains = [
+        'images.habimg.com',
+        'static.fotocasa.es',
+        'img3.idealista.com',
+        'img4.idealista.com',
+        'cdn.milanuncios.com',
+    ]
+    if parsed.netloc not in allowed_domains:
+        return HttpResponse(status=403)
+
+    # Determine referer based on domain
+    referers = {
+        'images.habimg.com': 'https://www.habitaclia.com/',
+        'static.fotocasa.es': 'https://www.fotocasa.es/',
+        'img3.idealista.com': 'https://www.idealista.com/',
+        'img4.idealista.com': 'https://www.idealista.com/',
+        'cdn.milanuncios.com': 'https://www.milanuncios.com/',
+    }
+    referer = referers.get(parsed.netloc, '')
+
+    try:
+        resp = requests.get(
+            url,
+            headers={
+                'Referer': referer,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+            timeout=10,
+            stream=True,
+        )
+        if resp.status_code != 200:
+            return HttpResponse(status=resp.status_code)
+
+        content_type = resp.headers.get('Content-Type', 'image/jpeg')
+        response = HttpResponse(resp.content, content_type=content_type)
+        response['Cache-Control'] = 'public, max-age=86400'  # Cache 1 day
+        return response
+    except requests.RequestException as e:
+        logger.warning(f"Image proxy error for {url}: {e}")
+        return HttpResponse(status=502)
