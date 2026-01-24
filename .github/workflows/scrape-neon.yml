@@ -96,8 +96,7 @@ jobs:
           EOF
           dbt deps --profiles-dir /tmp/dbt_profiles || true
           dbt run --select staging --profiles-dir /tmp/dbt_profiles
-          # Use full-refresh if dim_leads is empty
-          dbt run --select marts --profiles-dir /tmp/dbt_profiles --full-refresh
+          dbt run --select marts --profiles-dir /tmp/dbt_profiles
         env:
           DBT_PASSWORD: ${{ secrets.NEON_DB_PASSWORD }}
 

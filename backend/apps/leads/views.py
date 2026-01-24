@@ -21,53 +21,6 @@ from core.models import TenantUser, Tenant
 logger = logging.getLogger(__name__)
 
 
-def debug_db_view(request):
-    """DEBUG: Verificar estado de la BD - ELIMINAR DESPUES"""
-    from django.db import connection
-    results = {}
-
-    try:
-        with connection.cursor() as cursor:
-            # Check raw listings
-            cursor.execute("SELECT COUNT(*) FROM raw.raw_listings")
-            results['raw_listings'] = cursor.fetchone()[0]
-
-            # Sample raw listing
-            cursor.execute("SELECT portal, tenant_id, raw_data->>'anuncio_id' as listing_id FROM raw.raw_listings LIMIT 2")
-            results['raw_sample'] = [{'portal': r[0], 'tenant': r[1], 'listing_id': r[2]} for r in cursor.fetchall()]
-
-            # Check staging views
-            for stg in ['stg_habitaclia', 'stg_fotocasa', 'stg_idealista', 'stg_milanuncios']:
-                try:
-                    cursor.execute(f'SELECT COUNT(*) FROM "public_staging"."{stg}"')
-                    results[stg] = cursor.fetchone()[0]
-                except Exception as e:
-                    results[stg] = f"ERROR: {str(e)[:100]}"
-
-            # Check dim_leads
-            cursor.execute('SELECT COUNT(*) FROM "public_marts"."dim_leads"')
-            results['dim_leads'] = cursor.fetchone()[0]
-
-            # Sample lead with photos
-            cursor.execute('''
-                SELECT lead_id, source_portal, titulo, fotos_json::text
-                FROM "public_marts"."dim_leads"
-                WHERE source_portal = 'habitaclia'
-                LIMIT 1
-            ''')
-            row = cursor.fetchone()
-            if row:
-                results['sample_lead'] = {
-                    'id': row[0], 'portal': row[1], 'titulo': row[2],
-                    'fotos': row[3][:200] if row[3] else None
-                }
-
-    except Exception as e:
-        results['error'] = str(e)
-
-    return JsonResponse(results)
-
-
 def get_user_tenant(request):
     """Obtiene el tenant del usuario actual"""
     tenant_id = request.session.get('tenant_id')
