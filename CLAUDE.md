@@ -162,17 +162,17 @@ public_marts.dim_lead_duplicates
 ## GitHub Secrets
 
 **Scraping**:
-- `NEON_DATABASE_URL` - Connection string Neon
-- `NEON_DB_PASSWORD` - Password para dbt
-- `SCRAPINGBEE_API_KEY`
+- `NEON_DATABASE_URL` - Connection string Neon ✅
+- `NEON_DB_PASSWORD` - Password para dbt ✅
+- `SCRAPINGBEE_API_KEY` ✅
 
-**Contacto** (futuro):
-- `FOTOCASA_EMAIL/PASSWORD`
-- `CAPTCHA_API_KEY` (2Captcha)
-- `CONTACT_NAME/EMAIL/PHONE`
+**Contacto**:
+- `FOTOCASA_EMAIL/PASSWORD` ✅
+- `CAPTCHA_API_KEY` (2Captcha) ✅
+- `CONTACT_NAME/EMAIL/PHONE` ✅
 
 **Alertas**:
-- `TELEGRAM_BOT_TOKEN/CHAT_ID`
+- `TELEGRAM_BOT_TOKEN/CHAT_ID` ✅ (bot: @casateva_alerts_bot)
 
 ---
 

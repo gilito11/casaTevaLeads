@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169e1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/dbt-Core-ff694b?style=flat-square&logo=dbt&logoColor=white" alt="dbt" />
   <img src="https://img.shields.io/badge/Dagster-latest-5c4ee5?style=flat-square&logo=dagster&logoColor=white" alt="Dagster" />
-  <img src="https://img.shields.io/badge/Azure-Deployed-0078d4?style=flat-square&logo=microsoft-azure&logoColor=white" alt="Azure" />
+  <img src="https://img.shields.io/badge/Fly.io-Deployed-8b5cf6?style=flat-square&logo=fly.io&logoColor=white" alt="Fly.io" />
   <img src="https://img.shields.io/badge/License-Private-red?style=flat-square" alt="License" />
 </p>
 
@@ -50,43 +50,45 @@
 ## 🏗️ Arquitectura
 
 ```
-                              ┌─────────────────────────────────────────┐
-                              │           🌐 PORTALES WEB               │
-                              └─────────────────────────────────────────┘
-                                    │            │            │
-          ┌─────────────────────────┼────────────┼────────────┼─────────────────────────┐
-          │                         │            │            │                         │
-          ▼                         ▼            ▼            ▼                         │
-   ┌──────────────┐          ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-   │ 🏠 Habitaclia│          │ 📸 Fotocasa  │  │ 📋 Milanuncios│  │ 🏢 Idealista │      │
-   │  Botasaurus  │          │  Botasaurus  │  │  ScrapingBee │  │  ScrapingBee │      │
-   │    GRATIS    │          │    GRATIS    │  │   75 cred    │  │   75 cred    │      │
-   └──────┬───────┘          └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-          │                         │                 │                 │              │
-          └─────────────────────────┴────────┬────────┴─────────────────┘              │
-                                             │                                          │
-                                             ▼                                          │
-                              ┌──────────────────────────────┐                         │
-                              │     ⚙️ DAGSTER ORCHESTRATOR   │                         │
-                              │   Schedule: 12:00 / 18:00    │                         │
-                              └──────────────┬───────────────┘                         │
-                                             │                                          │
-                                             ▼                                          │
-                              ┌──────────────────────────────┐                         │
-                              │    🗄️ POSTGRESQL DATABASE     │                         │
-                              │                              │                         │
-                              │  raw_listings ──► dbt ──►   │                         │
-                              │    (JSONB)    staging  marts │                         │
-                              └──────────────┬───────────────┘                         │
-                                             │                                          │
-                                             ▼                                          │
-                              ┌──────────────────────────────┐                         │
-                              │      🖥️ DJANGO CRM + WEB      │                         │
-                              │   HTMX + TailwindCSS + DRF   │                         │
-                              └──────────────────────────────┘                         │
-                                                                                        │
-└───────────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           🌐 PORTALES WEB                                    │
+│     Habitaclia    Fotocasa     Milanuncios    Idealista                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      ⚙️ GITHUB ACTIONS (Scrapers)                            │
+│                      Schedule: L-X-V 12:00 UTC                              │
+│                                                                             │
+│   Botasaurus (habitaclia, fotocasa)    ScrapingBee (milanuncios, idealista)│
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    🗄️ NEON PostgreSQL (Serverless)                           │
+│                    ep-ancient-darkness-*.neon.tech                          │
+│                                                                             │
+│   raw.raw_listings ──► public_staging.stg_* ──► public_marts.dim_leads     │
+│       (JSONB)              (dbt views)             (dbt incremental)        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        🖥️ FLY.IO (Django CRM)                                │
+│                        casatevaleads.fly.dev                                │
+│                                                                             │
+│                    HTMX + TailwindCSS + DRF + PWA                           │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Costes Mensuales
+| Servicio | Coste |
+|----------|-------|
+| Fly.io | GRATIS |
+| Neon PostgreSQL | GRATIS |
+| GitHub Actions | GRATIS |
+| ScrapingBee | ~€50/mes |
+| **Total** | **~€50/mes** |
 
 ---
 
@@ -214,21 +216,21 @@ dbt test
 
 ---
 
-## ☁️ Despliegue en Azure
+## ☁️ Despliegue en Producción
 
-El sistema está desplegado en Azure con la siguiente arquitectura:
+El sistema está desplegado con la siguiente arquitectura serverless:
 
-| Servicio | Plataforma Azure |
-|----------|-----------------|
-| Django CRM | Azure App Service |
-| Dagster + Scrapers | Azure Container Apps |
-| Base de datos | Azure PostgreSQL Flexible Server |
-| Registry | Azure Container Registry |
+| Servicio | Plataforma |
+|----------|------------|
+| Django CRM | Fly.io (Docker) |
+| Scrapers | GitHub Actions |
+| Base de datos | Neon PostgreSQL (Serverless) |
+| Alertas | Telegram Bot |
 
 ### URLs de Producción
 
-- 🖥️ **CRM**: https://inmoleads-crm.azurewebsites.net
-- ⚙️ **Dagster**: https://dagster-scrapers.happysky-957a1351.spaincentral.azurecontainerapps.io
+- 🖥️ **CRM**: https://casatevaleads.fly.dev
+- 📱 **Alertas**: @casateva_alerts_bot (Telegram)
 
 ---
 
@@ -259,7 +261,8 @@ El sistema está desplegado en Azure con la siguiente arquitectura:
     </td>
     <td>
       <img src="https://img.shields.io/badge/Docker-2496ed?style=flat-square&logo=docker&logoColor=white" /><br>
-      <img src="https://img.shields.io/badge/Azure-0078d4?style=flat-square&logo=microsoft-azure&logoColor=white" /><br>
+      <img src="https://img.shields.io/badge/Fly.io-8b5cf6?style=flat-square&logo=fly.io&logoColor=white" /><br>
+      <img src="https://img.shields.io/badge/Neon-00e599?style=flat-square&logo=neon&logoColor=white" /><br>
       <img src="https://img.shields.io/badge/GitHub_Actions-2088ff?style=flat-square&logo=github-actions&logoColor=white" />
     </td>
   </tr>
@@ -280,17 +283,26 @@ GET /analytics/api/export/                # Exportar a CSV
 
 ---
 
-## 🔄 CI/CD
+## 🔄 CI/CD & Workflows
 
+### Scraping Automático
 ```
-Push a master → GitHub Actions → Build → Azure Container Registry → Deploy Azure
+L-X-V 12:00 UTC → GitHub Actions → Botasaurus/ScrapingBee → Neon DB → dbt
 ```
 
-El pipeline incluye:
-- ✅ Build de imagen Docker
-- ✅ Push a Azure Container Registry
-- ✅ Deploy a Azure Container Apps (Dagster)
-- ✅ Deploy a Azure App Service (Django)
+### Contacto Automático
+```
+L-V 18:00 Madrid → GitHub Actions → Playwright → Portales → Telegram Alert
+```
+
+### Despliegue Web
+```
+fly deploy → Docker build → Fly.io
+```
+
+Workflows disponibles:
+- `scrape-neon.yml` - Scraping de portales (cron: L-X-V 12:00)
+- `contact-queue.yml` - Contacto automático (cron: L-V 18:00)
 
 ---
 
