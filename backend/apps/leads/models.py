@@ -64,6 +64,21 @@ class Lead(models.Model):
     def __str__(self):
         return f"{self.telefono_norm} - {self.direccion} ({self.estado})"
 
+    @property
+    def fotos_list(self):
+        """Return photos as list, handling JSON string if needed."""
+        import json
+        if not self.fotos:
+            return []
+        if isinstance(self.fotos, str):
+            try:
+                return json.loads(self.fotos)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        if isinstance(self.fotos, list):
+            return self.fotos
+        return []
+
 
 class LeadEstado(models.Model):
     """
