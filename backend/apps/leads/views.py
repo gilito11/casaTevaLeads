@@ -1415,6 +1415,7 @@ def image_proxy_view(request):
     referer = referers.get(parsed.netloc, '')
 
     try:
+        logger.info(f"Image proxy: fetching {url}")
         resp = requests.get(
             url,
             headers={
@@ -1424,6 +1425,7 @@ def image_proxy_view(request):
             timeout=10,
             stream=True,
         )
+        logger.info(f"Image proxy: got response {resp.status_code}")
         if resp.status_code != 200:
             return HttpResponse(status=resp.status_code)
 
@@ -1432,5 +1434,8 @@ def image_proxy_view(request):
         response['Cache-Control'] = 'public, max-age=86400'  # Cache 1 day
         return response
     except requests.RequestException as e:
-        logger.warning(f"Image proxy error for {url}: {e}")
+        logger.warning(f"Image proxy request error for {url}: {e}")
         return HttpResponse(status=502)
+    except Exception as e:
+        logger.error(f"Image proxy unexpected error for {url}: {e}")
+        return HttpResponse(status=500)
