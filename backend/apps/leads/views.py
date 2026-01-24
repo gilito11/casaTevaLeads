@@ -1375,7 +1375,10 @@ def image_proxy_view(request):
     from urllib.parse import urlparse
 
     url_b64 = request.GET.get('url', '')
+    logger.info(f"Image proxy: received url_b64 len={len(url_b64)}")
+
     if not url_b64:
+        logger.warning("Image proxy: no url param")
         return HttpResponse(status=400)
 
     try:
@@ -1384,6 +1387,7 @@ def image_proxy_view(request):
         if padding != 4:
             url_b64 += '=' * padding
         url = base64.urlsafe_b64decode(url_b64.encode()).decode('utf-8')
+        logger.info(f"Image proxy: decoded url={url[:50]}...")
     except Exception as e:
         logger.warning(f"Image proxy base64 decode error: {e}, input: {url_b64[:50]}...")
         return HttpResponse(status=400)
