@@ -26,14 +26,11 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install Playwright
+      - name: Install dependencies
         run: |
           pip install playwright psycopg2-binary requests
           playwright install chromium
           playwright install-deps chromium
-
-      - name: Install project dependencies
-        run: pip install -e .
 
       - name: Process contact queue
         run: python scripts/process_contact_queue.py
