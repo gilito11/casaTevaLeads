@@ -28,6 +28,7 @@ from core.views import (
     run_botasaurus_view, scraping_jobs_partial_view, scraping_job_detail_view,
     clear_scraping_jobs_view, update_zona_radio_view, toggle_zona_portal_view
 )
+from notifications.views import alert_settings_view
 
 
 def health_check(request):
@@ -79,6 +80,7 @@ urlpatterns = [
     # Frontend
     path('', dashboard_view, name='dashboard'),
     path('profile/', profile_view, name='profile'),
+    path('settings/alerts/', alert_settings_view, name='alert_settings'),
     path('leads/', include('leads.urls', namespace='leads')),
     path('analytics/', include('analytics.urls', namespace='analytics')),
 

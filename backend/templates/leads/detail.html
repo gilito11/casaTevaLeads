@@ -230,6 +230,165 @@
                 </div>
             </div>
 
+            <!-- Price History Chart Section -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700"
+                 x-data="{
+                     loading: true,
+                     hasHistory: false,
+                     currentPrice: null,
+                     changePct: null,
+                     numChanges: 0,
+                     message: '',
+                     chart: null,
+                     async loadPriceHistory() {
+                         try {
+                             const res = await fetch('{% url 'leads:price_history' lead.lead_id %}');
+                             const data = await res.json();
+                             this.loading = false;
+                             this.hasHistory = data.has_history;
+                             this.currentPrice = data.current_price;
+                             this.changePct = data.change_pct;
+                             this.numChanges = data.num_changes || 0;
+                             this.message = data.message || '';
+
+                             if (data.has_history && data.labels && data.prices) {
+                                 this.renderChart(data.labels, data.prices);
+                             }
+                         } catch (e) {
+                             this.loading = false;
+                             this.message = 'Error cargando historial';
+                         }
+                     },
+                     renderChart(labels, prices) {
+                         const ctx = document.getElementById('priceHistoryChart');
+                         if (!ctx) return;
+
+                         const isDark = document.documentElement.classList.contains('dark');
+                         const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+                         const textColor = isDark ? '#9ca3af' : '#6b7280';
+
+                         this.chart = new Chart(ctx, {
+                             type: 'line',
+                             data: {
+                                 labels: labels,
+                                 datasets: [{
+                                     label: 'Precio',
+                                     data: prices,
+                                     borderColor: '#2563eb',
+                                     backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                     borderWidth: 2,
+                                     fill: true,
+                                     tension: 0.3,
+                                     pointRadius: 4,
+                                     pointBackgroundColor: '#2563eb',
+                                     pointBorderColor: '#fff',
+                                     pointBorderWidth: 2,
+                                     pointHoverRadius: 6
+                                 }]
+                             },
+                             options: {
+                                 responsive: true,
+                                 maintainAspectRatio: false,
+                                 plugins: {
+                                     legend: { display: false },
+                                     tooltip: {
+                                         callbacks: {
+                                             label: function(context) {
+                                                 return context.parsed.y.toLocaleString('es-ES') + ' EUR';
+                                             }
+                                         }
+                                     }
+                                 },
+                                 scales: {
+                                     x: {
+                                         grid: { color: gridColor },
+                                         ticks: { color: textColor }
+                                     },
+                                     y: {
+                                         grid: { color: gridColor },
+                                         ticks: {
+                                             color: textColor,
+                                             callback: function(value) {
+                                                 return value.toLocaleString('es-ES') + ' EUR';
+                                             }
+                                         }
+                                     }
+                                 }
+                             }
+                         });
+                     }
+                 }"
+                 x-init="loadPriceHistory()">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                        </svg>
+                        Historial de Precios
+                    </h2>
+                </div>
+
+                <div class="p-6">
+                    <!-- Loading state -->
+                    <template x-if="loading">
+                        <div class="flex items-center justify-center py-8">
+                            <svg class="w-8 h-8 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                    </template>
+
+                    <!-- Has price history -->
+                    <template x-if="!loading && hasHistory">
+                        <div>
+                            <!-- Summary stats -->
+                            <div class="flex flex-wrap gap-4 mb-4">
+                                <div class="flex items-center text-sm">
+                                    <span class="text-gray-500 dark:text-gray-400 mr-2">Precio actual:</span>
+                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="currentPrice ? currentPrice.toLocaleString('es-ES') + ' EUR' : '-'"></span>
+                                </div>
+                                <template x-if="changePct !== null">
+                                    <div class="flex items-center text-sm">
+                                        <span class="text-gray-500 dark:text-gray-400 mr-2">Variacion:</span>
+                                        <span class="font-semibold"
+                                              :class="changePct < 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                                              x-text="(changePct > 0 ? '+' : '') + changePct + '%'"></span>
+                                    </div>
+                                </template>
+                                <div class="flex items-center text-sm">
+                                    <span class="text-gray-500 dark:text-gray-400 mr-2">Registros:</span>
+                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="numChanges"></span>
+                                </div>
+                            </div>
+                            <!-- Chart container -->
+                            <div class="h-64">
+                                <canvas id="priceHistoryChart"></canvas>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- No price history -->
+                    <template x-if="!loading && !hasHistory">
+                        <div class="text-center py-8">
+                            <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                            </svg>
+                            <template x-if="currentPrice">
+                                <div>
+                                    <p class="text-2xl font-bold text-primary-600 dark:text-primary-400 mb-1" x-text="currentPrice.toLocaleString('es-ES') + ' EUR'"></p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Precio actual</p>
+                                </div>
+                            </template>
+                            <template x-if="!currentPrice">
+                                <p class="text-gray-500 dark:text-gray-400" x-text="message || 'Sin datos de precio'"></p>
+                            </template>
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">El historial se actualiza con cada scraping</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
             <!-- Tasks Section -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -551,6 +710,72 @@
                     {% endif %}
                 </dl>
             </div>
+
+            <!-- Duplicados Cross-Portal -->
+            {% if duplicate_leads %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        Duplicados
+                    </h2>
+                    <span class="text-xs px-2 py-1 rounded-full
+                        {% if duplicate_info.match_type == 'phone' %}bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300
+                        {% else %}bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300{% endif %}">
+                        {% if duplicate_info.match_type == 'phone' %}Por telefono{% else %}Por ubicacion{% endif %}
+                    </span>
+                </div>
+
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Este inmueble aparece en {{ duplicate_info.num_portales }} portales ({{ duplicate_info.portales }})
+                </p>
+
+                <div class="space-y-3">
+                    {% for dup in duplicate_leads %}
+                    <a href="{% url 'leads:detail' dup.lead_id %}"
+                       class="block p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <!-- Portal badge -->
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold uppercase
+                                    {% if dup.portal == 'habitaclia' %}bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300
+                                    {% elif dup.portal == 'fotocasa' %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300
+                                    {% elif dup.portal == 'idealista' %}bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300
+                                    {% elif dup.portal == 'milanuncios' %}bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300
+                                    {% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+                                    {{ dup.portal|slice:":2"|upper }}
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        {{ dup.titulo|default:"Sin titulo"|truncatechars:40 }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ dup.portal|title }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="text-right flex-shrink-0 ml-2">
+                                <p class="text-sm font-semibold text-primary-600 dark:text-primary-400">
+                                    {% if dup.precio %}{{ dup.precio|floatformat:0 }}&euro;{% else %}-{% endif %}
+                                </p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    {% if dup.metros %}{{ dup.metros|floatformat:0 }} m2{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+
+                {% if duplicate_leads|length > 0 %}
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-3 text-center">
+                    Click en un duplicado para ver su ficha completa
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
 
             <!-- ACM - Analisis Comparativo de Mercado -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6"

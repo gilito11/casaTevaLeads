@@ -1,0 +1,173 @@
+<form method="POST"
+      hx-post="{% url 'alert_settings' %}"
+      hx-target="#settings-form-container"
+      hx-swap="innerHTML"
+      class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+    {% csrf_token %}
+
+    {% if saved %}
+    <div class="p-4 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-700">
+        <div class="flex items-center text-green-700 dark:text-green-300">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            Preferencias guardadas correctamente
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Resumen Diario -->
+    <div class="p-6">
+        <div class="flex items-start justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Resumen diario</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Recibe un resumen diario de leads nuevos, tareas pendientes y actividad
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="daily_summary_enabled"
+                       class="sr-only peer"
+                       {% if prefs.daily_summary_enabled %}checked{% endif %}>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+            </label>
+        </div>
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Hora del resumen
+            </label>
+            <select name="daily_summary_hour"
+                    class="block w-32 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                <option value="6" {% if prefs.daily_summary_hour == 6 %}selected{% endif %}>06:00</option>
+                <option value="7" {% if prefs.daily_summary_hour == 7 %}selected{% endif %}>07:00</option>
+                <option value="8" {% if prefs.daily_summary_hour == 8 %}selected{% endif %}>08:00</option>
+                <option value="9" {% if prefs.daily_summary_hour == 9 %}selected{% endif %}>09:00</option>
+                <option value="10" {% if prefs.daily_summary_hour == 10 %}selected{% endif %}>10:00</option>
+                <option value="11" {% if prefs.daily_summary_hour == 11 %}selected{% endif %}>11:00</option>
+                <option value="12" {% if prefs.daily_summary_hour == 12 %}selected{% endif %}>12:00</option>
+                <option value="13" {% if prefs.daily_summary_hour == 13 %}selected{% endif %}>13:00</option>
+                <option value="14" {% if prefs.daily_summary_hour == 14 %}selected{% endif %}>14:00</option>
+                <option value="18" {% if prefs.daily_summary_hour == 18 %}selected{% endif %}>18:00</option>
+                <option value="20" {% if prefs.daily_summary_hour == 20 %}selected{% endif %}>20:00</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Bajadas de Precio -->
+    <div class="p-6">
+        <div class="flex items-start justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Alertas de bajada de precio</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Recibe una alerta cuando un inmueble baje de precio
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="price_drop_enabled"
+                       class="sr-only peer"
+                       {% if prefs.price_drop_enabled %}checked{% endif %}>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+            </label>
+        </div>
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Umbral minimo de bajada
+            </label>
+            <div class="flex items-center space-x-2">
+                <input type="number" name="price_drop_threshold"
+                       value="{{ prefs.price_drop_threshold }}"
+                       min="1" max="50"
+                       class="block w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                <span class="text-gray-500 dark:text-gray-400">%</span>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Solo alertar si la bajada es mayor a este porcentaje
+            </p>
+        </div>
+    </div>
+
+    <!-- Nuevos Leads -->
+    <div class="p-6">
+        <div class="flex items-start justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Alertas de leads nuevos</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Recibe notificacion cuando se encuentren leads de alto interes
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="new_leads_enabled"
+                       class="sr-only peer"
+                       {% if prefs.new_leads_enabled %}checked{% endif %}>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+            </label>
+        </div>
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Score minimo del lead
+            </label>
+            <div class="flex items-center space-x-2">
+                <input type="number" name="new_leads_min_score"
+                       value="{{ prefs.new_leads_min_score }}"
+                       min="0" max="100"
+                       class="block w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                <span class="text-gray-500 dark:text-gray-400">pts</span>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Solo alertar leads con score igual o superior (0 = todos)
+            </p>
+        </div>
+    </div>
+
+    <!-- Recordatorios de Tareas -->
+    <div class="p-6">
+        <div class="flex items-start justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Recordatorios de tareas</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Recibe recordatorios de tareas pendientes y vencidas
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="task_reminders_enabled"
+                       class="sr-only peer"
+                       {% if prefs.task_reminders_enabled %}checked{% endif %}>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Alertas de Errores (Admin) -->
+    {% if user.is_staff %}
+    <div class="p-6">
+        <div class="flex items-start justify-between">
+            <div>
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Alertas de errores</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Recibe alertas cuando ocurran errores en scrapers o sistema
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="error_alerts_enabled"
+                       class="sr-only peer"
+                       {% if prefs.error_alerts_enabled %}checked{% endif %}>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+            </label>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Submit -->
+    <div class="p-6 bg-gray-50 dark:bg-gray-900/50">
+        <button type="submit"
+                class="w-full sm:w-auto px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center">
+            <span class="htmx-indicator mr-2">
+                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </span>
+            Guardar preferencias
+        </button>
+    </div>
+</form>

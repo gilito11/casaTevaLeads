@@ -23,6 +23,27 @@
 
     <!-- KPI Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Total Leads -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Leads</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.leads_total|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <a href="{% url 'leads:list' %}" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
+                Ver todos
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+
         <!-- Leads Nuevos Hoy -->
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div class="flex items-center justify-between">
@@ -69,29 +90,8 @@
                     </svg>
                 </div>
             </div>
-            <a href="{% url 'leads:list' %}?estado=NUEVO&estado=EN_PROCESO" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
+            <a href="{% url 'leads:list' %}?estado=NUEVO" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
                 Ver todos
-                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-            </a>
-        </div>
-
-        <!-- Interesados -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Leads Interesados</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.interesados|default:0 }}</p>
-                </div>
-                <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-            </div>
-            <a href="{% url 'leads:list' %}?estado=INTERESADO" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
-                Ver interesados
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                 </svg>
@@ -117,16 +117,90 @@
         </div>
     </div>
 
-    <!-- Charts and Recent Activity -->
+    <!-- Second Row Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Leads Interesados -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Leads Interesados</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.interesados|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <a href="{% url 'leads:list' %}?estado=INTERESADO" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
+                Ver interesados
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+
+        <!-- Leads Esta Semana -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Leads Esta Semana</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.leads_semana|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-cyan-100 dark:bg-cyan-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-cyan-600 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            </div>
+            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                Desde el lunes de esta semana
+            </p>
+        </div>
+
+        <!-- Clientes Convertidos -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Clientes Convertidos</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white mt-1">{{ stats.clientes_total|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+            <a href="{% url 'leads:list' %}?estado=CLIENTE" class="mt-4 text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">
+                Ver clientes
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Leads por Estado (Chart) -->
-        <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <!-- Leads por Estado (Doughnut Chart) -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Leads por Estado</h3>
             <div class="h-64">
                 <canvas id="estadosChart"></canvas>
             </div>
         </div>
 
+        <!-- Leads Trend (Line Chart) -->
+        <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tendencia de Leads (30 dias)</h3>
+            <div class="h-64">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leads by Portal and Funnel -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Leads por Portal -->
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Leads por Portal</h3>
@@ -135,15 +209,79 @@
                 <div>
                     <div class="flex justify-between text-sm mb-1">
                         <span class="text-gray-600 dark:text-gray-400">{{ portal.nombre }}</span>
-                        <span class="font-medium text-gray-900 dark:text-white">{{ portal.count }}</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ portal.count }} ({{ portal.porcentaje }}%)</span>
                     </div>
-                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div class="bg-primary-600 h-2 rounded-full" style="width: {{ portal.porcentaje }}%"></div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                        <div class="bg-primary-600 h-2.5 rounded-full transition-all duration-500" style="width: {{ portal.porcentaje }}%"></div>
                     </div>
                 </div>
                 {% empty %}
-                <p class="text-gray-500 dark:text-gray-400 text-sm">No hay datos de portales</p>
+                <p class="text-gray-500 dark:text-gray-400 text-sm text-center py-4">No hay datos de portales</p>
                 {% endfor %}
+            </div>
+        </div>
+
+        <!-- Funnel de Conversion -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Funnel de Conversion</h3>
+            <div class="space-y-3">
+                <!-- Nuevos -->
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Nuevos</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ stats.por_estado.NUEVO|default:0 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6">
+                        <div class="bg-blue-500 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium" style="width: 100%">
+                            100%
+                        </div>
+                    </div>
+                </div>
+                <!-- Contactados -->
+                {% with total=stats.por_estado.NUEVO|default:1 contactados=stats.por_estado.CONTACTADO_SIN_RESPUESTA|default:0 %}
+                {% widthratio contactados total 100 as pct_contactados %}
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Contactados</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ contactados }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6">
+                        <div class="bg-orange-500 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium" style="width: {% if pct_contactados %}{{ pct_contactados }}%{% else %}0%{% endif %}; min-width: {% if contactados %}3rem{% else %}0{% endif %}">
+                            {% if pct_contactados %}{{ pct_contactados }}%{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+                <!-- Interesados -->
+                {% with total=stats.por_estado.NUEVO|default:1 interesados=stats.por_estado.INTERESADO|default:0 %}
+                {% widthratio interesados total 100 as pct_interesados %}
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Interesados</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ interesados }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6">
+                        <div class="bg-green-500 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium" style="width: {% if pct_interesados %}{{ pct_interesados }}%{% else %}0%{% endif %}; min-width: {% if interesados %}3rem{% else %}0{% endif %}">
+                            {% if pct_interesados %}{{ pct_interesados }}%{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+                <!-- Clientes -->
+                {% with total=stats.por_estado.NUEVO|default:1 clientes=stats.por_estado.CLIENTE|default:0 %}
+                {% widthratio clientes total 100 as pct_clientes %}
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Clientes</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ clientes }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6">
+                        <div class="bg-emerald-500 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium" style="width: {% if pct_clientes %}{{ pct_clientes }}%{% else %}0%{% endif %}; min-width: {% if clientes %}3rem{% else %}0{% endif %}">
+                            {% if pct_clientes %}{{ pct_clientes }}%{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
             </div>
         </div>
     </div>
@@ -219,16 +357,18 @@
 
 {% block extra_js %}
 <script>
-    // Chart.js - Leads por Estado
-    const ctx = document.getElementById('estadosChart');
-    if (ctx) {
-        const isDark = document.documentElement.classList.contains('dark');
-        const textColor = isDark ? '#9CA3AF' : '#6B7280';
+    // Detect dark mode
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#9CA3AF' : '#6B7280';
+    const gridColor = isDark ? '#374151' : '#E5E7EB';
 
-        new Chart(ctx, {
+    // Chart.js - Leads por Estado (Doughnut)
+    const estadosCtx = document.getElementById('estadosChart');
+    if (estadosCtx) {
+        new Chart(estadosCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Nuevos', 'En Proceso', 'Contactados', 'Interesados', 'No Interesados', 'En Espera', 'Clientes'],
+                labels: ['Nuevos', 'En Proceso', 'Contactados', 'Interesados', 'No Interesados', 'En Espera', 'Clientes', 'Ya Vendido', 'No Contactar'],
                 datasets: [{
                     data: [
                         {{ stats.por_estado.NUEVO|default:0 }},
@@ -237,16 +377,20 @@
                         {{ stats.por_estado.INTERESADO|default:0 }},
                         {{ stats.por_estado.NO_INTERESADO|default:0 }},
                         {{ stats.por_estado.EN_ESPERA|default:0 }},
-                        {{ stats.por_estado.CLIENTE|default:0 }}
+                        {{ stats.por_estado.CLIENTE|default:0 }},
+                        {{ stats.por_estado.YA_VENDIDO|default:0 }},
+                        {{ stats.por_estado.NO_CONTACTAR|default:0 }}
                     ],
                     backgroundColor: [
-                        '#3B82F6', // blue
-                        '#06B6D4', // cyan
-                        '#F97316', // orange
-                        '#22C55E', // green
-                        '#EF4444', // red
-                        '#EAB308', // yellow
-                        '#10B981'  // emerald
+                        '#3B82F6', // blue - Nuevos
+                        '#06B6D4', // cyan - En Proceso
+                        '#F97316', // orange - Contactados
+                        '#22C55E', // green - Interesados
+                        '#EF4444', // red - No Interesados
+                        '#EAB308', // yellow - En Espera
+                        '#10B981', // emerald - Clientes
+                        '#6B7280', // gray - Ya Vendido
+                        '#DC2626'  // dark red - No Contactar
                     ],
                     borderWidth: 0
                 }]
@@ -259,12 +403,89 @@
                         position: 'right',
                         labels: {
                             color: textColor,
-                            padding: 15,
-                            usePointStyle: true
+                            padding: 10,
+                            usePointStyle: true,
+                            font: { size: 11 }
                         }
                     }
                 },
                 cutout: '60%'
+            }
+        });
+    }
+
+    // Chart.js - Trend de Leads (Line Chart)
+    const trendCtx = document.getElementById('trendChart');
+    if (trendCtx) {
+        const trendData = {{ trend_data|safe }};
+
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: trendData.map(d => d.fecha),
+                datasets: [{
+                    label: 'Leads',
+                    data: trendData.map(d => d.count),
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#3B82F6',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: isDark ? '#1F2937' : '#fff',
+                        titleColor: isDark ? '#F9FAFB' : '#111827',
+                        bodyColor: isDark ? '#D1D5DB' : '#6B7280',
+                        borderColor: isDark ? '#374151' : '#E5E7EB',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                        callbacks: {
+                            title: (items) => `Fecha: ${items[0].label}`,
+                            label: (item) => `${item.raw} leads`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: gridColor,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: textColor,
+                            maxTicksLimit: 10
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: gridColor,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: textColor,
+                            precision: 0
+                        }
+                    }
+                }
             }
         });
     }

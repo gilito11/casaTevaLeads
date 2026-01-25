@@ -152,7 +152,7 @@
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 {% for lead in leads %}
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                    :class="{ 'bg-primary-50 dark:bg-primary-900/20': selected.includes({{ lead.lead_id }}) }"
+                    :class="{ 'bg-primary-50 dark:bg-primary-900/20': selected.includes('{{ lead.lead_id }}') }"
                     id="lead-row-{{ lead.lead_id }}"
                     data-lead-id="{{ lead.lead_id }}"
                     data-anuncio-id="{{ lead.anuncio_id|default:'' }}"
@@ -160,8 +160,8 @@
                     <!-- Checkbox -->
                     <td class="px-3 py-2 text-center">
                         <input type="checkbox"
-                               :checked="selected.includes({{ lead.lead_id }})"
-                               @change="toggleSelection({{ lead.lead_id }})"
+                               :checked="selected.includes('{{ lead.lead_id }}')"
+                               @change="toggleSelection('{{ lead.lead_id }}')"
                                class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
                     </td>
                     <!-- Thumbnail -->

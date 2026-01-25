@@ -2,13 +2,14 @@
 Vistas para la gestion de Leads.
 Lista, detalle, cambio de estado, notas, etc.
 """
+import csv
 import json
 import logging
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.db.models import Q
@@ -205,16 +206,42 @@ def lead_detail_view(request, lead_id):
 
     # Verificar duplicados cross-portal
     duplicate_info = None
+    duplicate_leads = []
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT num_portales, portales
+                SELECT duplicate_group_id, num_portales, portales, match_type, num_leads_grupo
                 FROM public_marts.dim_lead_duplicates
                 WHERE lead_id = %s AND tenant_id = %s
             """, [str(lead.lead_id), tenant_id])
             row = cursor.fetchone()
             if row:
-                duplicate_info = {'num_portales': row[0], 'portales': row[1]}
+                duplicate_info = {
+                    'group_id': row[0],
+                    'num_portales': row[1],
+                    'portales': row[2],
+                    'match_type': row[3],
+                    'num_leads': row[4],
+                }
+                # Obtener otros leads del mismo grupo
+                cursor.execute("""
+                    SELECT d.lead_id, l.portal, l.precio, l.superficie_m2, l.titulo, l.url_anuncio
+                    FROM public_marts.dim_lead_duplicates d
+                    JOIN public_marts.dim_leads l ON d.lead_id = l.lead_id AND d.tenant_id = l.tenant_id
+                    WHERE d.duplicate_group_id = %s
+                      AND d.tenant_id = %s
+                      AND d.lead_id != %s
+                    ORDER BY l.portal
+                """, [row[0], tenant_id, str(lead.lead_id)])
+                for dup_row in cursor.fetchall():
+                    duplicate_leads.append({
+                        'lead_id': dup_row[0],
+                        'portal': dup_row[1],
+                        'precio': dup_row[2],
+                        'metros': dup_row[3],
+                        'titulo': dup_row[4],
+                        'url': dup_row[5],
+                    })
     except Exception:
         pass  # Tabla puede no existir aun
 
@@ -232,6 +259,7 @@ def lead_detail_view(request, lead_id):
         'lead_estado': lead_estado,
         'team_users': team_users,
         'duplicate_info': duplicate_info,
+        'duplicate_leads': duplicate_leads,
         'lead_tasks': lead_tasks,
     }
 
@@ -1361,6 +1389,191 @@ def valuation_pdf_view(request, lead_id):
     except Exception as e:
         logger.error(f"Error generating PDF for lead {lead_id}: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+class Echo:
+    """An object that implements just the write method of the file-like interface."""
+    def write(self, value):
+        return value
+
+
+@login_required
+def export_csv_view(request):
+    """
+    Exportar leads filtrados a CSV usando StreamingHttpResponse.
+    Respeta los mismos filtros que lead_list_view (q, estado, portal, zona).
+    """
+    tenant_id = get_user_tenant(request)
+
+    # Base queryset
+    leads_qs = Lead.objects.all()
+    if tenant_id:
+        leads_qs = leads_qs.filter(tenant_id=tenant_id)
+
+    # Filtros (misma logica que lead_list_view)
+    q = request.GET.get('q', '').strip()
+    estado = request.GET.get('estado', '')
+    portal = request.GET.get('portal', '')
+    zona = request.GET.get('zona', '')
+
+    if q:
+        leads_qs = leads_qs.filter(
+            Q(telefono_norm__icontains=q) |
+            Q(nombre__icontains=q) |
+            Q(direccion__icontains=q) |
+            Q(zona_geografica__icontains=q)
+        )
+
+    if portal:
+        leads_qs = leads_qs.filter(portal=portal)
+
+    if zona:
+        leads_qs = leads_qs.filter(zona_geografica=zona)
+
+    # Filtrar por estado usando LeadEstado
+    if estado:
+        lead_ids_with_estado = LeadEstado.objects.filter(
+            estado=estado
+        ).values_list('lead_id', flat=True)
+
+        if estado == 'NUEVO':
+            leads_qs = leads_qs.filter(
+                Q(lead_id__in=[lid for lid in lead_ids_with_estado]) |
+                ~Q(lead_id__in=LeadEstado.objects.values_list('lead_id', flat=True))
+            )
+        else:
+            leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_with_estado])
+
+    leads_qs = leads_qs.order_by('-fecha_scraping')
+
+    # Obtener estados de LeadEstado para los leads
+    lead_ids = list(leads_qs.values_list('lead_id', flat=True))
+    lead_estados = {
+        le.lead_id: le.estado
+        for le in LeadEstado.objects.filter(lead_id__in=[str(lid) for lid in lead_ids])
+    }
+
+    def generate_csv():
+        pseudo_buffer = Echo()
+        writer = csv.writer(pseudo_buffer)
+
+        # Headers en espanol
+        yield writer.writerow([
+            'Telefono',
+            'Titulo',
+            'Precio',
+            'Portal',
+            'Zona',
+            'Estado',
+            'URL Anuncio',
+            'Fecha Scraping'
+        ])
+
+        # Iterar en batches para memoria eficiente
+        for lead in leads_qs.iterator(chunk_size=500):
+            estado_actual = lead_estados.get(str(lead.lead_id), lead.estado or 'NUEVO')
+            fecha = lead.fecha_scraping.strftime('%Y-%m-%d %H:%M') if lead.fecha_scraping else ''
+
+            yield writer.writerow([
+                lead.telefono_norm or '',
+                lead.titulo or lead.direccion or '',
+                lead.precio or '',
+                lead.portal or '',
+                lead.zona_geografica or '',
+                estado_actual,
+                lead.url_anuncio or '',
+                fecha
+            ])
+
+    response = StreamingHttpResponse(
+        generate_csv(),
+        content_type='text/csv; charset=utf-8'
+    )
+    fecha_export = timezone.now().strftime('%Y%m%d_%H%M')
+    response['Content-Disposition'] = f'attachment; filename="leads_{fecha_export}.csv"'
+
+    return response
+
+
+# ============================================================================
+# Price History API
+# ============================================================================
+
+@login_required
+def price_history_view(request, lead_id):
+    """
+    Fetch price history for a lead from raw.listing_price_history.
+    Returns JSON for Chart.js rendering.
+    """
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    if tenant_id and lead.tenant_id != tenant_id:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    # Get the source listing ID and portal from the lead
+    anuncio_id = lead.anuncio_id
+    portal = lead.portal
+
+    if not anuncio_id or not portal:
+        # No price history available without listing ID
+        return JsonResponse({
+            'has_history': False,
+            'current_price': float(lead.precio) if lead.precio else None,
+            'message': 'No hay historial de precios disponible'
+        })
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT precio, fecha_captura
+                FROM raw.listing_price_history
+                WHERE tenant_id = %s
+                  AND portal = %s
+                  AND anuncio_id = %s
+                ORDER BY fecha_captura ASC
+            """, [tenant_id, portal, anuncio_id])
+            rows = cursor.fetchall()
+
+        if not rows:
+            # No history, return current price only
+            return JsonResponse({
+                'has_history': False,
+                'current_price': float(lead.precio) if lead.precio else None,
+                'message': 'Sin historial de cambios de precio'
+            })
+
+        # Build data for Chart.js
+        labels = []
+        prices = []
+        for precio, fecha in rows:
+            labels.append(fecha.strftime('%d/%m/%Y'))
+            prices.append(float(precio) if precio else None)
+
+        # Calculate price change
+        first_price = prices[0] if prices else None
+        last_price = prices[-1] if prices else None
+        change_pct = None
+        if first_price and last_price and first_price > 0:
+            change_pct = round(((last_price - first_price) / first_price) * 100, 1)
+
+        return JsonResponse({
+            'has_history': True,
+            'labels': labels,
+            'prices': prices,
+            'current_price': float(lead.precio) if lead.precio else last_price,
+            'first_price': first_price,
+            'change_pct': change_pct,
+            'num_changes': len(prices)
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching price history for lead {lead_id}: {e}")
+        return JsonResponse({
+            'has_history': False,
+            'current_price': float(lead.precio) if lead.precio else None,
+            'error': str(e)
+        })
 
 
 def image_proxy_view(request):

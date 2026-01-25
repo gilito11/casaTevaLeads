@@ -1,11 +1,13 @@
 import json
 import logging
 from django.http import JsonResponse
+from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 
-from .models import PushSubscription
+from .models import PushSubscription, AlertPreferences
 
 logger = logging.getLogger(__name__)
 
@@ -88,3 +90,40 @@ def unsubscribe_push(request):
         'success': True,
         'deleted': deleted > 0
     })
+
+
+@login_required
+def alert_settings_view(request):
+    """View and update alert preferences."""
+    prefs = AlertPreferences.get_or_create_for_user(request.user)
+    is_htmx = request.headers.get('HX-Request') == 'true'
+
+    if request.method == 'POST':
+        # Update preferences from form
+        prefs.daily_summary_enabled = request.POST.get('daily_summary_enabled') == 'on'
+        prefs.daily_summary_hour = int(request.POST.get('daily_summary_hour', 9))
+
+        prefs.price_drop_enabled = request.POST.get('price_drop_enabled') == 'on'
+        prefs.price_drop_threshold = int(request.POST.get('price_drop_threshold', 5))
+
+        prefs.new_leads_enabled = request.POST.get('new_leads_enabled') == 'on'
+        prefs.new_leads_min_score = int(request.POST.get('new_leads_min_score', 0))
+
+        prefs.error_alerts_enabled = request.POST.get('error_alerts_enabled') == 'on'
+        prefs.task_reminders_enabled = request.POST.get('task_reminders_enabled') == 'on'
+
+        prefs.save()
+
+        if is_htmx:
+            return render(request, 'notifications/partials/settings_form.html', {
+                'prefs': prefs,
+                'saved': True,
+            })
+
+        messages.success(request, 'Preferencias de alertas guardadas')
+        return redirect('alert_settings')
+
+    context = {
+        'prefs': prefs,
+    }
+    return render(request, 'notifications/alert_settings.html', context)

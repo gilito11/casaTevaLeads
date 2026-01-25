@@ -9,6 +9,7 @@ urlpatterns = [
 
     # Leads
     path('', views.lead_list_view, name='list'),
+    path('export-csv/', views.export_csv_view, name='export_csv'),
     path('bulk-change-status/', views.bulk_change_status_view, name='bulk_change_status'),
     path('bulk-delete/', views.bulk_delete_view, name='bulk_delete'),
     path('bulk-assign/', views.bulk_assign_view, name='bulk_assign'),
@@ -45,4 +46,5 @@ urlpatterns = [
     path('<str:lead_id>/assign/', views.assign_lead_view, name='assign'),
     path('<str:lead_id>/enqueue/', views.enqueue_contact_view, name='enqueue_contact'),
     path('<str:lead_id>/valuation-pdf/', views.valuation_pdf_view, name='valuation_pdf'),
+    path('<str:lead_id>/price-history/', views.price_history_view, name='price_history'),
 ]

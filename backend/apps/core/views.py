@@ -50,7 +50,10 @@ def logout_view(request):
 
 @login_required
 def dashboard_view(request):
-    """Vista del dashboard principal con KPIs"""
+    """Vista del dashboard principal con KPIs y graficos"""
+    from django.db import connection
+    import json
+
     # Obtener tenant del usuario
     tenant_id = request.session.get('tenant_id')
     if not tenant_id:
@@ -66,10 +69,13 @@ def dashboard_view(request):
 
     # KPIs
     today = timezone.now().date()
+    yesterday = today - timedelta(days=1)
+    start_of_week = today - timedelta(days=today.weekday())
     start_of_day = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time()))
+    start_of_yesterday = timezone.make_aware(timezone.datetime.combine(yesterday, timezone.datetime.min.time()))
 
     # Conteos por estado
-    stats = leads_qs.aggregate(
+    estados_count = leads_qs.aggregate(
         total=Count('lead_id'),
         nuevos=Count('lead_id', filter=Q(estado='NUEVO')),
         en_proceso=Count('lead_id', filter=Q(estado='EN_PROCESO')),
@@ -82,39 +88,94 @@ def dashboard_view(request):
         no_contactar=Count('lead_id', filter=Q(estado='NO_CONTACTAR')),
     )
 
-    # Leads nuevos hoy
+    # Leads nuevos hoy y ayer (para comparar)
     leads_hoy = leads_qs.filter(fecha_scraping__gte=start_of_day).count()
+    leads_ayer = leads_qs.filter(
+        fecha_scraping__gte=start_of_yesterday,
+        fecha_scraping__lt=start_of_day
+    ).count()
+
+    # Cambio porcentual vs ayer
+    if leads_ayer > 0:
+        leads_cambio = round((leads_hoy - leads_ayer) / leads_ayer * 100, 0)
+    else:
+        leads_cambio = 100 if leads_hoy > 0 else 0
+
+    # Leads esta semana
+    start_of_week_dt = timezone.make_aware(timezone.datetime.combine(start_of_week, timezone.datetime.min.time()))
+    leads_semana = leads_qs.filter(fecha_scraping__gte=start_of_week_dt).count()
 
     # Tasa de conversion
-    total_procesados = stats['clientes'] + stats['no_interesados'] + stats['ya_vendidos']
-    tasa_conversion = (stats['clientes'] / total_procesados * 100) if total_procesados > 0 else 0
+    total_procesados = estados_count['clientes'] + estados_count['no_interesados'] + estados_count['ya_vendidos']
+    tasa_conversion = (estados_count['clientes'] / total_procesados * 100) if total_procesados > 0 else 0
 
-    # Leads por portal
-    leads_por_portal = list(leads_qs.values('portal').annotate(count=Count('lead_id')))
+    # Leads por portal con porcentaje
+    leads_por_portal_raw = list(leads_qs.values('portal').annotate(count=Count('lead_id')).order_by('-count'))
+    total_leads = estados_count['total'] or 1
+    leads_por_portal = []
+    for item in leads_por_portal_raw:
+        portal_name = item['portal'] or 'desconocido'
+        leads_por_portal.append({
+            'nombre': portal_name.capitalize(),
+            'count': item['count'],
+            'porcentaje': round(item['count'] / total_leads * 100, 1)
+        })
 
     # Ultimos leads
     ultimos_leads = leads_qs.order_by('-fecha_scraping')[:10]
 
-    # Estados disponibles para el grafico
-    estados_chart = [
-        {'nombre': 'Nuevo', 'valor': stats['nuevos'], 'color': '#3B82F6'},
-        {'nombre': 'En Proceso', 'valor': stats['en_proceso'], 'color': '#06B6D4'},
-        {'nombre': 'Contactado', 'valor': stats['contactados'], 'color': '#F97316'},
-        {'nombre': 'Interesado', 'valor': stats['interesados'], 'color': '#22C55E'},
-        {'nombre': 'No Interesado', 'valor': stats['no_interesados'], 'color': '#EF4444'},
-        {'nombre': 'En Espera', 'valor': stats['en_espera'], 'color': '#EAB308'},
-        {'nombre': 'Cliente', 'valor': stats['clientes'], 'color': '#10B981'},
-        {'nombre': 'Ya Vendido', 'valor': stats['ya_vendidos'], 'color': '#6B7280'},
-        {'nombre': 'No Contactar', 'valor': stats['no_contactar'], 'color': '#DC2626'},
-    ]
+    # Trend de leads ultimos 30 dias (para grafico de lineas)
+    trend_data = []
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    fecha_scraping::date as dia,
+                    COUNT(*) as total
+                FROM public_marts.dim_leads
+                WHERE tenant_id = %s
+                  AND fecha_scraping >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY fecha_scraping::date
+                ORDER BY dia
+            """, [tenant_id])
+            rows = cursor.fetchall()
+            for row in rows:
+                trend_data.append({
+                    'fecha': row[0].strftime('%d/%m'),
+                    'count': row[1]
+                })
+    except Exception:
+        # Fallback si la tabla no existe o hay error
+        pass
+
+    # Stats formateado para el template
+    stats = {
+        'leads_total': estados_count['total'],
+        'leads_nuevos_hoy': leads_hoy,
+        'leads_nuevos_cambio': leads_cambio,
+        'leads_semana': leads_semana,
+        'pendientes_llamar': estados_count['nuevos'] + estados_count['en_proceso'],
+        'interesados': estados_count['interesados'],
+        'clientes_total': estados_count['clientes'],
+        'tasa_conversion': round(tasa_conversion, 1),
+        'leads_por_portal': leads_por_portal,
+        'por_estado': {
+            'NUEVO': estados_count['nuevos'],
+            'EN_PROCESO': estados_count['en_proceso'],
+            'CONTACTADO_SIN_RESPUESTA': estados_count['contactados'],
+            'INTERESADO': estados_count['interesados'],
+            'NO_INTERESADO': estados_count['no_interesados'],
+            'EN_ESPERA': estados_count['en_espera'],
+            'CLIENTE': estados_count['clientes'],
+            'YA_VENDIDO': estados_count['ya_vendidos'],
+            'NO_CONTACTAR': estados_count['no_contactar'],
+        }
+    }
 
     context = {
         'stats': stats,
-        'leads_hoy': leads_hoy,
-        'tasa_conversion': round(tasa_conversion, 1),
-        'leads_por_portal': leads_por_portal,
-        'ultimos_leads': ultimos_leads,
-        'estados_chart': estados_chart,
+        'recent_leads': ultimos_leads,
+        'trend_data': json.dumps(trend_data),
         'estados': Lead.ESTADO_CHOICES,
     }
 
