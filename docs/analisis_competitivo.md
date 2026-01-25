@@ -88,12 +88,14 @@ El sistema identifica automaticamente el mismo inmueble publicado en multiples p
 
 ### 3.4 Automatizacion de Contacto
 Contacto automatico con propietarios en los 4 portales:
-- **Fotocasa**: Auto-login + formulario
-- **Habitaclia**: 2Captcha para reCAPTCHA
-- **Milanuncios**: Camoufox + chat interno
-- **Idealista**: Parcial (DataDome bloquea login)
+- **Fotocasa**: ✅ Auto-login + formulario (funciona bien con sesion guardada)
+- **Habitaclia**: ⚠️ Requiere 2Captcha para reCAPTCHA (~$3/1000 soluciones)
+- **Milanuncios**: ⚠️ Camoufox (Firefox anti-detect) + chat interno (lento pero funcional)
+- **Idealista**: ❌ Parcial - DataDome bloquea la mayoria de intentos, requiere 2Captcha
 
 Limite configurable: 5 contactos/dia con delays de 2-5 min.
+
+**Coste adicional de contacto automatizado**: ~$3-6/mes para 2Captcha (1000-2000 soluciones)
 
 ### 3.5 Sin Lock-in de Portal
 Los datos son **100% propiedad del usuario**:
@@ -149,6 +151,8 @@ Ahorro potencial: **100-950 EUR/mes** respecto a soluciones comerciales.
 - No permite publicar anuncios desde la plataforma
 - Es una herramienta de captacion, no de publicacion
 - Las agencias aun necesitan contratar portales para publicar
+- **Razon tecnica**: Los portales no ofrecen APIs publicas para publicacion, solo partnerships privados con CRMs autorizados (Inmoweb, Witei, etc.). Implementarlo requeriria 3-6 meses de negociacion con cada portal.
+- **Alternativa**: Integracion futura con Inmoweb (~100 EUR/mes adicionales) para publicacion multi-portal
 
 ### 4.6 Sin Tours Virtuales Integrados
 - No incluye herramientas tipo Visita Express
