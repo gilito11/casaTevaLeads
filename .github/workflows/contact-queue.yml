@@ -32,16 +32,32 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
 
+      - name: Install Firefox for Milanuncios
+        run: playwright install firefox
+
       - name: Process contact queue
         run: python scripts/process_contact_queue.py
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          # Fotocasa
           FOTOCASA_EMAIL: ${{ secrets.FOTOCASA_EMAIL }}
           FOTOCASA_PASSWORD: ${{ secrets.FOTOCASA_PASSWORD }}
+          # Habitaclia (same Adevinta account as Fotocasa usually)
+          HABITACLIA_EMAIL: ${{ secrets.HABITACLIA_EMAIL }}
+          HABITACLIA_PASSWORD: ${{ secrets.HABITACLIA_PASSWORD }}
+          # Milanuncios
+          MILANUNCIOS_EMAIL: ${{ secrets.MILANUNCIOS_EMAIL }}
+          MILANUNCIOS_PASSWORD: ${{ secrets.MILANUNCIOS_PASSWORD }}
+          # Idealista
+          IDEALISTA_EMAIL: ${{ secrets.IDEALISTA_EMAIL }}
+          IDEALISTA_PASSWORD: ${{ secrets.IDEALISTA_PASSWORD }}
+          # 2Captcha for reCAPTCHA (Habitaclia) and DataDome (Idealista)
           CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
+          # Contact info
           CONTACT_NAME: ${{ secrets.CONTACT_NAME }}
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
           CONTACT_PHONE: ${{ secrets.CONTACT_PHONE }}
+          # Notifications
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 

@@ -294,6 +294,8 @@ class ContactQueue(models.Model):
     PORTAL_CHOICES = [
         ('fotocasa', 'Fotocasa'),
         ('habitaclia', 'Habitaclia'),
+        ('milanuncios', 'Milanuncios'),
+        ('idealista', 'Idealista'),
     ]
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='contact_queue')
@@ -346,6 +348,8 @@ class PortalSession(models.Model):
     PORTAL_CHOICES = [
         ('fotocasa', 'Fotocasa'),
         ('habitaclia', 'Habitaclia'),
+        ('milanuncios', 'Milanuncios'),
+        ('idealista', 'Idealista'),
     ]
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='portal_sessions')
