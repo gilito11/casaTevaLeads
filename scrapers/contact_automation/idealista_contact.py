@@ -25,9 +25,9 @@ logger = logging.getLogger(__name__)
 
 
 class DataDomeSolver:
-    """2Captcha API wrapper for solving DataDome challenges."""
+    """2Captcha API wrapper for solving DataDome slider challenges."""
 
-    API_URL = "https://2captcha.com"
+    API_URL = "https://api.2captcha.com"
 
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -41,13 +41,13 @@ class DataDomeSolver:
         timeout: int = 180
     ) -> Optional[dict]:
         """
-        Solve DataDome challenge and return cookies/token.
+        Solve DataDome slider challenge using 2Captcha's new API.
 
         Args:
-            captcha_url: The URL of the DataDome captcha page
+            captcha_url: The full DataDome captcha URL (geo.captcha-delivery.com/...)
             page_url: Original page URL that triggered DataDome
             user_agent: Browser user agent
-            proxy: Optional proxy string
+            proxy: Optional proxy string (format: user:pass@ip:port or ip:port)
             timeout: Max seconds to wait for solution
 
         Returns:
@@ -57,8 +57,106 @@ class DataDomeSolver:
 
         try:
             async with aiohttp.ClientSession() as session:
-                # Submit DataDome challenge
-                submit_url = f"{self.API_URL}/in.php"
+                # Build task payload for new API
+                task = {
+                    "type": "DataDomeSliderTask",
+                    "websiteURL": page_url,
+                    "captchaUrl": captcha_url,
+                    "userAgent": user_agent,
+                }
+
+                # Add proxy if provided (required for DataDome)
+                if proxy:
+                    # Parse proxy: user:pass@ip:port or ip:port
+                    if '@' in proxy:
+                        auth, addr = proxy.rsplit('@', 1)
+                        user, passwd = auth.split(':', 1)
+                        ip, port = addr.split(':')
+                        task["proxyType"] = "http"
+                        task["proxyAddress"] = ip
+                        task["proxyPort"] = int(port)
+                        task["proxyLogin"] = user
+                        task["proxyPassword"] = passwd
+                    else:
+                        ip, port = proxy.split(':')
+                        task["proxyType"] = "http"
+                        task["proxyAddress"] = ip
+                        task["proxyPort"] = int(port)
+
+                payload = {
+                    "clientKey": self.api_key,
+                    "task": task
+                }
+
+                # Submit task
+                logger.info(f"Submitting DataDome task for: {page_url}")
+                async with session.post(
+                    f"{self.API_URL}/createTask",
+                    json=payload
+                ) as resp:
+                    result = await resp.json()
+                    if result.get('errorId', 0) != 0:
+                        logger.error(f"2Captcha DataDome submit error: {result}")
+                        # Try legacy method as fallback
+                        return await self._solve_legacy(captcha_url, page_url, user_agent, proxy, timeout)
+
+                    task_id = result.get('taskId')
+                    if not task_id:
+                        logger.error(f"No taskId in response: {result}")
+                        return await self._solve_legacy(captcha_url, page_url, user_agent, proxy, timeout)
+
+                    logger.info(f"DataDome task submitted: {task_id}")
+
+                # Poll for solution
+                start_time = asyncio.get_event_loop().time()
+                while asyncio.get_event_loop().time() - start_time < timeout:
+                    await asyncio.sleep(10)
+
+                    async with session.post(
+                        f"{self.API_URL}/getTaskResult",
+                        json={"clientKey": self.api_key, "taskId": task_id}
+                    ) as resp:
+                        result = await resp.json()
+
+                        if result.get('errorId', 0) != 0:
+                            logger.error(f"2Captcha poll error: {result}")
+                            return None
+
+                        status = result.get('status')
+                        if status == 'ready':
+                            solution = result.get('solution', {})
+                            cookie = solution.get('cookie')
+                            if cookie:
+                                logger.info("DataDome solved successfully!")
+                                return {'datadome': cookie}
+                            else:
+                                logger.error(f"No cookie in solution: {solution}")
+                                return None
+                        elif status == 'processing':
+                            continue
+
+                logger.error("DataDome solve timeout")
+                return None
+
+        except Exception as e:
+            logger.error(f"2Captcha DataDome error: {e}")
+            return None
+
+    async def _solve_legacy(
+        self,
+        captcha_url: str,
+        page_url: str,
+        user_agent: str,
+        proxy: Optional[str] = None,
+        timeout: int = 180
+    ) -> Optional[dict]:
+        """Fallback to legacy in.php method."""
+        import aiohttp
+
+        logger.info("Trying legacy 2Captcha method...")
+
+        try:
+            async with aiohttp.ClientSession() as session:
                 submit_data = {
                     'key': self.api_key,
                     'method': 'datadome',
@@ -72,46 +170,47 @@ class DataDomeSolver:
                     submit_data['proxy'] = proxy
                     submit_data['proxytype'] = 'HTTP'
 
-                async with session.post(submit_url, data=submit_data) as resp:
+                async with session.post(
+                    "https://2captcha.com/in.php",
+                    data=submit_data
+                ) as resp:
                     result = await resp.json()
                     if result.get('status') != 1:
-                        logger.error(f"2Captcha DataDome submit error: {result}")
+                        logger.error(f"Legacy submit error: {result}")
                         return None
                     request_id = result['request']
-                    logger.info(f"2Captcha DataDome request submitted: {request_id}")
+                    logger.info(f"Legacy request submitted: {request_id}")
 
-                # Poll for solution
-                result_url = f"{self.API_URL}/res.php"
-                result_params = {
-                    'key': self.api_key,
-                    'action': 'get',
-                    'id': request_id,
-                    'json': 1
-                }
-
+                # Poll
                 start_time = asyncio.get_event_loop().time()
                 while asyncio.get_event_loop().time() - start_time < timeout:
-                    await asyncio.sleep(10)  # DataDome takes longer
+                    await asyncio.sleep(10)
 
-                    async with session.get(result_url, params=result_params) as resp:
+                    async with session.get(
+                        "https://2captcha.com/res.php",
+                        params={
+                            'key': self.api_key,
+                            'action': 'get',
+                            'id': request_id,
+                            'json': 1
+                        }
+                    ) as resp:
                         result = await resp.json()
 
                         if result.get('status') == 1:
-                            # Result contains the datadome cookie
                             cookie_value = result['request']
-                            logger.info("DataDome solved successfully")
+                            logger.info("Legacy DataDome solved!")
                             return {'datadome': cookie_value}
                         elif result.get('request') == 'CAPCHA_NOT_READY':
                             continue
                         else:
-                            logger.error(f"2Captcha DataDome error: {result}")
+                            logger.error(f"Legacy poll error: {result}")
                             return None
 
-                logger.error("2Captcha DataDome timeout")
                 return None
 
         except Exception as e:
-            logger.error(f"2Captcha DataDome error: {e}")
+            logger.error(f"Legacy method error: {e}")
             return None
 
 
@@ -153,11 +252,14 @@ class IdealistaContact(BaseContactAutomation):
     # User agent (must match what 2Captcha uses)
     USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
 
-    def __init__(self, headless: bool = False, captcha_api_key: str = None, email: str = None, password: str = None):
+    def __init__(self, headless: bool = False, captcha_api_key: str = None, email: str = None, password: str = None, proxy: str = None):
         super().__init__(headless=headless)
         self.email = email or os.getenv('IDEALISTA_EMAIL')
         self.password = password or os.getenv('IDEALISTA_PASSWORD')
         self.captcha_api_key = captcha_api_key or os.getenv('CAPTCHA_API_KEY')
+        # Proxy format: user:pass@ip:port or ip:port
+        # Required for DataDome solving via 2Captcha
+        self.proxy = proxy or os.getenv('DATADOME_PROXY')
         self.datadome_solver = None
         if self.captcha_api_key:
             self.datadome_solver = DataDomeSolver(self.captcha_api_key)
@@ -217,22 +319,44 @@ class IdealistaContact(BaseContactAutomation):
             return False
 
         try:
-            # Get current URL (the challenge URL)
-            captcha_url = self.page.url
-            logger.info(f"Attempting to solve DataDome at: {captcha_url}")
-
-            # Get the original page URL from referer or construct it
-            # DataDome usually has the original URL in the page
+            # Get page content to find the DataDome captcha URL
             content = await self.page.content()
+            current_url = self.page.url
 
-            # Try to find the original URL
-            original_url = self.BASE_URL  # Fallback
+            # Extract the full DataDome captcha URL (geo.captcha-delivery.com)
+            captcha_url = None
 
-            # Solve DataDome
+            # Check if we're on a DataDome redirect page
+            if 'geo.captcha-delivery.com' in current_url:
+                captcha_url = current_url
+            else:
+                # Look for iframe or script with DataDome URL
+                import re
+                dd_pattern = r'(https://geo\.captcha-delivery\.com/captcha/[^"\'>\s]+)'
+                matches = re.findall(dd_pattern, content)
+                if matches:
+                    captcha_url = matches[0]
+
+            if not captcha_url:
+                # Construct a basic captcha URL
+                captcha_url = current_url
+                logger.warning(f"Could not find DataDome URL, using: {captcha_url}")
+            else:
+                logger.info(f"Found DataDome captcha URL: {captcha_url[:100]}...")
+
+            # Original page URL
+            original_url = self.BASE_URL
+
+            # Solve DataDome (requires proxy)
+            if not self.proxy:
+                logger.warning("No DATADOME_PROXY configured - DataDome solving may fail")
+                logger.warning("Set DATADOME_PROXY=user:pass@ip:port or get residential proxy")
+
             result = await self.datadome_solver.solve_datadome(
                 captcha_url=captcha_url,
                 page_url=original_url,
-                user_agent=self.USER_AGENT
+                user_agent=self.USER_AGENT,
+                proxy=self.proxy
             )
 
             if not result:
