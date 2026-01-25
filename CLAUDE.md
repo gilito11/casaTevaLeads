@@ -1,13 +1,14 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 24 Enero 2026
+> **Last Updated**: 25 Enero 2026
 
 ## Quick Reference
 
 ### Stack
 - **Backend**: Django 5.x + DRF
 - **BD**: PostgreSQL 16 (Neon - serverless)
-- **Scrapers**: Botasaurus (habitaclia, fotocasa), ScrapingBee (milanuncios, idealista)
+- **Scrapers**: Botasaurus (habitaclia, fotocasa), Camoufox (milanuncios, idealista)
+- **Contacto**: Camoufox + IPRoyal proxy (4 portales)
 - **Orquestacion**: GitHub Actions (L-X-V 12:00 UTC)
 - **ETL**: dbt (raw → staging → marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
@@ -21,11 +22,14 @@
 
 ### Comandos Frecuentes
 ```bash
-# Local scraping
+# Local scraping (Botasaurus)
 python run_habitaclia_scraper.py --zones salou --postgres
 
+# Local scraping Idealista (Camoufox + proxy)
+DATADOME_PROXY="user:pass_country-es@geo.iproyal.com:12321" python run_camoufox_idealista_scraper.py --zones igualada --postgres
+
 # Trigger GitHub Actions scraping
-gh workflow run scrape-neon.yml -f portals="habitaclia,fotocasa" -f zones="salou"
+gh workflow run scrape-neon.yml -f portals="habitaclia,fotocasa,idealista" -f zones="salou"
 
 # dbt (local con Neon)
 cd dbt_project && dbt run --profiles-dir /tmp/dbt_profiles --select staging marts
@@ -44,8 +48,9 @@ cd dbt_project && dbt run --profiles-dir /tmp/dbt_profiles --select staging mart
 ```
 GitHub Actions (scraping)     Fly.io (Django)
          ↓                         ↓
-    ScrapingBee              casatevaleads.fly.dev
-         ↓                         ↓
+  Botasaurus + Camoufox       casatevaleads.fly.dev
+   + IPRoyal proxy                  ↓
+         ↓                          ↓
     ┌─────────────────────────────────┐
     │   Neon PostgreSQL (serverless)  │
     │   ep-ancient-darkness-*.neon.tech│
@@ -57,11 +62,14 @@ GitHub Actions (scraping)     Fly.io (Django)
 ### Costes Mensuales
 | Servicio | Coste |
 |----------|-------|
-| Fly.io | GRATIS |
+| Fly.io (hosting) | GRATIS |
 | Neon PostgreSQL | GRATIS |
 | GitHub Actions | GRATIS |
-| ScrapingBee | ~€50/mes |
-| **Total** | **~€50/mes** |
+| 2Captcha (Habitaclia reCAPTCHA) | ~$3/mes |
+| IPRoyal proxy (Idealista DataDome) | ~$1/mes* |
+| **Total** | **~$4/mes** |
+
+*IPRoyal: Compra única de $7/GB, tráfico no expira. Estimado ~100-200MB/mes.
 
 ---
 
@@ -95,8 +103,8 @@ GitHub Actions (scraping)     Fly.io (Django)
 |--------|------------|-------|----------|
 | habitaclia | Botasaurus | Gratis | Ninguno |
 | fotocasa | Botasaurus | Gratis | Ninguno |
-| milanuncios | ScrapingBee | 75 cr/req | GeeTest |
-| idealista | ScrapingBee | 75 cr/req | DataDome |
+| milanuncios | Camoufox | Gratis | GeeTest (bypass) |
+| idealista | Camoufox + IPRoyal | ~$1/mes | DataDome (bypass) |
 
 ### Schedule
 - **Workflow**: `.github/workflows/scrape-neon.yml`
@@ -109,14 +117,15 @@ GitHub Actions (scraping)     Fly.io (Django)
 
 | Portal | Estado | Método |
 |--------|--------|--------|
-| Fotocasa | OK | Auto-login + formulario |
-| Habitaclia | OK | 2Captcha reCAPTCHA |
-| Milanuncios | OK | Camoufox + chat interno |
-| Idealista | Parcial | DataDome bloquea login |
+| Fotocasa | ✅ OK | Auto-login + formulario |
+| Habitaclia | ✅ OK | 2Captcha reCAPTCHA |
+| Milanuncios | ✅ OK | Camoufox + chat interno |
+| Idealista | ✅ OK | Camoufox + IPRoyal proxy + geoip |
 
 **Modelos**: `ContactQueue`, `PortalSession`, `PortalCredential`
 **Límite**: 5 contactos/día, delay 2-5min entre contactos
 **Código**: `scrapers/contact_automation/`
+**Idealista**: `camoufox_idealista.py` (requiere `DATADOME_PROXY`)
 
 ---
 
@@ -164,11 +173,12 @@ public_marts.dim_lead_duplicates
 **Scraping**:
 - `NEON_DATABASE_URL` - Connection string Neon ✅
 - `NEON_DB_PASSWORD` - Password para dbt ✅
-- `SCRAPINGBEE_API_KEY` ✅
 
 **Contacto**:
 - `FOTOCASA_EMAIL/PASSWORD` ✅
 - `CAPTCHA_API_KEY` (2Captcha) ✅
+- `DATADOME_PROXY` (IPRoyal) ✅ - Formato: `user:pass_country-es@geo.iproyal.com:12321`
+- `IDEALISTA_EMAIL/PASSWORD` ✅
 - `CONTACT_NAME/EMAIL/PHONE` ✅
 
 **Alertas**:
