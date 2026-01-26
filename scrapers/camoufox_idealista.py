@@ -380,7 +380,11 @@ class CamoufoxIdealista:
             raise ValueError(f"Zone not found: {zona_key}")
 
         url_path = zona['url_path']
-        base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
+
+        if self.only_particulares:
+            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/con-publicado_particular/"
+        else:
+            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
 
         if page_num > 1:
             base_url = base_url.rstrip('/') + f'/pagina-{page_num}.htm'
