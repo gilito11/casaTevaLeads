@@ -67,16 +67,15 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
 
-      - name: Run Milanuncios scraper (ScrapingBee)
+      - name: Run Milanuncios scraper (Camoufox)
         if: contains(github.event.inputs.portals || '', 'milanuncios')
         run: |
-          python run_scrapingbee_milanuncios_scraper.py \
+          python run_camoufox_milanuncios_scraper.py \
             --zones ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }} \
             --max-pages 2 \
             --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          SCRAPINGBEE_API_KEY: ${{ secrets.SCRAPINGBEE_API_KEY }}
 
       - name: Run dbt transformations
         run: |

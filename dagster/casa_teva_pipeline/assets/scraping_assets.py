@@ -192,7 +192,7 @@ ZONA_MAPPING_FOTOCASA = {
     'sant_carles_rapita': 'sant_carles_rapita',
 }
 
-# Mapping para Idealista (ScrapingBee - stealth proxy)
+# Mapping para Idealista (Camoufox + IPRoyal proxy)
 ZONA_MAPPING_IDEALISTA = {
     # Lleida
     'lleida_ciudad': 'lleida',
@@ -443,10 +443,10 @@ def scraping_all_portals(
                 if mapped not in milanuncios_zones:
                     milanuncios_zones.append(mapped)
 
-        # === Milanuncios with ScrapingBee (paid - bypasses GeeTest via stealth proxy) ===
+        # === Milanuncios with Camoufox (free - bypasses GeeTest) ===
         if milanuncios_zones:
-            context.log.info(f"Running Milanuncios with ScrapingBee (stealth proxy) - {len(milanuncios_zones)} zones")
-            result = run_scraper(context, 'scrapingbee_milanuncios', milanuncios_zones, tenant_id)
+            context.log.info(f"Running Milanuncios with Camoufox - {len(milanuncios_zones)} zones")
+            result = run_scraper(context, 'camoufox_milanuncios', milanuncios_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
@@ -484,7 +484,7 @@ def scraping_all_portals(
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 
-        # === Idealista with ScrapingBee (paid - bypasses DataDome via stealth proxy) ===
+        # === Idealista with Camoufox + IPRoyal proxy (bypasses DataDome) ===
         # Skip small zones where most listings are from agencies (0 results expected)
         idealista_zones = []
         skipped_idealista_zones = []
@@ -502,8 +502,8 @@ def scraping_all_portals(
             context.log.info(f"Skipping Idealista for small zones (agencies dominate): {skipped_idealista_zones}")
 
         if idealista_zones:
-            context.log.info(f"Running Idealista with ScrapingBee (stealth proxy) - {len(idealista_zones)} zones")
-            result = run_scraper(context, 'scrapingbee_idealista', idealista_zones, tenant_id)
+            context.log.info(f"Running Idealista with Camoufox - {len(idealista_zones)} zones")
+            result = run_scraper(context, 'camoufox_idealista', idealista_zones, tenant_id)
             all_results.append(result)
             total_leads += result.get('leads_found', 0)
 

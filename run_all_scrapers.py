@@ -153,60 +153,48 @@ def run_fotocasa(zones, postgres_config, dry_run=False, save_to_db=True):
 def run_milanuncios(zones, postgres_config, dry_run=False):
     """Run Milanuncios scraper (requires ScrapingBee API key)."""
     print("\n" + "=" * 60)
-    print("MILANUNCIOS (ScrapingBee)")
+    print("MILANUNCIOS (Camoufox)")
     print("=" * 60)
-
-    if not os.environ.get('SCRAPINGBEE_API_KEY'):
-        print("SKIPPED: SCRAPINGBEE_API_KEY not set")
-        return {'skipped': True, 'reason': 'no_api_key'}
 
     if dry_run:
         print(f"DRY RUN: Would scrape zones {zones}")
         return {'listings_found': 0, 'dry_run': True}
 
     try:
-        from scrapers.scrapingbee_milanuncios import ScrapingBeeMilanuncios
-        with ScrapingBeeMilanuncios(
+        from scrapers.camoufox_milanuncios import CamoufoxMilanuncios
+        scraper = CamoufoxMilanuncios(
             zones=zones,
             tenant_id=1,
             max_pages_per_zone=2,
-            postgres_config=postgres_config
-        ) as scraper:
-            scraper.scrape_and_save()
-            stats = scraper.get_stats()
-            print(f"Stats: {stats}")
-            return stats
+        )
+        stats = scraper.scrape()
+        print(f"Stats: {stats}")
+        return stats
     except Exception as e:
         logger.error(f"Milanuncios error: {e}")
         return {'error': str(e)}
 
 
 def run_idealista(zones, postgres_config, dry_run=False):
-    """Run Idealista scraper (requires ScrapingBee API key)."""
+    """Run Idealista scraper (Camoufox + IPRoyal proxy)."""
     print("\n" + "=" * 60)
-    print("IDEALISTA (ScrapingBee)")
+    print("IDEALISTA (Camoufox)")
     print("=" * 60)
-
-    if not os.environ.get('SCRAPINGBEE_API_KEY'):
-        print("SKIPPED: SCRAPINGBEE_API_KEY not set")
-        return {'skipped': True, 'reason': 'no_api_key'}
 
     if dry_run:
         print(f"DRY RUN: Would scrape zones {zones}")
         return {'listings_found': 0, 'dry_run': True}
 
     try:
-        from scrapers.scrapingbee_idealista import ScrapingBeeIdealista
-        with ScrapingBeeIdealista(
+        from scrapers.camoufox_idealista import CamoufoxIdealista
+        scraper = CamoufoxIdealista(
             zones=zones,
             tenant_id=1,
             max_pages_per_zone=2,
-            postgres_config=postgres_config
-        ) as scraper:
-            scraper.scrape_and_save()
-            stats = scraper.get_stats()
-            print(f"Stats: {stats}")
-            return stats
+        )
+        stats = scraper.scrape()
+        print(f"Stats: {stats}")
+        return stats
     except Exception as e:
         logger.error(f"Idealista error: {e}")
         return {'error': str(e)}
