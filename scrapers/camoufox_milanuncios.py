@@ -373,21 +373,19 @@ class CamoufoxMilanuncios:
 
         ads = None
         if isinstance(json_data, dict):
-            if 'ads' in json_data:
+            # Primary path: adListPagination.adList.ads
+            if 'adListPagination' in json_data:
+                pagination = json_data['adListPagination']
+                if isinstance(pagination, dict) and 'adList' in pagination:
+                    ad_list = pagination['adList']
+                    if isinstance(ad_list, dict) and 'ads' in ad_list:
+                        ads = ad_list['ads']
+
+            # Fallbacks
+            if not ads and 'ads' in json_data:
                 ads = json_data['ads']
-            elif 'pageProps' in json_data and 'ads' in json_data['pageProps']:
+            if not ads and 'pageProps' in json_data and 'ads' in json_data.get('pageProps', {}):
                 ads = json_data['pageProps']['ads']
-            elif 'data' in json_data and 'ads' in json_data['data']:
-                ads = json_data['data']['ads']
-            else:
-                for key, value in json_data.items():
-                    if isinstance(value, dict) and 'ads' in value:
-                        ads = value['ads']
-                        break
-                    elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
-                        if 'id' in value[0] and 'url' in value[0]:
-                            ads = value
-                            break
 
         if not ads:
             logger.warning(f"No ads found in JSON. Keys: {list(json_data.keys()) if isinstance(json_data, dict) else type(json_data)}")
@@ -398,8 +396,15 @@ class CamoufoxMilanuncios:
 
         for ad in ads:
             try:
+                # Skip professionals
                 seller_type = ad.get('sellerType', '').lower()
                 if self.only_particulares and seller_type == 'professional':
+                    logger.debug(f"Skipping professional (JSON): {ad.get('id')}")
+                    continue
+
+                # Skip promoted/highlighted ads (often out-of-zone spam)
+                if ad.get('highlighted') or ad.get('isVipContent'):
+                    logger.debug(f"Skipping promoted ad: {ad.get('id')}")
                     continue
 
                 anuncio_id = str(ad.get('id', ''))
@@ -417,6 +422,11 @@ class CamoufoxMilanuncios:
                         precio = price_data.get('value')
                 elif isinstance(price_data, (int, float)):
                     precio = price_data
+
+                # Skip listings under 10000€
+                if precio is not None and precio < 10000:
+                    logger.debug(f"Skipping low price ({precio}€): {anuncio_id}")
+                    continue
 
                 # URL
                 url_path = ad.get('url', '')
@@ -552,6 +562,19 @@ class CamoufoxMilanuncios:
                             break
                 except:
                     continue
+
+            # Skip listings under 10000€
+            if precio is not None and precio < 10000:
+                logger.debug(f"Skipping low price ({precio}€): {anuncio_id}")
+                return None
+
+            # Skip promoted/highlighted ads (often out-of-zone)
+            try:
+                if item.query_selector('[class*="highlight"], [class*="Highlight"], [class*="vip"], [class*="Vip"], [class*="promoted"], [class*="Promoted"]'):
+                    logger.debug(f"Skipping promoted ad (DOM): {anuncio_id}")
+                    return None
+            except:
+                pass
 
             zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 

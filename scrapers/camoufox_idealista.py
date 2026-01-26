@@ -495,6 +495,11 @@ class CamoufoxIdealista:
             location_elem = item.query_selector('.item-location')
             ubicacion = location_elem.inner_text() if location_elem else ''
 
+            # Skip listings under 10000€
+            if precio is not None and precio < 10000:
+                logger.debug(f"Skipping low price ({precio}€): {anuncio_id}")
+                return None
+
             zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
             return {
@@ -508,7 +513,7 @@ class CamoufoxIdealista:
                 'zona_geografica': zona_info.get('nombre', zona_key),
                 'zona_busqueda': zona_key,
                 'url_anuncio': f"{self.BASE_URL}{href}" if href.startswith('/') else href,
-                'es_particular': not is_professional,  # Heuristic, may need verification
+                'es_particular': not is_professional,
                 'tipo_inmueble': 'piso',
             }
 
