@@ -253,13 +253,13 @@ class IdealistaContact(BaseContactAutomation):
     USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
 
     def __init__(self, headless: bool = False, captcha_api_key: str = None, email: str = None, password: str = None, proxy: str = None):
-        super().__init__(headless=headless)
+        # Proxy format: user:pass@host:port
+        # Required for DataDome bypass - use residential proxy
+        proxy = proxy or os.getenv('DATADOME_PROXY')
+        super().__init__(headless=headless, proxy=proxy)
         self.email = email or os.getenv('IDEALISTA_EMAIL')
         self.password = password or os.getenv('IDEALISTA_PASSWORD')
         self.captcha_api_key = captcha_api_key or os.getenv('CAPTCHA_API_KEY')
-        # Proxy format: user:pass@ip:port or ip:port
-        # Required for DataDome solving via 2Captcha
-        self.proxy = proxy or os.getenv('DATADOME_PROXY')
         self.datadome_solver = None
         if self.captcha_api_key:
             self.datadome_solver = DataDomeSolver(self.captcha_api_key)

@@ -67,12 +67,14 @@ class BaseContactAutomation(ABC):
     MIN_DELAY_SECONDS = 120  # 2 minutes
     MAX_DELAY_SECONDS = 300  # 5 minutes
 
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = False, proxy: str = None):
         self.headless = headless
         self.browser = None
         self.context = None
         self.page = None
         self.contacts_today = 0
+        # Proxy format: user:pass@host:port
+        self.proxy = proxy
 
         # Ensure cookies directory exists
         self.COOKIES_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,6 +128,20 @@ class BaseContactAutomation(ABC):
             'locale': 'es-ES',
             'timezone_id': 'Europe/Madrid',
         }
+
+        # Configure proxy if provided (format: user:pass@host:port)
+        if self.proxy:
+            if '@' in self.proxy:
+                auth, addr = self.proxy.rsplit('@', 1)
+                user, passwd = auth.split(':', 1)
+                context_options['proxy'] = {
+                    'server': f'http://{addr}',
+                    'username': user,
+                    'password': passwd,
+                }
+            else:
+                context_options['proxy'] = {'server': f'http://{self.proxy}'}
+            logger.info(f"Browser proxy configured: {addr if '@' in self.proxy else self.proxy}")
 
         self.context = await self.browser.new_context(**context_options)
 

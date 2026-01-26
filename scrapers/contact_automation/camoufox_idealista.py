@@ -139,12 +139,15 @@ class CamoufoxIdealistaContact:
         headless: bool = True,
         email: str = None,
         password: str = None,
-        captcha_api_key: str = None
+        captcha_api_key: str = None,
+        proxy: str = None
     ):
         self.headless = headless
         self.email = email or os.getenv("IDEALISTA_EMAIL")
         self.password = password or os.getenv("IDEALISTA_PASSWORD")
         self.captcha_api_key = captcha_api_key or os.getenv("CAPTCHA_API_KEY")
+        # Proxy format: user:pass@host:port
+        self.proxy = proxy or os.getenv("DATADOME_PROXY")
         self.browser = None
         self.page = None
         self.datadome_solver = None
@@ -153,14 +156,31 @@ class CamoufoxIdealistaContact:
 
     def _get_camoufox_options(self) -> dict:
         """Get Camoufox browser options."""
-        return {
+        options = {
             "humanize": 2.5,  # Human-like behavior
             "headless": self.headless,
-            "geoip": True,  # Spain geolocation
+            "geoip": True,  # Match geolocation to proxy IP
             "os": "windows",
             "block_webrtc": True,
             "locale": ["es-ES", "es"],
         }
+
+        # Add proxy if configured (format: user:pass@host:port)
+        if self.proxy:
+            if "@" in self.proxy:
+                auth, addr = self.proxy.rsplit("@", 1)
+                user, passwd = auth.split(":", 1)
+                host, port = addr.split(":")
+                options["proxy"] = {
+                    "server": f"http://{host}:{port}",
+                    "username": user,
+                    "password": passwd,
+                }
+            else:
+                options["proxy"] = {"server": f"http://{self.proxy}"}
+            logger.info(f"Camoufox proxy: {addr if '@' in self.proxy else self.proxy}")
+
+        return options
 
     def _check_datadome(self) -> Optional[str]:
         """Check if DataDome challenge is present and return captcha URL if found."""
