@@ -69,6 +69,11 @@ def main():
         help='Run with visible browser (for debugging)'
     )
     parser.add_argument(
+        '--virtual',
+        action='store_true',
+        help='Use Xvfb virtual display (for CI - evades headless detection)'
+    )
+    parser.add_argument(
         '--postgres',
         action='store_true',
         help='Save to PostgreSQL (always enabled)'
@@ -117,7 +122,12 @@ def main():
         )
 
     only_particulares = not args.include_agencies
-    headless = not args.visible
+    if args.visible:
+        headless = False
+    elif args.virtual:
+        headless = "virtual"
+    else:
+        headless = True
 
     print(f"\n{'='*50}")
     print("  CAMOUFOX IDEALISTA SCRAPER")
