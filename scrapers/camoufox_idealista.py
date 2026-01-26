@@ -609,7 +609,6 @@ class CamoufoxIdealista:
         camoufox_opts = {
             "humanize": 2.5,
             "headless": self.headless,
-            "geoip": True,  # Critical: match timezone/locale to proxy location
             "os": "windows",
             "block_webrtc": True,
             "locale": ["es-ES", "es"],
@@ -619,8 +618,12 @@ class CamoufoxIdealista:
         proxy_config = parse_proxy(self.proxy)
         if proxy_config:
             camoufox_opts["proxy"] = proxy_config
+            # Only use geoip when NOT in virtual/CI mode (can cause fingerprint inconsistency)
+            if self.headless != "virtual":
+                camoufox_opts["geoip"] = True
             logger.info(f"Using proxy: {proxy_config['server']}")
         else:
+            camoufox_opts["geoip"] = True
             logger.warning("No DATADOME_PROXY configured - may get blocked")
 
         logger.info(f"Starting Camoufox Idealista scraper")
