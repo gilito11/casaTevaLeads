@@ -285,8 +285,15 @@ class CamoufoxMilanuncios:
             raise ValueError(f"Zone not found: {zona_key}")
 
         url = f"{self.BASE_URL}/{zona['url_path']}"
+
+        params = []
+        if self.only_particulares:
+            params.append('vendedor=particular')
         if page_num > 1:
-            url = url.rstrip('/') + f'?pagina={page_num}'
+            params.append(f'pagina={page_num}')
+
+        if params:
+            url = url.rstrip('/') + '?' + '&'.join(params)
         return url
 
     def _extract_listings_from_page(self, page, zona_key: str) -> List[Dict[str, Any]]:
@@ -457,17 +464,40 @@ class CamoufoxMilanuncios:
     def _parse_listing_card(self, item, zona_key: str) -> Optional[Dict[str, Any]]:
         """Parse a single listing card from DOM (fallback)."""
         try:
-            # Check if professional
-            pro_selectors = [
-                '[class*="professional"]', '[class*="Professional"]',
-                '.ma-AdTag--pro', '[data-seller-type="professional"]',
-            ]
-            for sel in pro_selectors:
-                try:
-                    if item.query_selector(sel) and self.only_particulares:
-                        return None
-                except:
-                    continue
+            # Detect professional seller from card HTML
+            is_professional = False
+            try:
+                card_html = item.inner_html().lower()
+                card_text = item.inner_text().lower()
+                pro_indicators = [
+                    'profesional', 'professional', 'inmobiliaria',
+                    'adtag--pro', 'seller-type="pro', 'sellerbadge',
+                ]
+                for indicator in pro_indicators:
+                    if indicator in card_html or indicator in card_text:
+                        is_professional = True
+                        break
+            except:
+                pass
+
+            # Also check CSS selectors
+            if not is_professional:
+                pro_selectors = [
+                    '[class*="professional"]', '[class*="Professional"]',
+                    '.ma-AdTag--pro', '[data-seller-type="professional"]',
+                    '[class*="ProBadge"]', '[class*="SellerBadge"]',
+                ]
+                for sel in pro_selectors:
+                    try:
+                        if item.query_selector(sel):
+                            is_professional = True
+                            break
+                    except:
+                        continue
+
+            if is_professional and self.only_particulares:
+                logger.debug("Skipping professional listing (DOM)")
+                return None
 
             # Get link
             link = None
@@ -534,7 +564,7 @@ class CamoufoxMilanuncios:
                 'zona_geografica': zona_info.get('nombre', zona_key),
                 'zona_busqueda': zona_key,
                 'url_anuncio': f"{self.BASE_URL}{href}" if href.startswith('/') else href,
-                'es_particular': True,
+                'es_particular': not is_professional,
                 'tipo_inmueble': 'piso',
                 'fotos': [],
             }
@@ -557,7 +587,7 @@ class CamoufoxMilanuncios:
         return None
 
     def _scrape_detail_page(self, page, listing: Dict[str, Any]) -> Dict[str, Any]:
-        """Visit detail page to get phone, description, photos."""
+        """Visit detail page to get phone, description, photos, and verify seller type."""
         url = listing.get('url_anuncio')
         if not url:
             return listing
@@ -568,6 +598,27 @@ class CamoufoxMilanuncios:
 
             page.mouse.wheel(0, random.randint(200, 400))
             self._human_delay(1, 2)
+
+            # Verify seller type from detail page
+            try:
+                detail_html = page.content().lower()
+                seller_selectors = [
+                    '[class*="seller"]', '[class*="Seller"]',
+                    '[class*="advertiser"]', '[class*="Advertiser"]',
+                ]
+                for sel in seller_selectors:
+                    try:
+                        elem = page.query_selector(sel)
+                        if elem:
+                            seller_text = elem.inner_text().lower()
+                            if any(w in seller_text for w in ['profesional', 'professional', 'inmobiliaria']):
+                                listing['es_particular'] = False
+                                logger.debug(f"Detail page: professional detected - {listing.get('anuncio_id')}")
+                                break
+                    except:
+                        continue
+            except:
+                pass
 
             # Try to get phone via button click
             try:
@@ -832,6 +883,11 @@ class CamoufoxMilanuncios:
                                 self.stats['listings_found'] += 1
 
                                 listing = self._scrape_detail_page(page, listing)
+
+                                # Skip professionals detected on detail page
+                                if self.only_particulares and not listing.get('es_particular'):
+                                    logger.debug(f"Skipping professional (detail): {listing.get('anuncio_id')}")
+                                    continue
 
                                 # Watermark check on first photo
                                 if self.filter_watermarks and listing.get('fotos'):
