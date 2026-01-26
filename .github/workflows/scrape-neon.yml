@@ -76,6 +76,7 @@ jobs:
             --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
 
       - name: Run dbt transformations
         run: |

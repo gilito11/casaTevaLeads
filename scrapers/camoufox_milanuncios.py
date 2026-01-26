@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 import psycopg2
 
 from scrapers.watermark_detector import has_watermark
+from scrapers.camoufox_idealista import parse_proxy
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +199,7 @@ class CamoufoxMilanuncios:
         only_particulares: bool = True,
         headless: bool = True,
         filter_watermarks: bool = True,
+        proxy: str = None,
     ):
         self.zones = zones or ['salou']
         self.tenant_id = tenant_id
@@ -205,6 +207,7 @@ class CamoufoxMilanuncios:
         self.only_particulares = only_particulares
         self.headless = headless
         self.filter_watermarks = filter_watermarks
+        self.proxy = proxy or os.environ.get('DATADOME_PROXY')
 
         self.postgres_conn = None
         self.stats = {
@@ -707,20 +710,32 @@ class CamoufoxMilanuncios:
 
         self._init_postgres()
 
+        # Build Camoufox options
+        camoufox_opts = {
+            "humanize": 2.5,
+            "headless": self.headless,
+            "geoip": True,
+            "os": "windows",
+            "block_webrtc": True,
+            "locale": ["es-ES", "es"],
+        }
+
+        # Add proxy if configured (needed for datacenter IPs like GitHub Actions)
+        proxy_config = parse_proxy(self.proxy)
+        if proxy_config:
+            camoufox_opts["proxy"] = proxy_config
+            logger.info(f"Using proxy: {proxy_config['server']}")
+        else:
+            logger.warning("No proxy configured - may be blocked from datacenter IPs")
+
         logger.info(f"Starting Camoufox Milanuncios scraper")
         logger.info(f"  Zones: {self.zones}")
         logger.info(f"  Max pages: {self.max_pages_per_zone}")
         logger.info(f"  Headless: {self.headless}")
+        logger.info(f"  Proxy: {'configured' if proxy_config else 'none'}")
 
         try:
-            with Camoufox(
-                humanize=2.5,
-                headless=self.headless,
-                geoip=True,
-                os="windows",
-                block_webrtc=True,
-                locale=["es-ES", "es"],
-            ) as browser:
+            with Camoufox(**camoufox_opts) as browser:
                 page = browser.new_page()
 
                 self._warmup_navigation(page)

@@ -109,6 +109,8 @@ def main():
     headless = not args.visible
     filter_watermarks = not args.no_watermark_filter
 
+    proxy = os.environ.get('DATADOME_PROXY')
+
     print(f"\n{'='*50}")
     print("  CAMOUFOX MILANUNCIOS SCRAPER")
     print(f"{'='*50}")
@@ -117,8 +119,9 @@ def main():
     print(f"  Max pages per zone: {args.max_pages}")
     print(f"  Only particulares: {only_particulares}")
     print(f"  Watermark filter: {filter_watermarks}")
+    print(f"  Proxy: {'configured' if proxy else 'NOT CONFIGURED'}")
     print(f"  Headless: {headless}")
-    print(f"  Cost: FREE")
+    print(f"  Cost: FREE (proxy: ~$0.01/scrape)")
     print(f"{'='*50}\n")
 
     try:
