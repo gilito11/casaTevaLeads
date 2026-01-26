@@ -741,28 +741,73 @@ class CamoufoxMilanuncios:
                             page.goto(url, wait_until='domcontentloaded', timeout=60000)
                             self._human_delay(3, 5)
 
-                            # Scroll to load content
+                            # Wait for React to hydrate
+                            try:
+                                page.wait_for_load_state('networkidle', timeout=15000)
+                            except:
+                                logger.debug("networkidle timeout, continuing...")
+
+                            # Scroll to load lazy content
                             for _ in range(3):
                                 page.mouse.wheel(0, random.randint(300, 600))
                                 self._human_delay(0.5, 1)
 
+                            # Extra wait for React re-render after scroll
+                            self._human_delay(2, 3)
+
                             self.stats['pages_scraped'] += 1
 
-                            # Check for GeeTest
+                            # Log actual URL (detect redirects)
+                            current_url = page.url
+                            if current_url != url:
+                                logger.warning(f"Redirected to: {current_url}")
+
+                            # Check for GeeTest / blocking
                             try:
                                 captcha = page.query_selector(
-                                    '.geetest_holder, [class*="geetest"], iframe[src*="geetest"]'
+                                    '.geetest_holder, [class*="geetest"], iframe[src*="geetest"], '
+                                    '.geetest_challenge, #geetest-wrap'
                                 )
                                 if captcha:
                                     logger.warning("GeeTest captcha detected!")
                                     self.stats['errors'] += 1
                                     break
-                            except:
-                                pass
+
+                                # Check for empty/error page
+                                body_text = page.evaluate("() => document.body.innerText.substring(0, 500)")
+                                if 'error' in body_text.lower() or len(body_text.strip()) < 50:
+                                    logger.warning(f"Possible block/error page. Body preview: {body_text[:200]}")
+                            except Exception as e:
+                                logger.debug(f"Block check error: {e}")
 
                             # Extract listings
                             listings = self._extract_listings_from_page(page, zona_key)
                             logger.info(f"Found {len(listings)} particular listings")
+
+                            # Debug: if no listings, log page diagnostics
+                            if not listings:
+                                try:
+                                    title = page.title()
+                                    html_len = page.evaluate("() => document.body.innerHTML.length")
+                                    scripts_with_data = page.evaluate("""
+                                        () => {
+                                            const scripts = document.querySelectorAll('script');
+                                            const info = [];
+                                            for (const s of scripts) {
+                                                const t = s.textContent || '';
+                                                if (t.includes('INITIAL') || t.includes('ads') || t.includes('__NEXT'))
+                                                    info.push(t.substring(0, 100));
+                                            }
+                                            return info;
+                                        }
+                                    """)
+                                    logger.warning(
+                                        f"DIAG: title='{title}', html_len={html_len}, "
+                                        f"data_scripts={len(scripts_with_data)}, "
+                                        f"previews={scripts_with_data[:3]}"
+                                    )
+                                except Exception as e:
+                                    logger.debug(f"Diagnostics failed: {e}")
 
                             if not listings:
                                 break
