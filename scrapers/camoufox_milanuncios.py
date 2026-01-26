@@ -393,18 +393,15 @@ class CamoufoxMilanuncios:
 
         logger.info(f"Found {len(ads)} ads in JSON")
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+        skipped_pro = 0
+        skipped_price = 0
 
         for ad in ads:
             try:
                 # Skip professionals
                 seller_type = ad.get('sellerType', '').lower()
                 if self.only_particulares and seller_type == 'professional':
-                    logger.debug(f"Skipping professional (JSON): {ad.get('id')}")
-                    continue
-
-                # Skip promoted/highlighted ads (often out-of-zone spam)
-                if ad.get('highlighted') or ad.get('isVipContent'):
-                    logger.debug(f"Skipping promoted ad: {ad.get('id')}")
+                    skipped_pro += 1
                     continue
 
                 anuncio_id = str(ad.get('id', ''))
@@ -425,7 +422,7 @@ class CamoufoxMilanuncios:
 
                 # Skip listings under 10000€
                 if precio is not None and precio < 10000:
-                    logger.debug(f"Skipping low price ({precio}€): {anuncio_id}")
+                    skipped_price += 1
                     continue
 
                 # URL
@@ -469,6 +466,7 @@ class CamoufoxMilanuncios:
             except Exception as e:
                 logger.debug(f"Error parsing JSON ad: {e}")
 
+        logger.info(f"JSON filter: {len(listings)} kept, {skipped_pro} professional, {skipped_price} low price (of {len(ads)} total)")
         return listings
 
     def _parse_listing_card(self, item, zona_key: str) -> Optional[Dict[str, Any]]:
@@ -567,14 +565,6 @@ class CamoufoxMilanuncios:
             if precio is not None and precio < 10000:
                 logger.debug(f"Skipping low price ({precio}€): {anuncio_id}")
                 return None
-
-            # Skip promoted/highlighted ads (often out-of-zone)
-            try:
-                if item.query_selector('[class*="highlight"], [class*="Highlight"], [class*="vip"], [class*="Vip"], [class*="promoted"], [class*="Promoted"]'):
-                    logger.debug(f"Skipping promoted ad (DOM): {anuncio_id}")
-                    return None
-            except:
-                pass
 
             zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
 
