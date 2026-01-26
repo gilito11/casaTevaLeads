@@ -10,7 +10,7 @@ on:
       portals:
         description: 'Portals to scrape (comma-separated)'
         required: false
-        default: 'habitaclia,fotocasa,idealista,milanuncios'
+        default: 'habitaclia,fotocasa,milanuncios'
       zones:
         description: 'Zones to scrape (comma-separated)'
         required: false
@@ -56,8 +56,9 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
-      - name: Run Idealista scraper (Camoufox)
+      - name: Run Idealista scraper (Camoufox) - may fail from datacenter IPs
         if: contains(github.event.inputs.portals || '', 'idealista')
+        continue-on-error: true
         run: |
           python run_camoufox_idealista_scraper.py \
             --zones ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }} \
