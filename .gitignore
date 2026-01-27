@@ -254,3 +254,7 @@ test_*.png
 tmp_*.ps1
 *.debug.png
 webapp_logs.zip
+webapp_logs/
+
+# dbt user config
+dbt_project/.user.yml

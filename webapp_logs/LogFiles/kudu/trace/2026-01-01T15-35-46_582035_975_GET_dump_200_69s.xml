@@ -1,6 +1,0 @@
-<step title="Incoming Request" date="2026-01-01T15:35:46.512" instance="582035" url="/dump" method="GET" type="request" pid="768,1,39" Host="inmoleads-crm.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (MSI)" Accept-Encoding="identity" Authorization="Bas..." x-ms-client-request-id="dd03cac9-e727-11f0-9bb7-2cf05d29d599" X-ARR-LOG-ID="dd03cac9-e727-11f0-9bb7-2cf05d29d599" CLIENT-IP="46.25.102.39:62760" X-SITE-DEPLOYMENT-ID="inmoleads-crm" WAS-DEFAULT-HOSTNAME="inmoleads-crm.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/dump" X-Client-IP="46.25.102.39" X-Client-Port="62760" >
-  <step title="Cleanup Xml Logs" date="2026-01-01T15:35:46.515" >
-    <step title="Cleanup Infos" date="2026-01-01T15:35:46.633" totalFiles="4007" totalCleanup="3847" /><!-- duration: 16ms -->
-  </step><!-- duration: 139ms -->
-  <step title="Outgoing response" date="2026-01-01T15:36:55.865" type="response" statusCode="200" statusText="OK" /><!-- duration: 4ms -->
-</step><!-- duration: 69360ms -->
