@@ -66,16 +66,16 @@ ZONAS_GEOGRAFICAS = {
     # TARRAGONA
     'tarragona': {
         'nombre': 'Tarragona',
-        'url_path': 'pisos-en-tarragona/',
+        'url_path': 'pisos-en-tarragona-tarragona/',
     },
     'tarragona_ciudad': {
         'nombre': 'Tarragona Ciudad',
-        'url_path': 'pisos-en-tarragona/',
+        'url_path': 'pisos-en-tarragona-tarragona/',
     },
     # COSTA DAURADA
     'salou': {
         'nombre': 'Salou',
-        'url_path': 'pisos-en-salou/',
+        'url_path': 'pisos-en-salou-tarragona/',
     },
     'cambrils': {
         'nombre': 'Cambrils',
@@ -840,6 +840,15 @@ class CamoufoxMilanuncios:
                             current_url = page.url
                             if current_url != url:
                                 logger.warning(f"Redirected to: {current_url}")
+
+                                # Check if redirected to generic page (lost zone filter)
+                                zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
+                                zona_url_path = zona_info.get('url_path', '')
+                                if zona_url_path and zona_url_path.rstrip('/') not in current_url:
+                                    logger.error(f"REDIRECT DETECTED: Lost zone filter! Expected '{zona_url_path}' in URL")
+                                    logger.error("Skipping this page to avoid saving wrong location data")
+                                    self.stats['errors'] += 1
+                                    break  # Skip to next zone
 
                             # Check for GeeTest / blocking
                             try:
