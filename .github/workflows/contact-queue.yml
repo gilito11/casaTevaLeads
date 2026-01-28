@@ -28,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install playwright psycopg2-binary requests
+          pip install playwright psycopg2-binary requests aiohttp
           playwright install chromium
           playwright install-deps chromium
 
@@ -53,6 +53,8 @@ jobs:
           IDEALISTA_PASSWORD: ${{ secrets.IDEALISTA_PASSWORD }}
           # 2Captcha for reCAPTCHA (Habitaclia) and DataDome (Idealista)
           CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
+          # DataDome proxy for Idealista
+          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           # Contact info
           CONTACT_NAME: ${{ secrets.CONTACT_NAME }}
           CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}

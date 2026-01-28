@@ -11,7 +11,10 @@ Usage:
 Requires:
     - DATABASE_URL environment variable (Neon)
     - FOTOCASA_EMAIL, FOTOCASA_PASSWORD (for Fotocasa)
+    - MILANUNCIOS_EMAIL, MILANUNCIOS_PASSWORD (for Milanuncios)
+    - IDEALISTA_EMAIL, IDEALISTA_PASSWORD (for Idealista)
     - CAPTCHA_API_KEY (for Habitaclia/Idealista)
+    - DATADOME_PROXY (for Idealista - IPRoyal residential proxy)
     - CONTACT_NAME, CONTACT_EMAIL, CONTACT_PHONE (for forms)
     - TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (optional, for alerts)
 """
@@ -195,6 +198,106 @@ async def process_habitaclia(contact: dict) -> dict:
     return result
 
 
+async def process_milanuncios(contact: dict) -> dict:
+    """Process Milanuncios contact."""
+    from scrapers.contact_automation.milanuncios_contact import MilanunciosContact
+
+    result = {'success': False, 'phone': None, 'message_sent': False, 'error': None}
+
+    email = os.environ.get('MILANUNCIOS_EMAIL')
+    password = os.environ.get('MILANUNCIOS_PASSWORD')
+
+    if not email or not password:
+        result['error'] = 'MILANUNCIOS credentials not configured'
+        return result
+
+    automation = MilanunciosContact(headless=True, email=email, password=password)
+
+    try:
+        await automation.setup_browser()
+
+        if not await automation.is_logged_in():
+            logger.info("Logging in to Milanuncios...")
+            if not await automation.login(email, password):
+                result['error'] = 'Login failed'
+                return result
+
+        contact_result = await automation.contact_lead(
+            lead_id=contact['lead_id'],
+            listing_url=contact['listing_url'],
+            message=contact['mensaje']
+        )
+
+        result['success'] = contact_result.success
+        result['phone'] = contact_result.phone_extracted
+        result['message_sent'] = contact_result.message_sent
+        result['error'] = contact_result.error
+
+    except Exception as e:
+        result['error'] = str(e)
+        logger.error(f"Milanuncios error: {e}")
+    finally:
+        await automation.close()
+
+    return result
+
+
+async def process_idealista(contact: dict) -> dict:
+    """Process Idealista contact."""
+    from scrapers.contact_automation.idealista_contact import IdealistaContact
+
+    result = {'success': False, 'phone': None, 'message_sent': False, 'error': None}
+
+    email = os.environ.get('IDEALISTA_EMAIL')
+    password = os.environ.get('IDEALISTA_PASSWORD')
+    captcha_key = os.environ.get('CAPTCHA_API_KEY')
+    proxy = os.environ.get('DATADOME_PROXY')
+
+    if not email or not password:
+        result['error'] = 'IDEALISTA credentials not configured'
+        return result
+
+    if not proxy:
+        result['error'] = 'DATADOME_PROXY not configured (required for Idealista)'
+        return result
+
+    automation = IdealistaContact(
+        headless=True,
+        captcha_api_key=captcha_key,
+        email=email,
+        password=password,
+        proxy=proxy
+    )
+
+    try:
+        await automation.setup_browser()
+
+        if not await automation.is_logged_in():
+            logger.info("Logging in to Idealista...")
+            if not await automation.login(email, password):
+                result['error'] = 'Login failed'
+                return result
+
+        contact_result = await automation.contact_lead(
+            lead_id=contact['lead_id'],
+            listing_url=contact['listing_url'],
+            message=contact['mensaje']
+        )
+
+        result['success'] = contact_result.success
+        result['phone'] = contact_result.phone_extracted
+        result['message_sent'] = contact_result.message_sent
+        result['error'] = contact_result.error
+
+    except Exception as e:
+        result['error'] = str(e)
+        logger.error(f"Idealista error: {e}")
+    finally:
+        await automation.close()
+
+    return result
+
+
 def main():
     """Main function."""
     logger.info("=" * 50)
@@ -232,6 +335,10 @@ def main():
             result = asyncio.run(process_fotocasa(contact))
         elif portal == 'habitaclia':
             result = asyncio.run(process_habitaclia(contact))
+        elif portal == 'milanuncios':
+            result = asyncio.run(process_milanuncios(contact))
+        elif portal == 'idealista':
+            result = asyncio.run(process_idealista(contact))
         else:
             result = {'success': False, 'error': f'Portal not supported: {portal}'}
 
