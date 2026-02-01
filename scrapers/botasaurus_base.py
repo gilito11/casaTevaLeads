@@ -83,7 +83,7 @@ class BotasaurusBaseScraper:
     def _init_postgres(self, config: Dict[str, str]):
         """Initialize PostgreSQL connection."""
         try:
-            conn_params = {
+            self._pg_config = {
                 'host': config.get('host', 'localhost'),
                 'port': config.get('port', 5432),
                 'database': config.get('database', 'casa_teva_db'),
@@ -91,13 +91,27 @@ class BotasaurusBaseScraper:
                 'password': config.get('password', ''),
             }
             if config.get('sslmode'):
-                conn_params['sslmode'] = config.get('sslmode')
+                self._pg_config['sslmode'] = config.get('sslmode')
 
-            conn = psycopg2.connect(**conn_params)
+            conn = psycopg2.connect(**self._pg_config)
             logger.info(f"PostgreSQL connected: {config.get('host')}")
             return conn
         except Exception as e:
             logger.error(f"PostgreSQL connection error: {e}")
+            raise
+
+    def _reconnect_postgres(self):
+        """Reconnect to PostgreSQL if connection was lost."""
+        try:
+            if self.postgres_conn:
+                try:
+                    self.postgres_conn.close()
+                except Exception:
+                    pass
+            self.postgres_conn = psycopg2.connect(**self._pg_config)
+            logger.info("PostgreSQL reconnected successfully")
+        except Exception as e:
+            logger.error(f"PostgreSQL reconnection failed: {e}")
             raise
 
     def _generate_lead_id(self, portal: str, anuncio_id: str) -> int:
@@ -272,10 +286,29 @@ class BotasaurusBaseScraper:
                 logger.debug(f"Duplicate skipped: {portal} - {anuncio_id}")
                 return False
 
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            logger.warning(f"PostgreSQL connection lost, reconnecting: {e}")
+            try:
+                self._reconnect_postgres()
+                cursor = self.postgres_conn.cursor()
+                cursor.execute(sql, (
+                    self.tenant_id, portal, data_lake_path,
+                    json.dumps(raw_data, ensure_ascii=False), now,
+                ))
+                self.postgres_conn.commit()
+                cursor.close()
+                logger.info(f"Lead saved after reconnect: {portal} - {anuncio_id}")
+                return True
+            except Exception as retry_err:
+                logger.error(f"Retry failed: {retry_err}")
+                return False
         except Exception as e:
             logger.error(f"Error saving to PostgreSQL: {e}")
             if self.postgres_conn:
-                self.postgres_conn.rollback()
+                try:
+                    self.postgres_conn.rollback()
+                except Exception:
+                    pass
             return False
 
     def _save_price_history(self, cursor, portal: str, anuncio_id: str, precio: float) -> None:
