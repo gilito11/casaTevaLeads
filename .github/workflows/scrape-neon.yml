@@ -46,13 +46,17 @@ jobs:
 
       - name: Run Habitaclia scraper
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa', 'habitaclia')
-        run: python run_habitaclia_scraper.py --zones ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }} --postgres
+        run: |
+          ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
+          python run_habitaclia_scraper.py --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
       - name: Run Fotocasa scraper
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa', 'fotocasa')
-        run: python run_fotocasa_scraper.py --zones ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }} --postgres
+        run: |
+          ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
+          python run_fotocasa_scraper.py --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
@@ -60,8 +64,9 @@ jobs:
         if: contains(github.event.inputs.portals || '', 'idealista')
         continue-on-error: true
         run: |
+          ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
           python run_camoufox_idealista_scraper.py \
-            --zones ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }} \
+            --zones ${ZONES//,/ } \
             --max-pages 2 \
             --virtual \
             --postgres
@@ -72,8 +77,9 @@ jobs:
       - name: Run Milanuncios scraper (Camoufox)
         if: contains(github.event.inputs.portals || '', 'milanuncios')
         run: |
+          ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
           python run_camoufox_milanuncios_scraper.py \
-            --zones ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }} \
+            --zones ${ZONES//,/ } \
             --max-pages 2 \
             --postgres
         env:
