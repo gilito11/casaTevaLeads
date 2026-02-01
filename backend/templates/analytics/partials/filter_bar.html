@@ -94,7 +94,7 @@ function analyticsFilters() {
         async init() {
             // Load filter options
             try {
-                const response = await fetch('/analytics/api/filter-options/');
+                const response = await fetch('{% url "analytics:api_filter_options" %}');
                 const data = await response.json();
                 this.portales = data.portales;
                 this.zonas = data.zonas;
@@ -146,7 +146,7 @@ function analyticsFilters() {
         },
 
         exportUrl() {
-            return '/analytics/api/export/?' + this.queryString();
+            return '{% url "analytics:api_export" %}?' + this.queryString();
         },
 
         async applyFilters() {

@@ -921,26 +921,24 @@ def toggle_zona_portal_view(request, zona_id, portal):
 
 def _render_zonas_panels(request, tenant_id):
     """Helper para renderizar el partial de zonas."""
-    from core.models import ZONAS_PREESTABLECIDAS, REGIONES_ZONAS
+    from core.models import ZONAS_PREESTABLECIDAS, ZONAS_POR_REGION
 
     zonas = ZonaGeografica.objects.filter(tenant_id=tenant_id, activa=True).order_by('nombre')
     zonas_activas_slugs = set(zonas.values_list('slug', flat=True))
 
     zonas_por_region = []
-    for region_nombre, zona_slugs in REGIONES_ZONAS.items():
+    for region_key, region_data in ZONAS_POR_REGION.items():
         zonas_region = []
-        for slug in zona_slugs:
-            if slug in ZONAS_PREESTABLECIDAS:
-                zona_data = ZONAS_PREESTABLECIDAS[slug]
-                zonas_region.append({
-                    'slug': slug,
-                    'nombre': zona_data['nombre'],
-                    'radio_default': zona_data.get('radio_default', 20),
-                    'activa': slug in zonas_activas_slugs
-                })
+        for slug, zona_data in region_data['zonas'].items():
+            zonas_region.append({
+                'slug': slug,
+                'nombre': zona_data['nombre'],
+                'radio_default': zona_data.get('radio_default', 20),
+                'activa': slug in zonas_activas_slugs
+            })
         if zonas_region:
             zonas_por_region.append({
-                'nombre': region_nombre,
+                'nombre': region_data['nombre'],
                 'zonas': zonas_region
             })
 

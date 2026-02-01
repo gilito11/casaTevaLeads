@@ -154,11 +154,12 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ map_config_json|json_script:"map-config-data" }}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 (function() {
     // Map configuration from Django (all in JSON to avoid locale issues)
-    var mapConfig = {{ map_config_json|safe }};
+    var mapConfig = JSON.parse(document.getElementById('map-config-data').textContent);
     var zonesData = mapConfig.zones;
     var centerLat = mapConfig.center[0];
     var centerLon = mapConfig.center[1];

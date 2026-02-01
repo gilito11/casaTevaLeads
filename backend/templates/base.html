@@ -67,7 +67,7 @@
             {% include 'components/navbar.html' %}
 
             <!-- Main Content -->
-            <main class="flex-1 overflow-y-auto p-4 md:p-6">
+            <main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-6">
                 <!-- Messages/Alerts -->
                 {% if messages %}
                 <div class="mb-4 space-y-2">
@@ -172,7 +172,7 @@
                     if (!confirm(`Cambiar estado a "${estado}" para ${this.selected.length} lead(s)?`)) return;
                     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token }}';
                     try {
-                        const response = await fetch('/leads/bulk-change-status/', {
+                        const response = await fetch('{% url "leads:bulk_change_status" %}', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify({ lead_ids: this.selected, estado: estado })
@@ -194,7 +194,7 @@
                         return { lead_id: leadId, anuncio_id: row?.dataset.anuncioId || '', portal: row?.dataset.portal || '' };
                     });
                     try {
-                        const response = await fetch('/leads/bulk-delete/', {
+                        const response = await fetch('{% url "leads:bulk_delete" %}', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify({ leads_info: leadsInfo, add_to_blacklist: addToBlacklist })
@@ -213,7 +213,7 @@
                     if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${this.selected.length} lead(s)?`)) return;
                     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token }}';
                     try {
-                        const response = await fetch('/leads/bulk-assign/', {
+                        const response = await fetch('{% url "leads:bulk_assign" %}', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify({ lead_ids: this.selected, user_id: userId })
@@ -235,7 +235,7 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', async () => {
                 try {
-                    const registration = await navigator.serviceWorker.register('/service-worker.js');
+                    const registration = await navigator.serviceWorker.register('{% url "service_worker" %}');
                     console.log('SW registered:', registration.scope);
 
                     registration.addEventListener('updatefound', () => {
@@ -273,7 +273,7 @@
                 });
 
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-                await fetch('/api/push/subscribe/', {
+                await fetch('{% url "notifications:subscribe" %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

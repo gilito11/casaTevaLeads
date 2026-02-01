@@ -554,7 +554,7 @@ def map_view(request):
 
     context = {
         'zones_data': zones_data,
-        'map_config_json': json.dumps(map_config),
+        'map_config_json': map_config,
         'total_leads': sum(z['total_leads'] for z in zones_data),
         'total_zones': len(zones_data),
     }
