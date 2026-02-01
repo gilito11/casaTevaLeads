@@ -22,7 +22,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 EMAIL = 'joelg@casateva.es'
-PASSWORD = 'CasaTeva2026!'
+PASSWORD = os.environ.get('DJANGO_USER_PASSWORD', 'changeme')
 USERNAME = 'joelg'
 FIRST_NAME = 'Joel'
 LAST_NAME = 'G'

@@ -6,7 +6,7 @@ casa_teva:
       host: inmoleads-db.postgres.database.azure.com
       port: 5432
       user: inmoleadsadmin
-      password: "ataulfo1!"
+      password: "{{ env_var('NEON_DB_PASSWORD') }}"
       dbname: inmoleadsdb
       schema: public
       threads: 4

@@ -1,30 +1,28 @@
-PROPRIETARY SOFTWARE LICENSE
+PROPRIETARY SOFTWARE LICENSE - SOURCE AVAILABLE
 
-Copyright (c) 2024-2026 Casa Teva. All Rights Reserved.
+Copyright (c) 2024-2026 Eric Garcia / Casa Teva. All Rights Reserved.
 
-NOTICE: This software and associated documentation files (the "Software") are
-proprietary and confidential. The Software is the exclusive property of
-Casa Teva and is protected by copyright law and international treaties.
+NOTICE: This repository is PUBLIC for transparency and CI/CD purposes only.
+Making the source code publicly accessible does NOT constitute a grant of any
+license or right to use, copy, or distribute the code.
 
 RESTRICTIONS:
 1. You may NOT copy, modify, merge, publish, distribute, sublicense, or sell
-   copies of the Software without express written permission from the copyright holder.
+   copies of the Software without express written permission from the copyright
+   holder.
 
-2. You may NOT use the Software for commercial purposes without a valid license
-   agreement.
+2. You may NOT use the Software, in whole or in part, for any commercial or
+   non-commercial purpose without explicit written permission.
 
-3. You may NOT reverse engineer, decompile, or disassemble the Software.
+3. You may NOT create derivative works based on this Software.
 
-4. You may NOT remove or alter any proprietary notices, labels, or marks on the
-   Software.
+4. You may NOT use any code, algorithms, scraping techniques, or business logic
+   from this repository in other projects.
 
-5. Access to this repository does not grant any rights to use, copy, or distribute
-   the Software.
+5. You may NOT reverse engineer, decompile, or disassemble the Software.
 
-CONFIDENTIALITY:
-The Software contains trade secrets and proprietary information belonging to
-Casa Teva. You agree to maintain the confidentiality of the Software and not
-disclose any part of it to third parties.
+6. Access to this repository grants VIEWING AND EDUCATIONAL REFERENCE rights
+   only. No other rights are granted, express or implied.
 
 WARRANTY DISCLAIMER:
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR

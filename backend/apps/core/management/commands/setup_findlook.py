@@ -79,7 +79,8 @@ class Command(BaseCommand):
             self.stdout.write(f'Tenant already exists: {tenant.nombre}')
 
         # Create user Mariano
-        password = 'FindLook2026!'
+        import os
+        password = os.environ.get('FINDLOOK_PASSWORD', 'changeme')
         user, user_created = User.objects.get_or_create(
             username='mariano',
             defaults={

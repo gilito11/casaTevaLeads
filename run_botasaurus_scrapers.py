@@ -45,13 +45,13 @@ def get_postgres_config(use_azure: bool = False, inside_docker: bool = False) ->
         inside_docker: Running inside Docker container (use 'postgres' as host)
     """
     if use_azure:
-        # Azure config
+        import os
         return {
-            'host': 'inmoleads-db.postgres.database.azure.com',
+            'host': os.environ.get('DB_HOST', 'inmoleads-db.postgres.database.azure.com'),
             'port': 5432,
-            'database': 'inmoleadsdb',
-            'user': 'inmoleadsadmin',
-            'password': 'ataulfo1!',
+            'database': os.environ.get('DB_NAME', 'inmoleadsdb'),
+            'user': os.environ.get('DB_USER', 'inmoleadsadmin'),
+            'password': os.environ['DB_PASS'],
             'sslmode': 'require',
         }
     else:
