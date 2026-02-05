@@ -185,9 +185,11 @@ def lead_detail_view(request, lead_id):
     if tenant_id and lead.tenant_id != tenant_id:
         return redirect('leads:list')
 
-    # Notas: skip para leads de dbt (tienen lead_id como MD5 hash)
-    # La tabla leads_nota tiene lead_id como integer, incompatible con lead_id string
-    notas = []
+    # Notas asociadas al lead
+    try:
+        notas = Nota.objects.filter(lead_id=str(lead.lead_id)).order_by('-created_at')
+    except Exception:
+        notas = []
 
     # Obtener estado de LeadEstado (tabla gestionada por Django)
     lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()
@@ -1646,3 +1648,95 @@ def image_proxy_view(request):
     except requests.RequestException as e:
         logger.warning(f"Image proxy error: {e}")
         return HttpResponse(status=502)
+
+
+@login_required
+@require_POST
+def analyze_lead_images_view(request, lead_id):
+    """HTMX endpoint: analyze lead images with Ollama Vision and return updated score."""
+    import sys
+    from pathlib import Path
+
+    PROJECT_ROOT = str(Path(__file__).resolve().parents[3])
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    fotos = lead.fotos_list
+    if not fotos:
+        return HttpResponse(
+            '<span class="text-sm text-red-500">No hay fotos para analizar</span>')
+
+    try:
+        from ai_agents.vision_analyzer import (
+            check_ollama_installed,
+            check_model_available,
+            analyze_property_images,
+        )
+
+        if not check_ollama_installed() or not check_model_available():
+            return HttpResponse(
+                '<span class="text-sm text-red-500">Ollama no disponible</span>')
+
+        result = analyze_property_images(fotos[:3], max_images=3)
+        image_score = result.get('total_image_score', 0)
+        images_analyzed = result.get('images_analyzed', 0)
+
+        # Save to DB
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS public.lead_image_scores (
+                    lead_id VARCHAR(100) PRIMARY KEY,
+                    image_score INTEGER NOT NULL DEFAULT 0,
+                    images_analyzed INTEGER NOT NULL DEFAULT 0,
+                    analysis_json JSONB,
+                    analyzed_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("""
+                INSERT INTO public.lead_image_scores (lead_id, image_score, images_analyzed, analysis_json)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (lead_id) DO UPDATE SET
+                    image_score = EXCLUDED.image_score,
+                    images_analyzed = EXCLUDED.images_analyzed,
+                    analysis_json = EXCLUDED.analysis_json,
+                    analyzed_at = NOW()
+            """, [lead_id, image_score, images_analyzed, json.dumps(result)])
+
+        # Build response HTML
+        details = result.get('individual_results', [])
+        detail_html = ""
+        for d in details:
+            if 'raw_response' not in d:
+                detail_html += (
+                    f'<div class="text-xs text-gray-500 dark:text-gray-400">'
+                    f'{d.get("tipo_estancia", "?")} - '
+                    f'conservacion:{d.get("estado_conservacion", 0)} '
+                    f'foto:{d.get("calidad_foto", 0)} '
+                    f'atractivo:{d.get("atractivo_visual", 0)}'
+                    f'</div>'
+                )
+
+        color = "green" if image_score >= 20 else "yellow" if image_score >= 10 else "red"
+        html = (
+            f'<div class="space-y-1">'
+            f'<div class="flex items-center space-x-2">'
+            f'<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs '
+            f'font-semibold bg-{color}-100 text-{color}-800 '
+            f'dark:bg-{color}-900/30 dark:text-{color}-300">'
+            f'AI Score: {image_score}/30</span>'
+            f'<span class="text-xs text-gray-500">({images_analyzed} fotos analizadas)</span>'
+            f'</div>'
+            f'{detail_html}'
+            f'</div>'
+        )
+        return HttpResponse(html)
+
+    except ImportError:
+        return HttpResponse(
+            '<span class="text-sm text-red-500">ai_agents no disponible</span>')
+    except Exception as e:
+        logger.error(f"Image analysis error for {lead_id}: {e}")
+        return HttpResponse(
+            f'<span class="text-sm text-red-500">Error: {str(e)[:100]}</span>')

@@ -367,6 +367,28 @@ class CamoufoxIdealista:
             except:
                 pass
 
+            # Extract photos from detail page
+            try:
+                content = page.content()
+                # Idealista uses img3/img4.idealista.com for property photos
+                photo_urls = set(re.findall(
+                    r'https://img[34]\.idealista\.com/[^"\'<>\s]+\.(?:jpg|jpeg|png|webp)',
+                    content, re.IGNORECASE
+                ))
+                if photo_urls:
+                    # Filter out tiny thumbnails and icons, keep large images
+                    fotos = []
+                    for url in photo_urls:
+                        # Skip tiny images (thumbs, logos)
+                        if '/WEB_LISTING/' in url or '/WEB_DETAIL/' in url or 'resize' in url.lower():
+                            fotos.append(url)
+                    # If the filter was too aggressive, use all
+                    if not fotos:
+                        fotos = list(photo_urls)
+                    listing['fotos'] = fotos[:10]
+            except Exception as e:
+                logger.debug(f"Could not extract photos: {e}")
+
             return listing
 
         except Exception as e:

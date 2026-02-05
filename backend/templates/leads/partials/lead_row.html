@@ -14,9 +14,9 @@
     </td>
     <!-- Thumbnail -->
     <td class="px-3 py-2">
-        {% if lead.fotos and lead.fotos|length > 0 %}
+        {% if lead.fotos_proxied %}
         <a href="{% url 'leads:detail' lead.lead_id %}" class="block">
-            <img src="{{ lead.fotos.0 }}"
+            <img src="{{ lead.fotos_proxied.0 }}"
                  alt="Foto"
                  class="w-14 h-14 object-cover rounded-lg border border-gray-200 dark:border-gray-600 hover:opacity-80 transition-opacity"
                  loading="lazy"

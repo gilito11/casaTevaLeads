@@ -201,6 +201,37 @@ fly ssh console
 
 ---
 
+## Workflow Rules
+
+### Planning
+- Plan mode for non-trivial tasks (3+ steps or architectural decisions)
+- Write plan to `tasks/todo.md` with checkable items before implementing
+- If something goes sideways, STOP and re-plan — don't keep pushing
+- Mark items complete as you go, add results summary when done
+
+### Execution
+- Offload research, exploration, and parallel analysis to subagents (one task per subagent)
+- For bugs: just fix them. Read logs, trace errors, resolve. Zero hand-holding from user
+- Fix failing CI tests autonomously without being told how
+
+### Verification
+- Never mark a task complete without proving it works (tests, logs, demo)
+- Diff behavior between main and changes when relevant
+- Ask: "Would a staff engineer approve this?"
+
+### Quality
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky, implement the clean solution instead
+- Skip elegance checks for simple, obvious fixes — don't over-engineer
+- Find root causes. No temporary fixes
+
+### Learning
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- Write rules that prevent the same mistake from recurring
+- Review lessons at session start
+
+---
+
 ## Debugging
 
 Si un bug no se resuelve al primer intento → crear endpoint de debug temporal:

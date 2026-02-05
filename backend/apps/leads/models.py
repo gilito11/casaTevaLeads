@@ -53,6 +53,11 @@ class Lead(models.Model):
     lead_score = models.IntegerField(null=True, blank=True)
     fecha_publicacion = models.DateTimeField(null=True, blank=True)
     fotos = models.JSONField(null=True, blank=True, db_column='fotos_json')
+    precio_anterior = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    precio_cambio_pct = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    dias_en_mercado = models.IntegerField(null=True, blank=True)
+    image_score = models.IntegerField(null=True, blank=True)
+    lead_score_total = models.IntegerField(null=True, blank=True)
 
     class Meta:
         db_table = '"public_marts"."dim_leads"'

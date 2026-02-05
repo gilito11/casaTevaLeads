@@ -23,7 +23,7 @@ import sys
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Optional, List
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -79,8 +79,14 @@ def check_model_available(model: str = "llama3.2-vision") -> bool:
 def download_image(url: str) -> Optional[bytes]:
     """Download image from URL and return as bytes."""
     try:
-        logger.info(f"Descargando imagen: {url[:60]}...")
-        with urlopen(url, timeout=30) as response:
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        logger.info(f"Descargando imagen: {url[:80]}...")
+        req = Request(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': url.split('/')[0] + '//' + url.split('/')[2] + '/',
+        })
+        with urlopen(req, timeout=30) as response:
             return response.read()
     except Exception as e:
         logger.error(f"Error descargando imagen: {e}")
@@ -125,7 +131,7 @@ def analyze_image_with_ollama(
         response = requests.post(
             OLLAMA_API,
             json=payload,
-            timeout=120  # Vision models can be slow
+            timeout=300  # Vision models slow, especially first load
         )
         response.raise_for_status()
 
@@ -135,10 +141,18 @@ def analyze_image_with_ollama(
         # Try to extract JSON from response
         json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group())
-        else:
-            logger.warning(f"No JSON found in response: {response_text[:200]}")
-            return {"raw_response": response_text}
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+
+        # Fallback: parse scores from markdown/text response
+        parsed = _parse_scores_from_text(response_text)
+        if parsed:
+            return parsed
+
+        logger.warning(f"No JSON found in response: {response_text[:200]}")
+        return {"raw_response": response_text}
 
     except requests.exceptions.ConnectionError:
         logger.error("No se puede conectar a Ollama. ¿Está corriendo? (ollama serve)")
@@ -152,6 +166,29 @@ def analyze_image_with_ollama(
     except Exception as e:
         logger.error(f"Error en análisis: {e}")
         return None
+
+
+def _parse_scores_from_text(text: str) -> Optional[Dict[str, Any]]:
+    """Extract scores from markdown/text response when JSON extraction fails."""
+    scores = {}
+    patterns = {
+        'estado_conservacion': r'[Ee]stado\s+(?:de\s+)?conservaci[oó]n[:\s*]+(\d+)',
+        'calidad_foto': r'[Cc]alidad\s+fotogr[aá]fica[:\s*]+(\d+)',
+        'atractivo_visual': r'[Aa]tractivo\s+visual[:\s*]+(\d+)',
+    }
+    for key, pattern in patterns.items():
+        match = re.search(pattern, text)
+        if match:
+            scores[key] = min(int(match.group(1)), 10)
+
+    if len(scores) >= 2:
+        scores.setdefault('estado_conservacion', 5)
+        scores.setdefault('calidad_foto', 5)
+        scores.setdefault('atractivo_visual', 5)
+        tipo_match = re.search(r'tipo.*?:\s*(sal[oó]n|dormitorio|cocina|ba[nñ]o|exterior|otro)', text, re.IGNORECASE)
+        scores['tipo_estancia'] = tipo_match.group(1).lower() if tipo_match else 'otro'
+        return scores
+    return None
 
 
 def calculate_image_score(analysis: Dict[str, Any]) -> int:

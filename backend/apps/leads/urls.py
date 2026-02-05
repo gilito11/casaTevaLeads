@@ -47,4 +47,5 @@ urlpatterns = [
     path('<str:lead_id>/enqueue/', views.enqueue_contact_view, name='enqueue_contact'),
     path('<str:lead_id>/valuation-pdf/', views.valuation_pdf_view, name='valuation_pdf'),
     path('<str:lead_id>/price-history/', views.price_history_view, name='price_history'),
+    path('<str:lead_id>/analyze-images/', views.analyze_lead_images_view, name='analyze_images'),
 ]

@@ -1,0 +1,42 @@
+# fly.toml app configuration file generated for casatevaleads on 2026-01-29T20:31:35+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'casatevaleads'
+primary_region = 'cdg'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  strategy = 'immediate'
+
+[env]
+  ALLOWED_HOSTS = '*'
+  CSRF_TRUSTED_ORIGINS = 'https://casatevaleads.fly.dev'
+  DEBUG = 'False'
+  DJANGO_SETTINGS_MODULE = 'casa_teva.settings'
+  PORT = '8000'
+  PYTHONUNBUFFERED = '1'
+  SECURE_SSL_REDIRECT = 'False'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/health/'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
