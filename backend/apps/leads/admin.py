@@ -1,6 +1,9 @@
 from django.contrib import admin
 from django import forms
-from .models import Lead, Nota, LeadEstado, PortalCredential, ContactQueue
+from .models import (
+    Lead, Nota, LeadEstado, PortalCredential, ContactQueue,
+    MessageTemplate, AutoContactConfig,
+)
 
 
 class NotaInline(admin.TabularInline):
@@ -127,7 +130,28 @@ class PortalCredentialAdmin(admin.ModelAdmin):
 
 @admin.register(ContactQueue)
 class ContactQueueAdmin(admin.ModelAdmin):
-    list_display = ['lead_id', 'portal', 'tenant', 'estado', 'prioridad', 'created_at', 'processed_at']
-    list_filter = ['estado', 'portal', 'tenant']
+    list_display = ['lead_id', 'portal', 'tenant', 'estado', 'prioridad', 'respondio', 'template', 'created_at', 'processed_at']
+    list_filter = ['estado', 'portal', 'tenant', 'respondio']
     search_fields = ['lead_id', 'titulo']
     readonly_fields = ['created_at', 'updated_at', 'processed_at']
+
+
+@admin.register(MessageTemplate)
+class MessageTemplateAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'canal', 'tenant', 'activa', 'peso', 'veces_usada', 'tasa_respuesta_display']
+    list_filter = ['canal', 'activa', 'tenant']
+    search_fields = ['nombre', 'cuerpo']
+    list_editable = ['activa', 'peso']
+    readonly_fields = ['veces_usada', 'veces_respondida', 'created_at', 'updated_at']
+
+    def tasa_respuesta_display(self, obj):
+        if obj.veces_usada == 0:
+            return '-'
+        return f"{obj.tasa_respuesta:.1%}"
+    tasa_respuesta_display.short_description = 'Tasa Respuesta'
+
+
+@admin.register(AutoContactConfig)
+class AutoContactConfigAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'habilitado', 'solo_particulares', 'max_contactos_dia', 'max_contactos_portal_dia']
+    list_filter = ['habilitado']

@@ -13,7 +13,7 @@ from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.db.models import Q
-from django.db import connection, IntegrityError
+from django.db import connection, models, IntegrityError
 from django.views.decorators.http import require_POST
 
 from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction, Task
@@ -1188,6 +1188,37 @@ def retry_queued_contact_view(request, queue_id):
     else:
         return JsonResponse({
             'error': f'Solo se puede reintentar items con estado FALLIDO (actual: {item.estado})'
+        }, status=400)
+
+
+@login_required
+@require_POST
+def mark_contact_responded_view(request, queue_id):
+    """Marcar un contacto como respondido (actualiza metricas A/B del template)"""
+    from leads.models import ContactQueue, MessageTemplate
+
+    tenant_id = get_user_tenant(request)
+    item = get_object_or_404(ContactQueue, id=queue_id, tenant_id=tenant_id)
+
+    if item.estado == 'COMPLETADO' and not item.respondio:
+        item.respondio = True
+        item.fecha_respuesta = timezone.now()
+        item.save(update_fields=['respondio', 'fecha_respuesta', 'updated_at'])
+
+        # Update template A/B metrics
+        if item.template_id:
+            MessageTemplate.objects.filter(id=item.template_id).update(
+                veces_respondida=models.F('veces_respondida') + 1
+            )
+
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=200)
+            response['HX-Refresh'] = 'true'
+            return response
+        return JsonResponse({'status': 'marked_responded', 'id': item.id})
+    else:
+        return JsonResponse({
+            'error': 'Solo se puede marcar como respondido items COMPLETADOS no marcados previamente'
         }, status=400)
 
 

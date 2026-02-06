@@ -206,10 +206,12 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
         postgres_config: Optional[Dict[str, str]] = None,
         headless: bool = True,
         only_private: bool = True,
+        quick_scan: bool = False,
     ):
         super().__init__(tenant_id, postgres_config, headless)
         self.zones = zones or ['tarragona_provincia']
         self.only_private = only_private
+        self.quick_scan = quick_scan
 
     def build_url(self, zona_key: str, page: int = 1) -> str:
         """Build search URL for Habitaclia."""
@@ -353,6 +355,11 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
         if not basic_listings:
             return []
+
+        # Quick scan: skip detail page enrichment for speed (~3x faster)
+        if self.quick_scan:
+            logger.info(f"Quick scan: returning {len(basic_listings)} basic listings (no enrichment)")
+            return basic_listings[:20]
 
         # Enrich with detail page data
         try:

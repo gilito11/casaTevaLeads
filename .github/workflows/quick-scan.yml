@@ -1,0 +1,84 @@
+# Quick Scan workflow - Fast new-lead detection (page 1 only, no detail enrichment)
+# Runs every 2 hours Mon-Sat for habitaclia + fotocasa (free, no proxy needed)
+# Budget: ~5 min/run x 6 runs/day x 26 days = ~780 min/month
+name: Quick Scan (New Listings)
+
+on:
+  schedule:
+    - cron: '0 8,10,12,14,16,18 * * 1-6'
+  workflow_dispatch:
+    inputs:
+      zones:
+        description: 'Zones to scan (comma-separated)'
+        required: false
+        default: 'salou,cambrils,tarragona'
+
+env:
+  DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+  TENANT_ID: 1
+
+jobs:
+  quick-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Chrome and Xvfb
+        run: |
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable xvfb
+
+      - name: Install dependencies
+        run: pip install botasaurus psycopg2-binary python-decouple dbt-postgres requests
+
+      - name: Quick scan (habitaclia + fotocasa, page 1 only)
+        run: |
+          ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
+          python run_quick_scan.py --zones ${ZONES//,/ } --postgres --portals habitaclia fotocasa
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+
+      - name: Run dbt transformations
+        run: |
+          cd dbt_project
+          mkdir -p /tmp/dbt_profiles
+          cat > /tmp/dbt_profiles/profiles.yml << EOF
+          casa_teva:
+            target: prod
+            outputs:
+              prod:
+                type: postgres
+                host: ep-ancient-darkness-agqilf7l-pooler.c-2.eu-central-1.aws.neon.tech
+                port: 5432
+                user: neondb_owner
+                password: "$DBT_PASSWORD"
+                dbname: neondb
+                schema: public
+                threads: 4
+                sslmode: require
+          EOF
+          dbt deps --profiles-dir /tmp/dbt_profiles || true
+          dbt run --select staging marts --profiles-dir /tmp/dbt_profiles
+        env:
+          DBT_PASSWORD: ${{ secrets.NEON_DB_PASSWORD }}
+
+      - name: Auto-queue new leads for contact
+        run: python scripts/post_scrape_auto_queue.py
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Summary
+        run: |
+          echo "## Quick Scan Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- Portals: habitaclia, fotocasa" >> $GITHUB_STEP_SUMMARY
+          echo "- Zones: ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Mode: Page 1 only (quick scan)" >> $GITHUB_STEP_SUMMARY

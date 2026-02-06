@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block title %}Real-Time Contact - Casa Teva CRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Auto-Contacto en Tiempo Real</h1>
+            <p class="text-gray-600 dark:text-gray-400">Deteccion rapida + contacto automatico a particulares</p>
+        </div>
+        <a href="{% url 'leads:contact_queue' %}"
+           class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors shadow-sm">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+            </svg>
+            Ver Cola
+        </a>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Tiempo medio -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Tiempo medio a contacto</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        {{ time_to_contact.avg_hours|default:"--" }}h
+                    </p>
+                    {% if time_to_contact.min_hours %}
+                    <p class="text-xs text-gray-400 mt-1">Min: {{ time_to_contact.min_hours }}h</p>
+                    {% endif %}
+                </div>
+                <div class="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leads detectados -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Leads detectados</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        {{ leads_count.leads_hoy|default:0 }}
+                        <span class="text-sm font-normal text-gray-400">hoy</span>
+                    </p>
+                    <p class="text-xs text-gray-400 mt-1">
+                        {{ leads_count.leads_semana|default:0 }} semana / {{ leads_count.leads_mes|default:0 }} mes
+                    </p>
+                </div>
+                <div class="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasa respuesta -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Tasa de respuesta</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        {{ tasa_respuesta }}%
+                    </p>
+                    <p class="text-xs text-gray-400 mt-1">
+                        {{ funnel.respondidos|default:0 }} / {{ funnel.contactados|default:0 }} contactados
+                    </p>
+                </div>
+                <div class="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
+                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cola pendiente -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Cola pendiente</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        {{ funnel.pendientes|default:0 }}
+                    </p>
+                    <p class="text-xs text-gray-400 mt-1">
+                        {{ funnel.fallidos|default:0 }} fallidos
+                    </p>
+                </div>
+                <div class="p-3 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                    <svg class="w-6 h-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Two columns: Funnel + A/B Templates -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Funnel -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Funnel de Contacto</h2>
+            <div class="space-y-3">
+                {% with total=funnel.total_encolados|default:1 %}
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Encolados</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ funnel.total_encolados|default:0 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                        <div class="bg-blue-500 h-3 rounded-full" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Contactados</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ funnel.contactados|default:0 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                        {% widthratio funnel.contactados|default:0 total 100 as pct_contactados %}
+                        <div class="bg-green-500 h-3 rounded-full" style="width: {{ pct_contactados|default:0 }}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Respondidos</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ funnel.respondidos|default:0 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                        {% widthratio funnel.respondidos|default:0 total 100 as pct_respondidos %}
+                        <div class="bg-purple-500 h-3 rounded-full" style="width: {{ pct_respondidos|default:0 }}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Fallidos</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ funnel.fallidos|default:0 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                        {% widthratio funnel.fallidos|default:0 total 100 as pct_fallidos %}
+                        <div class="bg-red-500 h-3 rounded-full" style="width: {{ pct_fallidos|default:0 }}%"></div>
+                    </div>
+                </div>
+                {% endwith %}
+            </div>
+
+            <!-- Por portal -->
+            {% if by_portal %}
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-6 mb-3">Por portal</h3>
+            <div class="space-y-2">
+                {% for p in by_portal %}
+                <div class="flex items-center justify-between text-sm">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                        {% if p.portal == 'fotocasa' %}bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300
+                        {% elif p.portal == 'habitaclia' %}bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300
+                        {% elif p.portal == 'idealista' %}bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300
+                        {% else %}bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300{% endif %}">
+                        {{ p.portal|title }}
+                    </span>
+                    <span class="text-gray-600 dark:text-gray-400">
+                        {{ p.total }} encolados / {{ p.completados }} enviados / {{ p.respondidos }} respondidos
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- A/B Template Performance -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">A/B Testing - Templates</h2>
+            {% if templates_ab %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 dark:text-gray-400">
+                            <th class="pb-3 font-medium">Template</th>
+                            <th class="pb-3 font-medium text-center">Peso</th>
+                            <th class="pb-3 font-medium text-center">Enviados</th>
+                            <th class="pb-3 font-medium text-center">Respondidos</th>
+                            <th class="pb-3 font-medium text-right">Tasa</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for t in templates_ab %}
+                        <tr>
+                            <td class="py-3 font-medium text-gray-900 dark:text-white">{{ t.nombre }}</td>
+                            <td class="py-3 text-center text-gray-500">{{ t.peso }}</td>
+                            <td class="py-3 text-center text-gray-600 dark:text-gray-400">{{ t.veces_usada }}</td>
+                            <td class="py-3 text-center text-gray-600 dark:text-gray-400">{{ t.veces_respondida }}</td>
+                            <td class="py-3 text-right">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {% if t.tasa_pct > 20 %}bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300
+                                    {% elif t.tasa_pct > 10 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300
+                                    {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+                                    {{ t.tasa_pct }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-gray-500 dark:text-gray-400">No hay templates configurados</p>
+                <p class="text-sm text-gray-400 mt-1">Crea templates en Django Admin</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Daily Chart -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actividad Diaria (14 dias)</h2>
+        <div style="height: 300px;">
+            <canvas id="dailyContactChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dailyData = JSON.parse('{{ daily_contacts_json|escapejs }}');
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#9ca3af' : '#6b7280';
+    const gridColor = isDark ? '#374151' : '#e5e7eb';
+
+    const ctx = document.getElementById('dailyContactChart');
+    if (!ctx || !dailyData.length) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dailyData.map(d => {
+                const date = new Date(d.fecha);
+                return date.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit'});
+            }),
+            datasets: [
+                {
+                    label: 'Encolados',
+                    data: dailyData.map(d => d.encolados),
+                    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.5)' : 'rgba(59, 130, 246, 0.3)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1,
+                },
+                {
+                    label: 'Enviados',
+                    data: dailyData.map(d => d.enviados),
+                    backgroundColor: isDark ? 'rgba(34, 197, 94, 0.5)' : 'rgba(34, 197, 94, 0.3)',
+                    borderColor: 'rgb(34, 197, 94)',
+                    borderWidth: 1,
+                },
+                {
+                    label: 'Respondidos',
+                    data: dailyData.map(d => d.respondidos),
+                    backgroundColor: isDark ? 'rgba(168, 85, 247, 0.5)' : 'rgba(168, 85, 247, 0.3)',
+                    borderColor: 'rgb(168, 85, 247)',
+                    borderWidth: 1,
+                },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    ticks: { color: textColor },
+                    grid: { color: gridColor },
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: textColor, stepSize: 1 },
+                    grid: { color: gridColor },
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: textColor }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

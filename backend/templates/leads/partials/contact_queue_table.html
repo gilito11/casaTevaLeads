@@ -206,6 +206,24 @@
                                 </svg>
                             </button>
                             {% endif %}
+
+                            <!-- Marcar respondio (solo si completado y no marcado) -->
+                            {% if item.estado == 'COMPLETADO' and not item.respondio %}
+                            <button hx-post="{% url 'leads:mark_responded' item.id %}"
+                                    hx-confirm="Marcar como respondido?"
+                                    class="p-2 text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    title="Marcar como respondido">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                                </svg>
+                            </button>
+                            {% elif item.respondio %}
+                            <span class="p-2 text-emerald-500 dark:text-emerald-400" title="Respondido {{ item.fecha_respuesta|date:'d/m/Y H:i' }}">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                                </svg>
+                            </span>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

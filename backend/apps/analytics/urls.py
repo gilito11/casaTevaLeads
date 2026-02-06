@@ -2,7 +2,8 @@ from django.urls import path
 from django.views.generic import RedirectView
 from .views import (
     analytics_dashboard_view, map_view, map_data_api, scrape_history_view, zones_grid_view,
-    acm_view, acm_calcular_api, acm_lead_api, pdf_valoracion_view, pdf_lead_view
+    acm_view, acm_calcular_api, acm_lead_api, pdf_valoracion_view, pdf_lead_view,
+    realtime_dashboard_view,
 )
 from . import api_views
 
@@ -11,6 +12,7 @@ app_name = 'analytics'
 urlpatterns = [
     path('', RedirectView.as_view(pattern_name='analytics:dashboard'), name='index'),
     path('dashboard/', analytics_dashboard_view, name='dashboard'),
+    path('realtime/', realtime_dashboard_view, name='realtime_dashboard'),
     path('mapa/', map_view, name='map'),
     path('scrapes/', scrape_history_view, name='scrape_history'),
     path('zonas/', zones_grid_view, name='zones_grid'),

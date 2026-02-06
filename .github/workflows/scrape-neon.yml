@@ -111,6 +111,13 @@ jobs:
         env:
           DBT_PASSWORD: ${{ secrets.NEON_DB_PASSWORD }}
 
+      - name: Auto-queue new leads for contact
+        run: python scripts/post_scrape_auto_queue.py
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Summary
         run: |
           echo "## Scraping Complete" >> $GITHUB_STEP_SUMMARY

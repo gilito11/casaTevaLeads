@@ -312,10 +312,20 @@ class ContactQueue(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_QUEUE_CHOICES, default='PENDIENTE')
     prioridad = models.IntegerField(default=0, help_text="Mayor numero = mayor prioridad")
 
+    # Template usado (para A/B testing)
+    template = models.ForeignKey(
+        'MessageTemplate', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='contactos'
+    )
+
     # Resultado del contacto
     telefono_extraido = models.CharField(max_length=20, blank=True, null=True)
     mensaje_enviado = models.BooleanField(default=False)
     error = models.TextField(blank=True, null=True)
+
+    # Tracking respuesta (A/B testing)
+    respondio = models.BooleanField(default=False)
+    fecha_respuesta = models.DateTimeField(null=True, blank=True)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -551,3 +561,105 @@ class Task(models.Model):
             return None
         delta = self.fecha_vencimiento - timezone.now()
         return delta.days
+
+
+class MessageTemplate(models.Model):
+    """Plantillas de mensaje para contacto automatico con A/B testing."""
+    CANAL_CHOICES = [
+        ('portal', 'Formulario Portal'),
+        ('email', 'Email'),
+        ('whatsapp', 'WhatsApp'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='message_templates')
+    nombre = models.CharField(max_length=100)
+    canal = models.CharField(max_length=20, choices=CANAL_CHOICES, default='portal')
+    asunto = models.CharField(max_length=255, blank=True, help_text="Asunto (para email)")
+    cuerpo = models.TextField(
+        help_text="Variables: {nombre_zona}, {tipo_propiedad}, {precio}, {portal}, {url_anuncio}"
+    )
+    activa = models.BooleanField(default=True)
+    peso = models.IntegerField(
+        default=100,
+        help_text="Peso relativo para A/B testing. Mayor peso = mas frecuente."
+    )
+
+    # Metricas A/B
+    veces_usada = models.IntegerField(default=0)
+    veces_respondida = models.IntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'leads_message_template'
+        ordering = ['-peso', 'nombre']
+
+    def __str__(self):
+        tasa = f" ({self.tasa_respuesta:.0%})" if self.veces_usada > 0 else ""
+        return f"{self.nombre} [{self.get_canal_display()}]{tasa}"
+
+    @property
+    def tasa_respuesta(self):
+        if self.veces_usada == 0:
+            return 0.0
+        return self.veces_respondida / self.veces_usada
+
+    def render(self, context: dict) -> str:
+        """Render template con variables. Ignora keys faltantes."""
+        body = self.cuerpo
+        for key, val in context.items():
+            body = body.replace(f'{{{key}}}', str(val))
+        return body
+
+
+class AutoContactConfig(models.Model):
+    """Configuracion de auto-contacto por tenant."""
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='auto_contact_config')
+    habilitado = models.BooleanField(default=False)
+
+    # Filtros
+    solo_particulares = models.BooleanField(default=True)
+    score_minimo = models.IntegerField(default=0)
+    precio_minimo = models.DecimalField(max_digits=12, decimal_places=2, default=5000)
+    precio_maximo = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    # Portales habilitados
+    contactar_fotocasa = models.BooleanField(default=True)
+    contactar_habitaclia = models.BooleanField(default=True)
+    contactar_milanuncios = models.BooleanField(default=True)
+    contactar_idealista = models.BooleanField(default=True)
+
+    # Limites
+    max_contactos_dia = models.IntegerField(default=5)
+    max_contactos_portal_dia = models.IntegerField(default=3)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'leads_auto_contact_config'
+
+    def __str__(self):
+        estado = "ON" if self.habilitado else "OFF"
+        return f"Auto-contacto {estado}"
+
+    def portal_habilitado(self, portal: str) -> bool:
+        mapping = {
+            'fotocasa': self.contactar_fotocasa,
+            'habitaclia': self.contactar_habitaclia,
+            'milanuncios': self.contactar_milanuncios,
+            'idealista': self.contactar_idealista,
+        }
+        return mapping.get(portal, False)
+
+    def select_template(self, canal='portal'):
+        """Selecciona template con weighted random para A/B testing."""
+        import random
+        templates = list(MessageTemplate.objects.filter(
+            tenant=self.tenant, activa=True, canal=canal
+        ))
+        if not templates:
+            return None
+        weights = [t.peso for t in templates]
+        return random.choices(templates, weights=weights, k=1)[0]

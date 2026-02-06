@@ -1006,3 +1006,103 @@ def pdf_lead_view(request, lead_id):
     except Exception as e:
         logger.error(f"Error generando PDF para lead {lead_id}: {e}")
         return HttpResponse(f'Error: {str(e)}', status=500)
+
+
+@login_required
+def realtime_dashboard_view(request):
+    """Dashboard de deteccion en tiempo real y auto-contacto."""
+    tenant_id = request.session.get('tenant_id', 1)
+
+    with connection.cursor() as cursor:
+        # KPI 1: Tiempo medio deteccion -> contacto (horas)
+        cursor.execute("""
+            SELECT
+                ROUND(AVG(EXTRACT(EPOCH FROM (cq.created_at - l.fecha_primera_captura)) / 3600)::NUMERIC, 1) AS avg_hours,
+                ROUND(MIN(EXTRACT(EPOCH FROM (cq.created_at - l.fecha_primera_captura)) / 3600)::NUMERIC, 1) AS min_hours
+            FROM leads_contact_queue cq
+            JOIN public_marts.dim_leads l ON l.lead_id = cq.lead_id
+            WHERE cq.tenant_id = %s AND cq.created_at >= CURRENT_DATE - 30
+        """, [tenant_id])
+        time_to_contact = dict_fetchone(cursor)
+
+        # KPI 2: Leads por periodo
+        cursor.execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE DATE(fecha_primera_captura) = CURRENT_DATE) AS leads_hoy,
+                COUNT(*) FILTER (WHERE fecha_primera_captura >= CURRENT_DATE - 7) AS leads_semana,
+                COUNT(*) FILTER (WHERE fecha_primera_captura >= CURRENT_DATE - 30) AS leads_mes
+            FROM public_marts.dim_leads
+            WHERE tenant_id = %s
+        """, [tenant_id])
+        leads_count = dict_fetchone(cursor)
+
+        # KPI 3: Funnel de contacto (ultimos 30 dias)
+        cursor.execute("""
+            SELECT
+                COUNT(*) AS total_encolados,
+                COUNT(*) FILTER (WHERE estado = 'COMPLETADO') AS contactados,
+                COUNT(*) FILTER (WHERE respondio = TRUE) AS respondidos,
+                COUNT(*) FILTER (WHERE estado = 'FALLIDO') AS fallidos,
+                COUNT(*) FILTER (WHERE estado = 'PENDIENTE') AS pendientes
+            FROM leads_contact_queue
+            WHERE tenant_id = %s AND created_at >= CURRENT_DATE - 30
+        """, [tenant_id])
+        funnel = dict_fetchone(cursor)
+
+        # KPI 4: Templates A/B
+        cursor.execute("""
+            SELECT
+                mt.nombre, mt.peso,
+                mt.veces_usada, mt.veces_respondida,
+                CASE WHEN mt.veces_usada > 0
+                    THEN ROUND(mt.veces_respondida::NUMERIC / mt.veces_usada * 100, 1)
+                    ELSE 0 END AS tasa_pct
+            FROM leads_message_template mt
+            WHERE mt.tenant_id = %s AND mt.activa = TRUE
+            ORDER BY tasa_pct DESC
+        """, [tenant_id])
+        templates_ab = dict_fetchall(cursor)
+
+        # Tasa de respuesta global
+        total_completados = funnel.get('contactados', 0)
+        total_respondidos = funnel.get('respondidos', 0)
+        tasa_respuesta = round(total_respondidos / total_completados * 100, 1) if total_completados > 0 else 0
+
+        # KPI 5: Chart datos diarios (14 dias)
+        cursor.execute("""
+            SELECT
+                DATE(created_at) AS fecha,
+                COUNT(*) AS encolados,
+                COUNT(*) FILTER (WHERE estado = 'COMPLETADO') AS enviados,
+                COUNT(*) FILTER (WHERE respondio = TRUE) AS respondidos
+            FROM leads_contact_queue
+            WHERE tenant_id = %s AND created_at >= CURRENT_DATE - 14
+            GROUP BY DATE(created_at)
+            ORDER BY fecha
+        """, [tenant_id])
+        daily_contacts = dict_fetchall(cursor)
+
+        # KPI 6: Por portal (ultimos 30 dias)
+        cursor.execute("""
+            SELECT
+                portal,
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE estado = 'COMPLETADO') AS completados,
+                COUNT(*) FILTER (WHERE respondio = TRUE) AS respondidos
+            FROM leads_contact_queue
+            WHERE tenant_id = %s AND created_at >= CURRENT_DATE - 30
+            GROUP BY portal ORDER BY total DESC
+        """, [tenant_id])
+        by_portal = dict_fetchall(cursor)
+
+    context = {
+        'time_to_contact': time_to_contact,
+        'leads_count': leads_count,
+        'funnel': funnel,
+        'tasa_respuesta': tasa_respuesta,
+        'templates_ab': templates_ab,
+        'by_portal': by_portal,
+        'daily_contacts_json': json.dumps(daily_contacts, default=str),
+    }
+
+    return render(request, 'analytics/realtime_dashboard.html', context)

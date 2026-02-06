@@ -28,6 +28,7 @@ urlpatterns = [
     path('contact-queue/', views.contact_queue_view, name='contact_queue'),
     path('contact-queue/<int:queue_id>/cancel/', views.cancel_queued_contact_view, name='cancel_queued'),
     path('contact-queue/<int:queue_id>/retry/', views.retry_queued_contact_view, name='retry_queued'),
+    path('contact-queue/<int:queue_id>/responded/', views.mark_contact_responded_view, name='mark_responded'),
     path('bulk-enqueue/', views.bulk_enqueue_view, name='bulk_enqueue'),
 
     # Contacts
