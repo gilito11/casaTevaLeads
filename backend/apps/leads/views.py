@@ -1632,6 +1632,17 @@ def image_proxy_view(request):
         logger.warning(f"Image proxy decode error: {e}")
         return HttpResponse(status=400)
 
+    # Fix known URL issues before proxying
+    import re as _re
+    # Habitaclia: XL_XXL/M_M/L_L suffixes get 502, but base URL works
+    if 'images.habimg.com' in url:
+        url = _re.sub(r'(XL_XXL|L_L|M_M|S_S)\.jpg', '.jpg', url)
+    # Milanuncios: images-re domain returns 404, images works
+    url = url.replace('images-re.milanuncios.com', 'images.milanuncios.com')
+    # Milanuncios: ensure https:// prefix
+    if url.startswith('images.milanuncios.com'):
+        url = 'https://' + url
+
     # Validate URL domain
     parsed = urlparse(url)
     allowed_domains = [
@@ -1639,8 +1650,7 @@ def image_proxy_view(request):
         'static.fotocasa.es',       # fotocasa
         'img3.idealista.com',       # idealista
         'img4.idealista.com',       # idealista
-        'images.milanuncios.com',   # milanuncios (new API format)
-        'images-re.milanuncios.com',  # milanuncios (legacy)
+        'images.milanuncios.com',   # milanuncios
     ]
     if parsed.netloc not in allowed_domains:
         return HttpResponse(status=403)
@@ -1652,7 +1662,6 @@ def image_proxy_view(request):
         'img3.idealista.com': 'https://www.idealista.com/',
         'img4.idealista.com': 'https://www.idealista.com/',
         'images.milanuncios.com': 'https://www.milanuncios.com/',
-        'images-re.milanuncios.com': 'https://www.milanuncios.com/',
     }
     referer = referers.get(parsed.netloc, '')
 
