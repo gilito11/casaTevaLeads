@@ -643,22 +643,35 @@ class CamoufoxMilanuncios:
 
             # Verify seller type from detail page
             try:
-                detail_html = page.content().lower()
                 seller_selectors = [
-                    '[class*="seller"]', '[class*="Seller"]',
+                    '[class*="SellerBadge"]', '[class*="seller-badge"]',
+                    '[class*="Seller"]', '[class*="seller"]',
                     '[class*="advertiser"]', '[class*="Advertiser"]',
+                    '[data-testid*="seller"]', '[data-testid*="Seller"]',
                 ]
+                seller_name = None
                 for sel in seller_selectors:
                     try:
                         elem = page.query_selector(sel)
                         if elem:
-                            seller_text = elem.inner_text().lower()
-                            if any(w in seller_text for w in ['profesional', 'professional', 'inmobiliaria']):
-                                listing['es_particular'] = False
-                                logger.debug(f"Detail page: professional detected - {listing.get('anuncio_id')}")
-                                break
+                            seller_text = elem.inner_text().strip()
+                            if seller_text:
+                                seller_name = seller_text
+                                seller_lower = seller_text.lower()
+                                pro_keywords = [
+                                    'profesional', 'professional', 'inmobiliaria',
+                                    'agencia', 'real estate', 'properties',
+                                    ' s.l.', ' sl', ' s.a.',
+                                ]
+                                if any(w in seller_lower for w in pro_keywords):
+                                    listing['es_particular'] = False
+                                    listing['vendedor'] = seller_text
+                                    logger.info(f"Detail page: professional detected '{seller_text}' - {listing.get('anuncio_id')}")
+                                    break
                     except:
                         continue
+                if seller_name and listing.get('es_particular', True):
+                    listing['vendedor'] = seller_name
             except:
                 pass
 
@@ -685,15 +698,27 @@ class CamoufoxMilanuncios:
             except Exception as e:
                 logger.debug(f"Could not get phone from button: {e}")
 
-            # Get full description
+            # Get full description - try multiple selectors
             try:
-                desc_elem = page.query_selector(
-                    '[class*="description"], .ma-AdDetail-description, [data-testid="AD_DESCRIPTION"]'
-                )
-                if desc_elem:
-                    full_desc = desc_elem.inner_text()
-                    if full_desc and len(full_desc) > len(listing.get('descripcion', '')):
-                        listing['descripcion'] = full_desc[:2000]
+                desc_selectors = [
+                    '[data-testid="AD_DESCRIPTION"]',
+                    '.ma-AdDetail-description',
+                    '[class*="AdDescription"]',
+                    '[class*="adDescription"]',
+                    'section[class*="description"] p',
+                    '[class*="Description"] p',
+                    '[class*="description"]:not(meta)',
+                ]
+                for desc_sel in desc_selectors:
+                    try:
+                        desc_elem = page.query_selector(desc_sel)
+                        if desc_elem:
+                            full_desc = desc_elem.inner_text().strip()
+                            if full_desc and len(full_desc) > len(listing.get('descripcion', '')):
+                                listing['descripcion'] = full_desc[:2000]
+                                break
+                    except:
+                        continue
             except:
                 pass
 
@@ -754,6 +779,7 @@ class CamoufoxMilanuncios:
                 'fotos': listing.get('fotos', []),
                 'url': listing.get('url_anuncio', ''),
                 'es_particular': listing.get('es_particular', True),
+                'vendedor': listing.get('vendedor', ''),
                 'scraper_type': 'camoufox',
             }
 

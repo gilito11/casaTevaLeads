@@ -99,8 +99,8 @@ normalized AS (
             AS INTEGER
         ) AS banos,
 
-        -- Milanuncios filtra por particulares en la URL (vendedor=part)
-        TRUE AS es_particular,
+        -- Use es_particular from scraper raw data (DOM-based detection)
+        COALESCE((raw_data->>'es_particular')::BOOLEAN, TRUE) AS es_particular,
         TRUE AS permite_inmobiliarias
 
     FROM extracted
@@ -210,6 +210,8 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
+        -- Filter out listings marked as professional by scraper
+        AND es_particular = TRUE
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
@@ -218,12 +220,16 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no inmobiliaria%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%sin intermediario%'
         )
-        -- Filter out agency listings disguised as particulars (they advertise "no agency fees")
+        -- Filter out sellers who explicitly reject agencies/intermediaries
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%sin comision%agencia%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%sin comisiones de agencia%'
-            OR LOWER(COALESCE(descripcion, '')) LIKE '%0% comision%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%cero comision%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%sin comisiones%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%venta directa%particular%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%particular a particular%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%solo particulares%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%sólo particulares%'
         )
         -- Filter out agencies by seller name patterns
         AND NOT (
@@ -239,6 +245,9 @@ final AS (
             OR LOWER(COALESCE(vendedor, '')) LIKE '%properties%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%servicios inmobiliarios%'
         )
+        -- Filter out listings with empty descriptions (just "Ref: NNN")
+        -- These are almost always professional listings where full description wasn't extracted
+        AND LENGTH(TRIM(REGEXP_REPLACE(COALESCE(descripcion, ''), 'Descripci.n|Ref:?\s*[0-9]+', '', 'g'))) >= 10
 )
 
 SELECT * FROM final
