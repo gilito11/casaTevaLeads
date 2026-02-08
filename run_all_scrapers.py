@@ -49,7 +49,7 @@ def get_postgres_config():
             'user': parsed.username,
             'password': parsed.password,
             'port': parsed.port or 5432,
-            'sslmode': 'require' if 'azure' in (parsed.hostname or '') else 'prefer',
+            'sslmode': 'require' if parsed.hostname and parsed.hostname != 'localhost' else 'prefer',
         }
 
     # Fallback to individual env vars

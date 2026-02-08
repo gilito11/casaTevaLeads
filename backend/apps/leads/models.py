@@ -489,6 +489,7 @@ class Task(models.Model):
         ('alta', 'Alta'),
         ('urgente', 'Urgente'),
     ]
+    PRIORIDAD_ORDER = {'urgente': 0, 'alta': 1, 'media': 2, 'baja': 3}
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='tasks')
     lead_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
@@ -531,7 +532,7 @@ class Task(models.Model):
         db_table = 'leads_task'
         verbose_name = 'Tarea'
         verbose_name_plural = 'Tareas'
-        ordering = ['completada', 'fecha_vencimiento', '-prioridad']
+        ordering = ['completada', 'fecha_vencimiento']
         indexes = [
             models.Index(fields=['tenant', 'asignado_a', 'completada']),
             models.Index(fields=['fecha_vencimiento', 'completada']),

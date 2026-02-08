@@ -385,11 +385,13 @@ def delete_lead_view(request, lead_id):
     with connection.cursor() as cursor:
         cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
 
-    # Eliminar el lead de la tabla public_marts.dim_leads
+    # Delete from raw_listings (source of truth) - dbt view will update on next run
     with connection.cursor() as cursor:
         cursor.execute("""
-            DELETE FROM public_marts.dim_leads
-            WHERE lead_id = %s
+            DELETE FROM raw.raw_listings
+            WHERE (raw_data->>'anuncio_id') IN (
+                SELECT source_listing_id FROM public_marts.dim_leads WHERE lead_id = %s
+            )
         """, [lead_id])
 
     # Devolver respuesta vacía para que HTMX elimine la fila
@@ -983,7 +985,7 @@ def enqueue_contact_view(request, lead_id):
 
     # Verificar que el portal soporta contacto automatico
     portal = lead.portal
-    supported_portals = ['fotocasa', 'habitaclia', 'milanuncios']
+    supported_portals = ['fotocasa', 'habitaclia', 'milanuncios', 'idealista']
     if portal not in supported_portals:
         return JsonResponse({
             'error': f'Contacto automatico no soportado para {portal}. Soportados: {", ".join(supported_portals)}'
@@ -1070,7 +1072,7 @@ def bulk_enqueue_view(request):
                     continue
 
                 portal = lead.portal
-                if portal not in ['fotocasa', 'habitaclia']:
+                if portal not in ['fotocasa', 'habitaclia', 'milanuncios', 'idealista']:
                     skipped += 1
                     continue
 
@@ -1341,14 +1343,9 @@ def task_create_view(request):
 
         return JsonResponse({'status': 'created', 'id': task.id})
 
-    # GET: mostrar formulario
-    lead_id = request.GET.get('lead_id', '')
-    context = {
-        'tipos_tarea': Task.TIPO_CHOICES,
-        'prioridades': Task.PRIORIDAD_CHOICES,
-        'lead_id': lead_id,
-    }
-    return render(request, 'leads/task_form.html', context)
+    # GET: redirect to agenda (form is in the modal on task_list.html)
+    from django.shortcuts import redirect
+    return redirect('leads:agenda')
 
 
 @login_required

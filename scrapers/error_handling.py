@@ -293,7 +293,7 @@ def send_email_alert(
 
 ---
 Timestamp: {get_madrid_time().strftime('%Y-%m-%d %H:%M:%S')} (Europe/Madrid)
-Environment: {'Azure' if os.environ.get('WEBSITE_INSTANCE_ID') else 'Local'}
+Environment: {'Production' if os.environ.get('FLY_APP_NAME') else 'Local'}
 """
 
     try:

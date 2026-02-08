@@ -100,15 +100,14 @@ def main():
         if db_url:
             from urllib.parse import urlparse
             parsed = urlparse(db_url)
-            # Check if Azure by hostname (*.database.azure.com)
-            is_azure = parsed.hostname and 'azure' in parsed.hostname.lower()
+            is_remote = parsed.hostname and parsed.hostname != 'localhost'
             postgres_config = {
                 'host': parsed.hostname,
                 'port': parsed.port or 5432,
                 'database': parsed.path.lstrip('/'),
                 'user': parsed.username,
                 'password': parsed.password,
-                'sslmode': 'require' if is_azure else 'prefer'
+                'sslmode': 'require' if is_remote else 'prefer'
             }
         else:
             postgres_config = {

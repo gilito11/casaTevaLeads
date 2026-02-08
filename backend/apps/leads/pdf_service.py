@@ -203,14 +203,11 @@ class ValuationPDFGenerator:
 
     def _setup_styles(self):
         """Setup custom paragraph styles."""
-        self.styles.add(ParagraphStyle(
-            name='Title',
-            parent=self.styles['Heading1'],
-            fontSize=24,
-            textColor=PRIMARY_COLOR,
-            alignment=TA_CENTER,
-            spaceAfter=20
-        ))
+        # Override existing 'Title' style
+        self.styles['Title'].fontSize = 24
+        self.styles['Title'].textColor = PRIMARY_COLOR
+        self.styles['Title'].alignment = TA_CENTER
+        self.styles['Title'].spaceAfter = 20
 
         self.styles.add(ParagraphStyle(
             name='Subtitle',
@@ -233,13 +230,10 @@ class ValuationPDFGenerator:
             borderPadding=5
         ))
 
-        self.styles.add(ParagraphStyle(
-            name='BodyText',
-            parent=self.styles['Normal'],
-            fontSize=10,
-            textColor=TEXT_COLOR,
-            leading=14
-        ))
+        # Override existing 'BodyText' style
+        self.styles['BodyText'].fontSize = 10
+        self.styles['BodyText'].textColor = TEXT_COLOR
+        self.styles['BodyText'].leading = 14
 
         self.styles.add(ParagraphStyle(
             name='ValuationMain',

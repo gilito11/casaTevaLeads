@@ -5,7 +5,7 @@ Script para crear usuario Joelg.
 Ejecutar con PostgreSQL local activo:
     cd backend && python ../scripts/create_user_joelg.py
 
-O desde Azure Cloud Shell conectado a la BD de produccion.
+O con DATABASE_URL apuntando a Neon produccion.
 """
 import os
 import sys

@@ -335,7 +335,7 @@ class BotasaurusBaseScraper:
         self.close()
 
 
-# Chrome flags optimized for Azure Container Apps
+# Chrome flags optimized for container environments
 # IMPORTANT: Do NOT use --single-process or --no-zygote as they cause WebSocket disconnection
 CONTAINER_CHROME_ARGS = [
     '--no-sandbox',                    # Required for containers (no root sandboxing)
@@ -368,7 +368,7 @@ CONTAINER_CHROME_ARGS = [
 def create_browser_scraper(headless: bool = True):
     """Create a browser decorator with optimal anti-bot settings.
 
-    Includes Chrome flags required for running in containers (Docker, Azure Container Apps).
+    Includes Chrome flags required for running in containers (Docker, GitHub Actions).
     IMPORTANT: Removed --single-process and --no-zygote which cause WebSocket issues.
     """
     return browser(

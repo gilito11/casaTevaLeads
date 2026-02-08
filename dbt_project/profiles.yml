@@ -3,11 +3,11 @@ casa_teva:
   outputs:
     prod:
       type: postgres
-      host: inmoleads-db.postgres.database.azure.com
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
       port: 5432
-      user: inmoleadsadmin
-      password: "{{ env_var('NEON_DB_PASSWORD') }}"
-      dbname: inmoleadsdb
+      user: "{{ env_var('DBT_USER', 'postgres') }}"
+      password: "{{ env_var('DBT_PASSWORD', '') }}"
+      dbname: "{{ env_var('DBT_DBNAME', 'casa_teva_db') }}"
       schema: public
       threads: 4
       connect_timeout: 30

@@ -67,7 +67,7 @@ def get_postgres_config() -> Dict[str, str]:
             'database': parsed.path.lstrip('/') if parsed.path else 'inmoleadsdb',
             'user': parsed.username or 'inmoleadsadmin',
             'password': parsed.password or '',
-            'sslmode': 'require' if parsed.hostname and 'azure' in parsed.hostname.lower() else 'prefer',
+            'sslmode': 'require' if parsed.hostname and parsed.hostname != 'localhost' else 'prefer',
         }
 
     return {

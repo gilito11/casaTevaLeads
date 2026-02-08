@@ -97,7 +97,7 @@ class BaseScraper:
                 'user': config.get('user', 'casa_teva'),
                 'password': config.get('password', ''),
             }
-            # Añadir sslmode si está presente (requerido para Azure)
+            # Añadir sslmode si está presente (requerido para Neon/remote)
             if config.get('sslmode'):
                 conn_params['sslmode'] = config.get('sslmode')
 

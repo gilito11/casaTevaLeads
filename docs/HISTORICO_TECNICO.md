@@ -117,19 +117,6 @@ Filtro para detectar agencias disfrazadas:
 
 Módulo: `scrapers/watermark_detector.py`
 
-## Costes Azure (Enero 2026)
-
-| Servicio | SKU | Coste/mes |
-|----------|-----|-----------|
-| PostgreSQL Flexible | B1ms | ~$17 |
-| Web App | B1 Linux | ~$13 |
-| Container Apps | Consumption | ~$10-15 |
-| ACR | Basic | ~$5 |
-| Log Analytics | Mínimo | ~$2 |
-| **Total Azure** | | **~$47-52** |
-| ScrapingBee | 250K credits | 50€ |
-| **TOTAL** | | **~$95-100/mes** |
-
 ## Competencia (Precios Enero 2026)
 
 | Producto | Precio | Qué ofrece |

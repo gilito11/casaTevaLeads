@@ -219,40 +219,78 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
 
             logger.info(f"Loading: {url}")
             driver.get(url)
-            driver.sleep(8)  # Increased wait for JS rendering
+            driver.sleep(3)
 
-            # Accept cookies if present
+            # Accept cookies via TCF API (Fotocasa uses iframe-based TCF consent)
             try:
                 driver.run_js('''
-                    const acceptBtn = document.querySelector('[data-testid="TcfAccept"], .sui-AtomButton--primary, button[id*="accept"], button[class*="accept"]');
-                    if (acceptBtn) acceptBtn.click();
+                    // Method 1: Use TCF API directly to grant all consent
+                    if (window.__tcfapi) {
+                        window.__tcfapi('postCustomConsent', 2, function(){}, [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]);
+                    }
+                    // Method 2: Click any visible accept/consent button
+                    const selectors = [
+                        '[data-testid="TcfAccept"]',
+                        'button[id*="accept"]',
+                        'button[class*="accept"]',
+                        '.sui-AtomButton--primary',
+                        '#didomi-notice-agree-button',
+                        'button[aria-label*="accept" i]',
+                        'button[aria-label*="aceptar" i]',
+                    ];
+                    for (const sel of selectors) {
+                        const btn = document.querySelector(sel);
+                        if (btn && btn.offsetParent !== null) { btn.click(); break; }
+                    }
                 ''')
                 driver.sleep(1)
             except:
                 pass
 
-            # Scroll aggressively to load all lazy content
-            # Fotocasa uses infinite scroll, need to trigger multiple times
-            for i in range(10):  # More scrolls
-                scroll_pos = 600 * (i + 1)
+            # Wait for React to hydrate and listing links to appear
+            for attempt in range(15):
+                has_content = driver.run_js('''
+                    return document.querySelectorAll('a[href*="/es/comprar/vivienda/"]').length;
+                ''')
+                if has_content and has_content > 0:
+                    logger.info(f"Content loaded after {(attempt+1)*2}s: {has_content} listing links found")
+                    break
+                driver.sleep(2)
+            else:
+                logger.warning("Content did not load after 30s of waiting")
+
+            # Scroll to load lazy content
+            for i in range(6):
+                scroll_pos = 800 * (i + 1)
                 driver.run_js(f'window.scrollTo({{top: {scroll_pos}, behavior: "smooth"}})')
-                driver.sleep(1.5)
+                driver.sleep(1)
 
-            # Scroll to bottom to ensure all content loads
             driver.run_js('window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"})')
-            driver.sleep(3)
-
-            # Scroll back to top
-            driver.run_js('window.scrollTo({top: 0, behavior: "smooth"})')
             driver.sleep(2)
 
             html = driver.page_html
             logger.info(f"HTML length: {len(html)}")
 
-            # Check for blocking - lowered threshold
-            if len(html) < 30000:
-                logger.warning(f"Possible blocking or empty results (HTML: {len(html)} bytes)")
+            # Try JSON-LD extraction first (available even in SSR HTML)
+            json_ld_listings = []
+            try:
+                import json as json_mod
+                ld_matches = re.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.DOTALL)
+                for ld_text in ld_matches:
+                    ld_data = json_mod.loads(ld_text)
+                    if ld_data.get('@type') == 'RealEstateListing':
+                        logger.info("Found JSON-LD RealEstateListing data")
+            except:
+                pass
+
+            # Check for blocking
+            if len(html) < 10000:
+                logger.warning(f"Possible blocking (HTML: {len(html)} bytes)")
                 return []
+
+            # If HTML is small (SSR only, React didn't hydrate), still try to extract links
+            if len(html) < 30000:
+                logger.warning(f"Small HTML ({len(html)} bytes) - React may not have hydrated, trying SSR extraction")
 
             # Fotocasa page structure:
             # 1. First section: PARTICULARES listings (what we want)
@@ -387,51 +425,67 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                 title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
                 listing['titulo'] = title_match.group(1).strip() if title_match else None
 
-                # Extract price - from re-DetailHeader-price class (main listing price)
-                price_header = re.search(
-                    r'class="[^"]*re-DetailHeader-price[^"]*"[^>]*>([^<]+)',
-                    html, re.IGNORECASE
-                )
-                if price_header:
-                    price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*€', price_header.group(1))
-                    if price_match:
-                        price_str = price_match.group(1).replace('.', '')
-                        listing['precio'] = float(price_str)
-                else:
-                    # Fallback to generic pattern
-                    price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|euros|€)', html, re.IGNORECASE)
-                    if price_match:
-                        price_str = price_match.group(1).replace('.', '')
-                        listing['precio'] = float(price_str)
+                # Extract price - try multiple patterns
+                price_patterns = [
+                    # React class (may change between deploys)
+                    r'class="[^"]*(?:re-DetailHeader-price|DetailHeader-price|price)[^"]*"[^>]*>([^<]+)',
+                    # Generic price near EUR/€ symbol
+                    r'(\d{1,3}(?:\.\d{3})*)\s*(?:EUR|€)',
+                    # Price in JSON-LD
+                    r'"price"\s*:\s*"?(\d+(?:\.\d+)?)"?',
+                ]
+                for pattern in price_patterns:
+                    price_header = re.search(pattern, html, re.IGNORECASE)
+                    if price_header:
+                        raw = price_header.group(1)
+                        price_match = re.search(r'(\d{1,3}(?:[.\s]\d{3})*)', raw)
+                        if price_match:
+                            price_str = price_match.group(1).replace('.', '').replace(' ', '')
+                            if price_str.isdigit() and int(price_str) > 10000:
+                                listing['precio'] = float(price_str)
+                                break
 
-                # Extract metros - from feature spans (e.g. <span><span>170</span> m²)
-                metros_span = re.search(r'<span[^>]*>\s*<span>(\d+)</span>\s*m[²2]', html)
-                if metros_span:
-                    listing['metros'] = int(metros_span.group(1))
-                else:
-                    # Fallback - look in feature items
-                    metros_li = re.search(r'<li[^>]*>(\d+)\s*m[²2]</li>', html, re.IGNORECASE)
-                    if metros_li:
-                        listing['metros'] = int(metros_li.group(1))
+                # Extract metros - multiple patterns
+                metros_patterns = [
+                    r'<span[^>]*>\s*<span>(\d+)</span>\s*m[²2]',
+                    r'(\d+)\s*m[²2]',
+                    r'(\d+)\s*m&sup2;',
+                ]
+                for pattern in metros_patterns:
+                    metros_match = re.search(pattern, html)
+                    if metros_match:
+                        val = int(metros_match.group(1))
+                        if 10 < val < 10000:
+                            listing['metros'] = val
+                            break
 
-                # Extract habitaciones - from feature spans (e.g. <span><span>4</span> hab)
-                habs_span = re.search(r'<span[^>]*>\s*<span>(\d+)</span>\s*hab', html, re.IGNORECASE)
-                if habs_span:
-                    listing['habitaciones'] = int(habs_span.group(1))
-                else:
-                    # Fallback - look in feature items
-                    habs_li = re.search(r'<li[^>]*>(\d+)\s*hab', html, re.IGNORECASE)
-                    if habs_li:
-                        listing['habitaciones'] = int(habs_li.group(1))
+                # Extract habitaciones - multiple patterns
+                habs_patterns = [
+                    r'<span[^>]*>\s*<span>(\d+)</span>\s*hab',
+                    r'(\d+)\s*hab',
+                ]
+                for pattern in habs_patterns:
+                    habs_match = re.search(pattern, html, re.IGNORECASE)
+                    if habs_match:
+                        val = int(habs_match.group(1))
+                        if 0 < val < 50:
+                            listing['habitaciones'] = val
+                            break
 
-                # Extract description - look for substantial text blocks
-                # Fotocasa descriptions are typically in divs or paragraphs
-                desc_match = re.search(
-                    r'class="[^"]*(?:re-DetailDescription|description|comment|detalle)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
-                    html, re.DOTALL | re.IGNORECASE
-                )
-                if not desc_match:
-                    # Find long text blocks (property descriptions tend to be 100+ chars)
+                # Extract description - try structured selectors then text blocks
+                desc_patterns = [
+                    r'class="[^"]*(?:re-DetailDescription|DetailDescription|description|comment|detalle)[^"]*"[^>]*>(.*?)</(?:div|p|section)',
+                    r'<meta\s+name="description"\s+content="([^"]{50,})"',
+                ]
+                for pattern in desc_patterns:
+                    desc_match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
+                    if desc_match:
+                        desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
+                        desc_text = re.sub(r'\s+', ' ', desc_text).strip()
+                        if len(desc_text) > 50:
+                            listing['descripcion'] = desc_text[:2000]
+                            break
+                if 'descripcion' not in listing:
                     text_blocks = re.findall(r'>([^<]{100,})<', html)
                     for block in text_blocks:
                         clean_text = block.strip()
@@ -441,11 +495,6 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
                             'privacy' not in clean_text.lower()):
                             listing['descripcion'] = clean_text[:2000]
                             break
-                if desc_match and 'descripcion' not in listing:
-                    desc_text = re.sub(r'<[^>]+>', ' ', desc_match.group(1))
-                    desc_text = re.sub(r'\s+', ' ', desc_text).strip()
-                    if len(desc_text) > 50:
-                        listing['descripcion'] = desc_text[:2000]
 
                 # Try to extract phone from description (many sellers put it there)
                 descripcion = listing.get('descripcion', '')

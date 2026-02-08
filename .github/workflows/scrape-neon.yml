@@ -33,8 +33,8 @@ jobs:
 
       - name: Install Chrome and Xvfb
         run: |
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable xvfb
 
@@ -52,16 +52,29 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
-      - name: Run Fotocasa scraper
+      - name: Run Fotocasa scraper (with Xvfb virtual display)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa', 'fotocasa')
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
-          python run_fotocasa_scraper.py --zones ${ZONES//,/ } --postgres
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            python run_fotocasa_scraper.py --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
-      - name: Run Idealista scraper (Camoufox + Xvfb virtual display)
-        if: contains(github.event.inputs.portals || '', 'idealista')
+      - name: Run Milanuncios scraper (Camoufox)
+        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'milanuncios')
+        continue-on-error: true
+        run: |
+          ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
+          python run_camoufox_milanuncios_scraper.py \
+            --zones ${ZONES//,/ } \
+            --max-pages 2 \
+            --postgres
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+
+      - name: Run Idealista scraper (Camoufox + Xvfb + proxy)
+        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'idealista')
         continue-on-error: true
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
@@ -69,18 +82,6 @@ jobs:
             --zones ${ZONES//,/ } \
             --max-pages 2 \
             --virtual \
-            --postgres
-        env:
-          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
-
-      - name: Run Milanuncios scraper (Camoufox)
-        if: contains(github.event.inputs.portals || '', 'milanuncios')
-        run: |
-          ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
-          python run_camoufox_milanuncios_scraper.py \
-            --zones ${ZONES//,/ } \
-            --max-pages 2 \
             --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -121,7 +122,7 @@ jobs:
       - name: Summary
         run: |
           echo "## Scraping Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Portals: ${{ github.event.inputs.portals || 'habitaclia,fotocasa' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Portals: ${{ github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios' }}" >> $GITHUB_STEP_SUMMARY
           echo "- Zones: ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}" >> $GITHUB_STEP_SUMMARY
           echo "- dbt: Transformations applied" >> $GITHUB_STEP_SUMMARY
 

@@ -284,16 +284,14 @@ class CamoufoxMilanuncios:
         if not zona:
             raise ValueError(f"Zone not found: {zona_key}")
 
+        # Milanuncios no longer supports ?vendedor=particular (redirects/strips it)
+        # Particular filtering is done via DOM/JSON instead
         url = f"{self.BASE_URL}/{zona['url_path']}"
 
-        params = []
-        if self.only_particulares:
-            params.append('vendedor=particular')
         if page_num > 1:
-            params.append(f'pagina={page_num}')
+            # Milanuncios uses /pagina-N/ in the URL path, not query params
+            url = url.rstrip('/') + f'?pagina={page_num}'
 
-        if params:
-            url = url.rstrip('/') + '?' + '&'.join(params)
         return url
 
     def _extract_listings_from_page(self, page, zona_key: str) -> List[Dict[str, Any]]:
@@ -396,11 +394,27 @@ class CamoufoxMilanuncios:
         skipped_pro = 0
         skipped_price = 0
 
+        # Check if JSON seller classification is broken (all marked professional)
+        seller_types = [ad.get('sellerType', '').lower() for ad in ads if ad.get('sellerType')]
+        all_same_type = len(set(seller_types)) <= 1 and len(seller_types) > 3
+        if all_same_type and seller_types and seller_types[0] == 'professional':
+            logger.warning(f"JSON classifies ALL {len(ads)} ads as 'professional' - likely broken, skipping JSON filter")
+            return []  # Fall through to DOM extraction
+
         for ad in ads:
             try:
-                # Skip professionals
+                # Check seller type from multiple fields
                 seller_type = ad.get('sellerType', '').lower()
-                if self.only_particulares and seller_type == 'professional':
+                seller_badge = str(ad.get('sellerBadge', '')).lower()
+                user_type = str(ad.get('userType', '')).lower()
+
+                is_professional = (
+                    seller_type == 'professional'
+                    or 'pro' in seller_badge
+                    or user_type == 'professional'
+                )
+
+                if self.only_particulares and is_professional:
                     skipped_pro += 1
                     continue
 
@@ -436,7 +450,7 @@ class CamoufoxMilanuncios:
                 elif 'location' in ad:
                     ubicacion = ad.get('location', '')
 
-                # Images
+                # Images - handle both old and new domain
                 fotos = []
                 if 'images' in ad and ad['images']:
                     for img in ad['images'][:10]:
@@ -445,6 +459,7 @@ class CamoufoxMilanuncios:
                         else:
                             img_url = str(img)
                         if img_url:
+                            img_url = self._fix_image_url(img_url)
                             fotos.append(img_url)
 
                 listing = {
@@ -456,7 +471,7 @@ class CamoufoxMilanuncios:
                     'zona_geografica': zona_info.get('nombre', zona_key),
                     'zona_busqueda': zona_key,
                     'url_anuncio': url_anuncio,
-                    'es_particular': seller_type != 'professional',
+                    'es_particular': not is_professional,
                     'tipo_inmueble': 'piso',
                     'fotos': fotos,
                 }
@@ -599,6 +614,20 @@ class CamoufoxMilanuncios:
             pass
         return None
 
+    def _fix_image_url(self, url: str) -> str:
+        """Fix image URL: ensure https:// prefix and handle domain changes."""
+        if not url:
+            return url
+        # Add protocol if missing
+        if url.startswith('//'):
+            url = 'https:' + url
+        elif not url.startswith('http'):
+            url = 'https://' + url
+        # Handle both old and new image domains
+        # images.milanuncios.com -> images-re.milanuncios.com (new)
+        # Both domains work, just normalize
+        return url
+
     def _scrape_detail_page(self, page, listing: Dict[str, Any]) -> Dict[str, Any]:
         """Visit detail page to get phone, description, photos, and verify seller type."""
         url = listing.get('url_anuncio')
@@ -680,12 +709,13 @@ class CamoufoxMilanuncios:
             if not listing.get('fotos'):
                 try:
                     content = page.content()
+                    # Match both old and new image domains
                     photo_ids = set(re.findall(
-                        r'https://images\.milanuncios\.com/api/v1/ma-ad-media-pro/images/([a-f0-9-]{36})',
+                        r'https?://images(?:-re)?\.milanuncios\.com/api/v1/ma-ad-media-pro/images/([a-f0-9-]{36})',
                         content, re.IGNORECASE
                     ))
                     listing['fotos'] = [
-                        f"https://images.milanuncios.com/api/v1/ma-ad-media-pro/images/{pid}?rule=detail_640x480"
+                        f"https://images-re.milanuncios.com/api/v1/ma-ad-media-pro/images/{pid}?rule=detail_640x480"
                         for pid in list(photo_ids)[:10]
                     ]
                 except:
@@ -811,6 +841,7 @@ class CamoufoxMilanuncios:
                         continue
 
                     logger.info(f"Scraping zone: {zona_info['nombre']}")
+                    seen_ad_ids = set()
 
                     for page_num in range(1, self.max_pages_per_zone + 1):
                         try:
@@ -900,8 +931,21 @@ class CamoufoxMilanuncios:
                             if not listings:
                                 break
 
+                            # Detect pagination duplicates (milanuncios may redirect pagina=N to page 1)
+                            current_ids = {l.get('anuncio_id') for l in listings}
+                            new_ids = current_ids - seen_ad_ids
+                            if page_num > 1 and len(new_ids) == 0:
+                                logger.warning(f"Page {page_num} returned all duplicate ads - pagination broken, stopping")
+                                break
+                            seen_ad_ids.update(current_ids)
+
+                            # Filter out already-seen listings
+                            new_listings = [l for l in listings if l.get('anuncio_id') in new_ids]
+                            if page_num > 1:
+                                logger.info(f"New listings on page {page_num}: {len(new_listings)} (filtered {len(listings) - len(new_listings)} duplicates)")
+
                             # Get details for each listing
-                            for listing in listings[:15]:
+                            for listing in new_listings[:15]:
                                 self.stats['listings_found'] += 1
 
                                 listing = self._scrape_detail_page(page, listing)

@@ -37,20 +37,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_postgres_config(use_azure: bool = False, inside_docker: bool = False) -> Dict[str, str]:
+def get_postgres_config(use_remote: bool = False, inside_docker: bool = False) -> Dict[str, str]:
     """Get PostgreSQL configuration.
 
     Args:
-        use_azure: Use Azure PostgreSQL (production)
+        use_remote: Use remote PostgreSQL (Neon production)
         inside_docker: Running inside Docker container (use 'postgres' as host)
     """
-    if use_azure:
+    if use_remote:
         import os
         return {
-            'host': os.environ.get('DB_HOST', 'inmoleads-db.postgres.database.azure.com'),
-            'port': 5432,
-            'database': os.environ.get('DB_NAME', 'inmoleadsdb'),
-            'user': os.environ.get('DB_USER', 'inmoleadsadmin'),
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'port': int(os.environ.get('DB_PORT', '5432')),
+            'database': os.environ.get('DB_NAME', 'casa_teva_db'),
+            'user': os.environ.get('DB_USER', 'postgres'),
             'password': os.environ['DB_PASS'],
             'sslmode': 'require',
         }
@@ -176,9 +176,8 @@ Available portals:
   milanuncios  - Milanuncios.com (free with Botasaurus)
   fotocasa     - Fotocasa.es (free with Botasaurus)
   habitaclia   - Habitaclia.com (free with Botasaurus)
-  pisos        - Pisos.com (free with Botasaurus)
 
-Note: Idealista requires paid service (ScrapingBee with stealth_proxy)
+Note: Idealista uses Camoufox + IPRoyal proxy (see run_camoufox_idealista_scraper.py)
 
 Examples:
   python run_botasaurus_scrapers.py --all
@@ -210,9 +209,9 @@ Examples:
         help='Save results to PostgreSQL'
     )
     parser.add_argument(
-        '--azure',
+        '--remote',
         action='store_true',
-        help='Use Azure PostgreSQL instead of local Docker'
+        help='Use remote PostgreSQL (Neon) instead of local Docker'
     )
     parser.add_argument(
         '--headless',
@@ -244,7 +243,7 @@ Examples:
         import os
         # Detect if running inside Docker container
         inside_docker = os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER', False)
-        postgres_config = get_postgres_config(use_azure=args.azure, inside_docker=inside_docker)
+        postgres_config = get_postgres_config(use_remote=args.remote, inside_docker=inside_docker)
         logger.info(f"PostgreSQL: {postgres_config['host']}")
 
     # Headless mode

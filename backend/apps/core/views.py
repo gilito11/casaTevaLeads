@@ -416,7 +416,7 @@ def _run_scraper_process(scraper_id, zona_slug, scraper_key):
                     return
 
             # Ejecutar el scraper usando sys.executable para asegurar el Python correcto
-            # Incluir PLAYWRIGHT_BROWSERS_PATH para Azure
+            # Incluir PLAYWRIGHT_BROWSERS_PATH para contenedores
             scraper_env = {
                 **os.environ,
                 'PYTHONPATH': project_root,
@@ -511,7 +511,7 @@ def _run_all_scrapers_process(tenant_id, zonas, scraper_key):
             zone_slugs = ','.join([z.slug for z in zonas])
 
             # Ejecutar el script de todos los scrapers
-            # Incluir PLAYWRIGHT_BROWSERS_PATH para Azure
+            # Incluir PLAYWRIGHT_BROWSERS_PATH para contenedores
             scraper_env = {
                 **os.environ,
                 'PYTHONPATH': project_root,

@@ -213,7 +213,7 @@ ollama pull nomic-embed-text
 ollama list
 
 # 4. Instalar pgvector en PostgreSQL
-# Azure PostgreSQL Flexible Server soporta pgvector nativo
+# Neon soporta pgvector nativo
 # Ejecutar: CREATE EXTENSION vector;
 
 # 5. Instalar dependencias Python
@@ -237,4 +237,4 @@ python ai_agents/vision_analyzer.py --test
 1. **Probar PoC**: `python ai_agents/vision_analyzer.py --test`
 2. **Instalar Ollama** en tu máquina
 3. **Evaluar hardware** disponible
-4. Decidir si ejecutar local o en Azure (Container Apps con GPU)
+4. Decidir si ejecutar local o en servidor dedicado

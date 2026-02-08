@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 
-from leads.models import Lead, Nota, Task
+from leads.models import Lead, LeadEstado, Nota, Task
 from leads.serializers import (
     LeadListSerializer,
     LeadDetailSerializer,
@@ -32,7 +32,7 @@ class LeadViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['estado', 'portal', 'zona_geografica']
     search_fields = ['telefono_norm', 'nombre', 'direccion']
-    ordering_fields = ['fecha_scraping', 'precio', 'created_at']
+    ordering_fields = ['fecha_scraping', 'precio']
     ordering = ['-fecha_scraping']
 
     def get_queryset(self):
@@ -60,20 +60,28 @@ class LeadViewSet(viewsets.ModelViewSet):
         return LeadDetailSerializer
 
     def perform_update(self, serializer):
-        """Actualiza timestamps al cambiar estado"""
+        """Actualiza estado via LeadEstado (Lead model is read-only dbt view)."""
         instance = serializer.instance
         nuevo_estado = serializer.validated_data.get('estado')
 
-        if nuevo_estado and nuevo_estado != instance.estado:
-            serializer.validated_data['fecha_cambio_estado'] = timezone.now()
+        if nuevo_estado:
+            lead_estado, _ = LeadEstado.objects.get_or_create(
+                lead_id=instance.lead_id,
+                defaults={
+                    'tenant_id': instance.tenant_id,
+                    'telefono_norm': instance.telefono_norm or '',
+                }
+            )
+            lead_estado.estado = nuevo_estado
+            lead_estado.fecha_cambio_estado = timezone.now()
 
-            # Si es primer contacto
             if nuevo_estado in ['CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'NO_INTERESADO']:
-                if not instance.fecha_primer_contacto:
-                    serializer.validated_data['fecha_primer_contacto'] = timezone.now()
-                serializer.validated_data['fecha_ultimo_contacto'] = timezone.now()
+                if not lead_estado.fecha_primer_contacto:
+                    lead_estado.fecha_primer_contacto = timezone.now()
+                lead_estado.fecha_ultimo_contacto = timezone.now()
+                lead_estado.numero_intentos += 1
 
-        serializer.save()
+            lead_estado.save()
 
     @action(detail=True, methods=['post'])
     def cambiar_estado(self, request, pk=None):
@@ -98,23 +106,32 @@ class LeadViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        old_estado = lead.estado
-        lead.estado = nuevo_estado
-        lead.fecha_cambio_estado = timezone.now()
+        # Write to LeadEstado (Lead model is read-only dbt view)
+        lead_estado, _ = LeadEstado.objects.get_or_create(
+            lead_id=lead.lead_id,
+            defaults={
+                'tenant_id': lead.tenant_id,
+                'telefono_norm': lead.telefono_norm or '',
+            }
+        )
+
+        old_estado = lead_estado.estado
+        lead_estado.estado = nuevo_estado
+        lead_estado.fecha_cambio_estado = timezone.now()
 
         if nuevo_estado in ['CONTACTADO_SIN_RESPUESTA', 'INTERESADO', 'NO_INTERESADO']:
-            if not lead.fecha_primer_contacto:
-                lead.fecha_primer_contacto = timezone.now()
-            lead.fecha_ultimo_contacto = timezone.now()
-            lead.numero_intentos += 1
+            if not lead_estado.fecha_primer_contacto:
+                lead_estado.fecha_primer_contacto = timezone.now()
+            lead_estado.fecha_ultimo_contacto = timezone.now()
+            lead_estado.numero_intentos += 1
 
-        lead.save()
+        lead_estado.save()
 
         return Response({
             'lead_id': lead.lead_id,
             'estado_anterior': old_estado,
             'estado_nuevo': nuevo_estado,
-            'fecha_cambio': lead.fecha_cambio_estado
+            'fecha_cambio': lead_estado.fecha_cambio_estado
         })
 
     @action(detail=True, methods=['get', 'post'])
