@@ -185,9 +185,9 @@ def lead_detail_view(request, lead_id):
     if tenant_id and lead.tenant_id != tenant_id:
         return redirect('leads:list')
 
-    # Notas asociadas al lead
+    # Notas asociadas al lead (evaluate eagerly to catch DB errors)
     try:
-        notas = Nota.objects.filter(lead_id=str(lead.lead_id)).order_by('-created_at')
+        notas = list(Nota.objects.filter(lead_id=str(lead.lead_id)).order_by('-created_at'))
     except Exception:
         notas = []
 
