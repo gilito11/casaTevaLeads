@@ -636,6 +636,10 @@ class CamoufoxMilanuncios:
 
         try:
             page.goto(url, wait_until='domcontentloaded')
+            try:
+                page.wait_for_load_state('networkidle', timeout=10000)
+            except:
+                pass
             self._human_delay(2, 4)
 
             page.mouse.wheel(0, random.randint(200, 400))
@@ -705,6 +709,8 @@ class CamoufoxMilanuncios:
                     '.ma-AdDetail-description',
                     '[class*="AdDescription"]',
                     '[class*="adDescription"]',
+                    '[class*="Description__container"]',
+                    '[class*="description-content"]',
                     'section[class*="description"] p',
                     '[class*="Description"] p',
                     '[class*="description"]:not(meta)',
@@ -719,6 +725,39 @@ class CamoufoxMilanuncios:
                                 break
                     except:
                         continue
+
+                # Fallback: extract from page content via regex
+                if not listing.get('descripcion'):
+                    try:
+                        content = page.content()
+                        # Look for description in JSON-LD or inline data
+                        import re as _re
+                        desc_match = _re.search(
+                            r'"description"\s*:\s*"([^"]{20,})"',
+                            content
+                        )
+                        if desc_match:
+                            desc_text = desc_match.group(1).replace('\\n', '\n').replace('\\"', '"')
+                            listing['descripcion'] = desc_text[:2000]
+                        else:
+                            # Try article or main content area
+                            for tag_sel in ['article', 'main', '[role="main"]']:
+                                try:
+                                    el = page.query_selector(tag_sel)
+                                    if el:
+                                        text = el.inner_text().strip()
+                                        # Filter out very short or navigation-only text
+                                        if len(text) > 100:
+                                            # Take first 2000 chars, skip if too short
+                                            listing['descripcion'] = text[:2000]
+                                            break
+                                except:
+                                    continue
+                    except:
+                        pass
+
+                if not listing.get('descripcion'):
+                    logger.debug(f"No description found for {url}")
             except:
                 pass
 
@@ -807,6 +846,22 @@ class CamoufoxMilanuncios:
 
             rows_affected = cursor.rowcount
             self.postgres_conn.commit()
+
+            # Track price history for price drop detection
+            precio = listing.get('precio')
+            if precio and anuncio_id:
+                try:
+                    cursor2 = self.postgres_conn.cursor()
+                    cursor2.execute("""
+                        INSERT INTO raw.listing_price_history (tenant_id, portal, anuncio_id, precio)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (tenant_id, portal, anuncio_id, precio) DO NOTHING
+                    """, (self.tenant_id, self.PORTAL_NAME, anuncio_id, precio))
+                    self.postgres_conn.commit()
+                    cursor2.close()
+                except Exception as e:
+                    logger.debug(f"Price history insert skipped: {e}")
+
             cursor.close()
 
             if rows_affected > 0:

@@ -613,6 +613,22 @@ class CamoufoxIdealista:
 
             rows_affected = cursor.rowcount
             self.postgres_conn.commit()
+
+            # Track price history for price drop detection
+            precio = listing.get('precio')
+            if precio and anuncio_id:
+                try:
+                    cursor2 = self.postgres_conn.cursor()
+                    cursor2.execute("""
+                        INSERT INTO raw.listing_price_history (tenant_id, portal, anuncio_id, precio)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (tenant_id, portal, anuncio_id, precio) DO NOTHING
+                    """, (self.tenant_id, self.PORTAL_NAME, anuncio_id, precio))
+                    self.postgres_conn.commit()
+                    cursor2.close()
+                except Exception as e:
+                    logger.debug(f"Price history insert skipped: {e}")
+
             cursor.close()
 
             if rows_affected > 0:

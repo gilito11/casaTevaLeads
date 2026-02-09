@@ -84,8 +84,8 @@ normalized AS (
             ''
         ) AS telefono_norm,
 
-        -- Price already numeric from scraper
-        COALESCE(precio_num, 0)::INTEGER AS precio,
+        -- Price: keep NULL for missing, filter in WHERE
+        NULLIF(COALESCE(precio_num, 0), 0)::INTEGER AS precio,
 
         -- Metros already extracted
         COALESCE(metros, 0) AS superficie_m2,
@@ -189,7 +189,7 @@ final AS (
 
     -- Apply filters as specified
     WHERE
-        precio > 0  -- Must have a valid price
+        precio IS NOT NULL  -- Must have a valid price
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'

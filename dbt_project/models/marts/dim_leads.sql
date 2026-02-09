@@ -4,7 +4,16 @@
         unique_key=['tenant_id', 'lead_unique_key'],
         schema='marts',
         tags=['marts', 'leads', 'incremental'],
-        on_schema_change='sync_all_columns'
+        on_schema_change='sync_all_columns',
+        pre_hook="CREATE TABLE IF NOT EXISTS raw.listing_price_history (
+            id SERIAL PRIMARY KEY,
+            tenant_id VARCHAR DEFAULT 'casa_teva',
+            portal VARCHAR NOT NULL,
+            anuncio_id VARCHAR NOT NULL,
+            precio NUMERIC,
+            fecha_captura TIMESTAMP DEFAULT NOW(),
+            UNIQUE(tenant_id, portal, anuncio_id, precio)
+        );"
     )
 }}
 
