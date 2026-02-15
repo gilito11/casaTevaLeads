@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 """
-Script para ejecutar el scraper de Habitaclia con Botasaurus.
+Script para ejecutar el scraper de Habitaclia.
+
+Uses Camoufox (anti-detect Firefox) to bypass Imperva bot protection.
+Falls back to Botasaurus Chrome if Camoufox is not available.
 
 Uso:
     python run_habitaclia_scraper.py [--zones ZONE1 ZONE2] [--postgres] [--tenant-id=1]
 
 Ejemplos:
-    python run_habitaclia_scraper.py --zones salou
+    python run_habitaclia_scraper.py --zones salou --postgres
     python run_habitaclia_scraper.py --zones costa_daurada --postgres
     python run_habitaclia_scraper.py --zones baix_camp tarragones --postgres
 """
@@ -22,10 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 
-from scrapers.botasaurus_habitaclia import (
-    BotasaurusHabitaclia,
-    ZONAS_GEOGRAFICAS,
-)
+from scrapers.botasaurus_habitaclia import ZONAS_GEOGRAFICAS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Ejecutar scraper de Habitaclia (Botasaurus)',
+        description='Ejecutar scraper de Habitaclia',
     )
     parser.add_argument(
         '--zones',
@@ -65,6 +65,11 @@ def main():
         '--list-zones',
         action='store_true',
         help='Listar zonas disponibles y salir'
+    )
+    parser.add_argument(
+        '--botasaurus',
+        action='store_true',
+        help='Forzar uso de Botasaurus en vez de Camoufox'
     )
 
     args = parser.parse_args()
@@ -96,60 +101,87 @@ def main():
             print(f"Usa --list-zones para ver zonas disponibles")
             sys.exit(1)
 
-    # PostgreSQL config
-    postgres_config = None
-    if args.postgres:
-        db_url = os.environ.get('DATABASE_URL', '')
-        if db_url:
-            from urllib.parse import urlparse
-            parsed = urlparse(db_url)
-            is_remote = parsed.hostname and parsed.hostname != 'localhost'
-            postgres_config = {
-                'host': parsed.hostname,
-                'port': parsed.port or 5432,
-                'database': parsed.path.lstrip('/'),
-                'user': parsed.username,
-                'password': parsed.password,
-                'sslmode': 'require' if is_remote else 'prefer'
-            }
-        else:
-            postgres_config = {
-                'host': 'localhost',
-                'port': 5432,
-                'database': 'casa_teva_db',
-                'user': 'casa_teva',
-                'password': 'casateva2024'
-            }
+    # Choose scraper: Camoufox (default) or Botasaurus (fallback)
+    use_camoufox = not args.botasaurus
+    if use_camoufox:
+        try:
+            from scrapers.camoufox_habitaclia import CamoufoxHabitaclia
+            scraper_name = "Camoufox"
+        except ImportError:
+            use_camoufox = False
+
+    if not use_camoufox:
+        scraper_name = "Botasaurus"
 
     print(f"\n{'='*60}")
-    print("SCRAPER DE HABITACLIA (Botasaurus)")
+    print(f"SCRAPER DE HABITACLIA ({scraper_name})")
     print(f"{'='*60}")
     print(f"Tenant ID: {args.tenant_id}")
     print(f"Zonas: {', '.join(args.zones)}")
     print(f"PostgreSQL: {'Habilitado' if args.postgres else 'Deshabilitado'}")
     print(f"{'='*60}\n")
 
-    with BotasaurusHabitaclia(
-        tenant_id=args.tenant_id,
-        zones=args.zones,
-        postgres_config=postgres_config,
-        headless=args.headless,
-    ) as scraper:
+    if use_camoufox:
+        scraper = CamoufoxHabitaclia(
+            zones=args.zones,
+            tenant_id=args.tenant_id,
+            headless=args.headless,
+        )
+        stats = scraper.scrape()
+        print(f"\n{'='*60}")
+        print("RESULTADOS")
+        print(f"{'='*60}")
+        print(f"Total anuncios encontrados: {stats['total_listings']}")
+        print(f"Guardados: {stats['saved']}")
+        print(f"Duplicados: {stats['duplicates']}")
+        print(f"Errores: {stats['errors']}")
+    else:
+        # Botasaurus fallback
+        from scrapers.botasaurus_habitaclia import BotasaurusHabitaclia
+        postgres_config = None
         if args.postgres:
-            stats = scraper.scrape_and_save()
-            print(f"\n{'='*60}")
-            print("RESULTADOS")
-            print(f"{'='*60}")
-            print(f"Total anuncios encontrados: {stats['total_listings']}")
-            print(f"Filtrados (agencias): {stats['filtered_out']}")
-            print(f"Guardados: {stats['saved']}")
-            print(f"Errores: {stats['errors']}")
-            print(f"{stats['saved']} leads guardados en PostgreSQL")
-        else:
-            listings = scraper.scrape()
-            print(f"\nEncontrados {len(listings)} anuncios")
-            for l in listings[:5]:
-                print(f"  - {l.get('titulo', 'N/A')[:50]}... | {l.get('precio')}€")
+            db_url = os.environ.get('DATABASE_URL', '')
+            if db_url:
+                from urllib.parse import urlparse
+                parsed = urlparse(db_url)
+                is_remote = parsed.hostname and parsed.hostname != 'localhost'
+                postgres_config = {
+                    'host': parsed.hostname,
+                    'port': parsed.port or 5432,
+                    'database': parsed.path.lstrip('/'),
+                    'user': parsed.username,
+                    'password': parsed.password,
+                    'sslmode': 'require' if is_remote else 'prefer'
+                }
+            else:
+                postgres_config = {
+                    'host': 'localhost',
+                    'port': 5432,
+                    'database': 'casa_teva_db',
+                    'user': 'casa_teva',
+                    'password': '',
+                }
+
+        with BotasaurusHabitaclia(
+            tenant_id=args.tenant_id,
+            zones=args.zones,
+            postgres_config=postgres_config,
+            headless=args.headless,
+        ) as scraper:
+            if args.postgres:
+                stats = scraper.scrape_and_save()
+                print(f"\n{'='*60}")
+                print("RESULTADOS")
+                print(f"{'='*60}")
+                print(f"Total anuncios encontrados: {stats['total_listings']}")
+                print(f"Filtrados (agencias): {stats['filtered_out']}")
+                print(f"Guardados: {stats['saved']}")
+                print(f"Errores: {stats['errors']}")
+            else:
+                listings = scraper.scrape()
+                print(f"\nEncontrados {len(listings)} anuncios")
+                for l in listings[:5]:
+                    print(f"  - {l.get('titulo', 'N/A')[:50]}... | {l.get('precio')}€")
 
 
 if __name__ == '__main__':
