@@ -293,17 +293,46 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
             logger.info(f"Loading: {url}")
             driver.get(url)
-            driver.sleep(5)  # Increased wait
+            driver.sleep(3)
 
-            # Accept cookies if present
+            # Accept cookies via TCF API + common button selectors
             try:
                 driver.run_js('''
-                    const acceptBtn = document.querySelector('[id*="accept"], [class*="accept-cookies"], .cookie-accept');
-                    if (acceptBtn) acceptBtn.click();
+                    // TCF API consent (many Spanish portals use this)
+                    if (window.__tcfapi) {
+                        window.__tcfapi('postCustomConsent', 2, function(){}, [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]);
+                    }
+                    // Click consent buttons
+                    const selectors = [
+                        '#didomi-notice-agree-button',
+                        'button[id*="accept"]',
+                        'button[class*="accept"]',
+                        '[data-testid="TcfAccept"]',
+                        'button[aria-label*="accept" i]',
+                        'button[aria-label*="aceptar" i]',
+                        '.cookie-accept',
+                        '[class*="accept-cookies"]',
+                    ];
+                    for (const sel of selectors) {
+                        const btn = document.querySelector(sel);
+                        if (btn && btn.offsetParent !== null) { btn.click(); break; }
+                    }
                 ''')
-                driver.sleep(1)
+                driver.sleep(2)
             except:
                 pass
+
+            # Wait for listing content to appear (up to 30s)
+            for attempt in range(15):
+                has_content = driver.run_js('''
+                    return document.querySelectorAll('a[href*="/comprar-"]').length;
+                ''')
+                if has_content and has_content > 0:
+                    logger.info(f"Content loaded after {(attempt+1)*2}s: {has_content} listing links found")
+                    break
+                driver.sleep(2)
+            else:
+                logger.warning("Content did not load after 30s of waiting")
 
             # Scroll multiple times to load lazy content
             for i in range(4):
@@ -312,11 +341,6 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
 
             html = driver.page_html
             logger.info(f"HTML length: {len(html)}")
-
-            # Check for blocking - lowered threshold
-            if len(html) < 30000:
-                logger.warning(f"Possible blocking or empty results (HTML: {len(html)} bytes)")
-                return []
 
             # Extract listing URLs - Habitaclia format (may have query params)
             links = re.findall(r'href="(https://www\.habitaclia\.com/comprar-(?:piso|casa|chalet|vivienda)[^"]+\.htm)[^"]*"', html)
