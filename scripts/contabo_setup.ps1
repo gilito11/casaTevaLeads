@@ -2,18 +2,19 @@
 # Run this on the VPS (Windows Server 2022) as Administrator
 #
 # Prerequisites:
-#   - Python 3.11+ installed at E:\Python311\
+#   - Python 3.13+ installed at C:\Python313\
 #   - Git installed
 #   - Google Chrome installed
 #   - NSSM installed (https://nssm.cc/)
-#   - Repo cloned to E:\casa-teva\
-#   - .env configured at E:\casa-teva\.env
+#   - Repo cloned to C:\casa-teva\
+#   - .env configured at C:\casa-teva\.env
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File E:\casa-teva\scripts\contabo_setup.ps1
+#   powershell -ExecutionPolicy Bypass -File C:\casa-teva\scripts\contabo_setup.ps1
 
 $ErrorActionPreference = "Stop"
-$PROJECT = "E:\casa-teva"
+$PROJECT = "C:\casa-teva"
+$PYTHON_SYS = "C:\Python313\python.exe"
 $PYTHON = "$PROJECT\venv\Scripts\python.exe"
 $LOGS = "$PROJECT\logs"
 
@@ -32,7 +33,7 @@ Write-Host "  OK" -ForegroundColor Green
 # ---- 2. Virtual environment ----
 Write-Host "`n[2/7] Setting up Python venv..." -ForegroundColor Yellow
 if (-not (Test-Path "$PROJECT\venv")) {
-    E:\Python311\python.exe -m venv "$PROJECT\venv"
+    & $PYTHON_SYS -m venv "$PROJECT\venv"
 }
 & $PYTHON -m pip install --upgrade pip
 & $PYTHON -m pip install -r "$PROJECT\requirements.txt"
@@ -119,7 +120,7 @@ Write-Host "  1. Download cloudflared: https://developers.cloudflare.com/cloudfl
 Write-Host "  2. cloudflared tunnel login" -ForegroundColor Gray
 Write-Host "  3. cloudflared tunnel create casa-teva" -ForegroundColor Gray
 Write-Host "  4. cloudflared tunnel route dns casa-teva <your-domain>" -ForegroundColor Gray
-Write-Host "  5. Create E:\cloudflared\config.yml (see plan)" -ForegroundColor Gray
-Write-Host "  6. nssm install CloudflareTunnel E:\cloudflared\cloudflared.exe" -ForegroundColor Gray
+Write-Host "  5. Create C:\cloudflared\config.yml (see plan)" -ForegroundColor Gray
+Write-Host "  6. nssm install CloudflareTunnel C:\cloudflared\cloudflared.exe" -ForegroundColor Gray
 Write-Host "     nssm set CloudflareTunnel AppParameters 'tunnel run casa-teva'" -ForegroundColor Gray
 Write-Host "     nssm start CloudflareTunnel" -ForegroundColor Gray
