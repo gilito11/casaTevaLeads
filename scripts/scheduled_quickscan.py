@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Quick scan scheduled task - replaces GitHub Actions quick-scan.yml cron.
+"""Quick scan scheduled task for VPS.
 
 Schedule: L-S cada 2h (09:00-19:00 CET) via Windows Task Scheduler.
 
-Runs habitaclia + fotocasa (page 1 only) + dbt for fast new-lead detection.
+Runs habitaclia + milanuncios (page 1 only) + dbt for fast new-lead detection.
+fotocasa is blocked on VPS (Imperva) → only on GitHub Actions.
 """
 import os
 import sys
@@ -52,10 +53,11 @@ def main():
     start = datetime.datetime.now()
     logger.info(f"Quick scan started at {start}, zones: {ZONES}")
 
+    # Only portals that work from VPS (fotocasa blocked by Imperva)
     run_step("Habitaclia",
              [PYTHON, "run_habitaclia_scraper.py", "--zones"] + ZONES + ["--postgres"])
-    run_step("Fotocasa",
-             [PYTHON, "run_fotocasa_scraper.py", "--zones"] + ZONES + ["--postgres"])
+    run_step("Milanuncios",
+             [PYTHON, "run_camoufox_milanuncios_scraper.py", "--zones"] + ZONES + ["--max-pages", "1", "--postgres"])
 
     # dbt: staging + marts
     run_step("dbt",

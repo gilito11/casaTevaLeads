@@ -174,7 +174,11 @@ LOGOUT_REDIRECT_URL = 'login'
 
 # Security settings for production
 if not DEBUG:
-    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default='True', cast=bool)
+    # Behind Cloudflare Tunnel: cloudflared → localhost:8000 (HTTP)
+    # Trust X-Forwarded-Proto from the tunnel/proxy
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Disable SSL redirect - Cloudflare handles HTTPS termination
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default='False', cast=bool)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True

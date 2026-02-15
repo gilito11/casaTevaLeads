@@ -72,21 +72,12 @@ Write-Host "  OK - http://localhost:8000/health/" -ForegroundColor Green
 # ---- 6. Scheduled Tasks ----
 Write-Host "`n[6/7] Creating Windows Scheduled Tasks..." -ForegroundColor Yellow
 
-# Full scrape: L-X-V 13:00 CET (12:00 UTC)
+# VPS scrape (habitaclia + milanuncios only): L-X-V 13:00 CET
+# fotocasa + idealista stay on GitHub Actions (blocked by Imperva/DataDome)
 schtasks /Create /SC WEEKLY /D MON,WED,FRI /ST 13:00 `
     /TN "CasaTeva\FullScrape" `
     /TR "$PYTHON $PROJECT\scripts\scheduled_scrape.py" /F
-Write-Host "  FullScrape (L-X-V 13:00)" -ForegroundColor Gray
-
-# Quick scans: L-S every 2h 09:00-19:00 CET
-$quickTimes = @("09:00","11:00","13:00","15:00","17:00","19:00")
-foreach ($t in $quickTimes) {
-    $name = "QuickScan$($t.Replace(':',''))"
-    schtasks /Create /SC DAILY /ST $t `
-        /TN "CasaTeva\$name" `
-        /TR "$PYTHON $PROJECT\scripts\scheduled_quickscan.py" /F
-    Write-Host "  $name ($t)" -ForegroundColor Gray
-}
+Write-Host "  FullScrape: hab+mil (L-X-V 13:00)" -ForegroundColor Gray
 
 # Contact queue: L-V 18:00 CET (17:00 UTC)
 schtasks /Create /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 18:00 `
@@ -104,8 +95,7 @@ Write-Host "Services:" -ForegroundColor White
 Write-Host "  CasaTevaWeb    -> http://localhost:8000/health/" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Scheduled Tasks:" -ForegroundColor White
-Write-Host "  FullScrape     -> L-X-V 13:00 CET" -ForegroundColor Gray
-Write-Host "  QuickScan      -> L-S cada 2h (09-19 CET)" -ForegroundColor Gray
+Write-Host "  FullScrape     -> L-X-V 13:00 CET (hab+mil only)" -ForegroundColor Gray
 Write-Host "  ContactQueue   -> L-V 18:00 CET" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Logs: $LOGS" -ForegroundColor White

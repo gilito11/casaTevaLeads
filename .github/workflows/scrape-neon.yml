@@ -1,4 +1,5 @@
 # Scraper workflow - Runs on GitHub Actions, saves to Neon PostgreSQL
+# Only fotocasa + idealista: habitaclia + milanuncios run on Contabo VPS
 # Free tier: 2000 min/month
 name: Run Scrapers (Neon)
 
@@ -10,7 +11,7 @@ on:
       portals:
         description: 'Portals to scrape (comma-separated)'
         required: false
-        default: 'habitaclia,fotocasa,milanuncios'
+        default: 'fotocasa,idealista'
       zones:
         description: 'Zones to scrape (comma-separated)'
         required: false
@@ -45,7 +46,7 @@ jobs:
         run: camoufox fetch
 
       - name: Run Habitaclia scraper
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa', 'habitaclia')
+        if: contains(github.event.inputs.portals || 'fotocasa,idealista', 'habitaclia')
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
           python run_habitaclia_scraper.py --zones ${ZONES//,/ } --postgres
@@ -53,7 +54,7 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
       - name: Run Fotocasa scraper (with Xvfb virtual display)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa', 'fotocasa')
+        if: contains(github.event.inputs.portals || 'fotocasa,idealista', 'fotocasa')
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
@@ -62,7 +63,7 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
       - name: Run Milanuncios scraper (Camoufox)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'milanuncios')
+        if: contains(github.event.inputs.portals || 'fotocasa,idealista', 'milanuncios')
         continue-on-error: true
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
@@ -74,7 +75,7 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
       - name: Run Idealista scraper (Camoufox + Xvfb + proxy)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'idealista')
+        if: contains(github.event.inputs.portals || 'fotocasa,idealista', 'idealista')
         continue-on-error: true
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
@@ -122,7 +123,7 @@ jobs:
       - name: Summary
         run: |
           echo "## Scraping Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Portals: ${{ github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Portals: ${{ github.event.inputs.portals || 'fotocasa,idealista' }}" >> $GITHUB_STEP_SUMMARY
           echo "- Zones: ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}" >> $GITHUB_STEP_SUMMARY
           echo "- dbt: Transformations applied" >> $GITHUB_STEP_SUMMARY
 

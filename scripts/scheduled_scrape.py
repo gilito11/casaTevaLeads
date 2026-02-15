@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Full scraping scheduled task - replaces GitHub Actions scrape-neon.yml cron.
+"""VPS scraping scheduled task - runs portals that work from Contabo.
 
 Schedule: L-X-V 13:00 CET (12:00 UTC) via Windows Task Scheduler.
 
-Runs all 4 portals + dbt transformations + auto-queue with Telegram alerts.
+Runs habitaclia + milanuncios + dbt + auto-queue with Telegram alerts.
+fotocasa + idealista are blocked on VPS (Imperva/DataDome) → stay on GitHub Actions.
 """
 import os
 import sys
@@ -92,23 +93,15 @@ def main():
 
     results = {}
 
-    # 1. Scrapers
+    # 1. Scrapers (only portals that work from VPS)
+    # fotocasa (Imperva) and idealista (DataDome) are blocked → GitHub Actions only
     results['habitaclia'] = run_step(
         "Habitaclia",
         [PYTHON, "run_habitaclia_scraper.py", "--zones"] + ZONES + ["--postgres"],
     )
-    results['fotocasa'] = run_step(
-        "Fotocasa",
-        [PYTHON, "run_fotocasa_scraper.py", "--zones"] + ZONES + ["--postgres"],
-    )
     results['milanuncios'] = run_step(
         "Milanuncios",
         [PYTHON, "run_camoufox_milanuncios_scraper.py", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
-        allow_fail=True,
-    )
-    results['idealista'] = run_step(
-        "Idealista",
-        [PYTHON, "run_camoufox_idealista_scraper.py", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
         allow_fail=True,
     )
 
