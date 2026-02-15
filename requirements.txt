@@ -1,38 +1,33 @@
 # Django & Web Framework
 Django>=5.1,<6.0
-djangorestframework==3.14.0
-django-cors-headers==4.3.1
-django-filter==25.1
-drf-spectacular==0.27.0
-gunicorn==21.2.0
-waitress==3.0.0
-whitenoise==6.11.0
+djangorestframework>=3.14
+django-cors-headers>=4.3
+django-filter>=25.1
+drf-spectacular>=0.27
+waitress>=3.0
+whitenoise>=6.11
 
 # Database
 psycopg2-binary>=2.9.10
-dj-database-url==2.1.0
-python-decouple==3.8
+dj-database-url>=2.1
+python-decouple>=3.8
 
-# Scrapers dependencies
-playwright==1.48.0
-botasaurus==4.0.72
-camoufox[geoip]>=0.4.11  # Anti-detect browser with GeoIP for Milanuncios/Idealista
-requests>=2.31.0  # HTTP client
-curl_cffi>=0.7.0  # Browser TLS fingerprint impersonation for anti-bot bypass
+# Scrapers
+playwright>=1.48
+botasaurus>=4.0
+camoufox[geoip]>=0.4.11
+requests>=2.31
+curl_cffi>=0.7
 
 # dbt
-dbt-core==1.7.4
-dbt-postgres==1.7.4
-protobuf<5.0  # Required for dbt 1.7.x compatibility
+dbt-core>=1.8,<2.0
+dbt-postgres>=1.8,<2.0
 
 # PDF Generation
-reportlab>=4.0.0
+reportlab>=4.0
 
 # Encryption
-cryptography>=41.0.0
+cryptography>=41.0
 
-# Testing
-pytest==7.4.3
-pytest-cov==4.1.0
-pytest-mock==3.12.0
-playwright-stealth==1.0.6
+# Stealth (scraper helper)
+playwright-stealth>=1.0.6
