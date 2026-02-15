@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 import psycopg2
 
 from scrapers.botasaurus_habitaclia import ZONAS_GEOGRAFICAS
+from scrapers.camoufox_idealista import parse_proxy
 from scrapers.utils.particular_filter import debe_scrapear
 
 logger = logging.getLogger(__name__)
@@ -72,12 +73,14 @@ class CamoufoxHabitaclia:
         headless: bool = True,
         only_private: bool = True,
         quick_scan: bool = False,
+        proxy: str = None,
     ):
         self.zones = zones or ['salou']
         self.tenant_id = tenant_id
         self.headless = headless
         self.only_private = only_private
         self.quick_scan = quick_scan
+        self.proxy = proxy or os.environ.get('DATADOME_PROXY')
         self.postgres_conn = None
         self.stats = {
             'total_listings': 0,
@@ -418,9 +421,15 @@ class CamoufoxHabitaclia:
             "locale": ["es-ES", "es"],
         }
 
+        proxy_config = parse_proxy(self.proxy)
+        if proxy_config:
+            camoufox_opts["proxy"] = proxy_config
+            logger.info(f"Using proxy: {proxy_config['server']}")
+
         logger.info(f"Starting Camoufox Habitaclia scraper")
         logger.info(f"  Zones: {self.zones}")
         logger.info(f"  Headless: {self.headless}")
+        logger.info(f"  Proxy: {'configured' if proxy_config else 'none (will use direct IP)'}")
 
         try:
             with Camoufox(**camoufox_opts) as browser:
