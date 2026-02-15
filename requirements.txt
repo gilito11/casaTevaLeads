@@ -14,20 +14,11 @@ dj-database-url==2.1.0
 python-decouple==3.8
 
 # Scrapers dependencies
-minio==7.2.7
 playwright==1.48.0
-scrapy==2.11.0
-scrapy-playwright==0.0.34
 botasaurus==4.0.72
 camoufox[geoip]>=0.4.11  # Anti-detect browser with GeoIP for Milanuncios/Idealista
 requests>=2.31.0  # HTTP client
 curl_cffi>=0.7.0  # Browser TLS fingerprint impersonation for anti-bot bypass
-
-# Dagster
-dagster==1.5.12
-dagster-webserver==1.5.12
-dagster-postgres==0.21.12
-dagster-docker==0.21.12
 
 # dbt
 dbt-core==1.7.4
