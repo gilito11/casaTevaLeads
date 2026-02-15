@@ -1,14 +1,12 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/🏠-Casa%20Teva%20Lead%20System-blue?style=for-the-badge&labelColor=1a1a2e" alt="Casa Teva" />
+  <img src="https://img.shields.io/badge/🏠-FincaRadar-blue?style=for-the-badge&labelColor=1a1a2e" alt="FincaRadar" />
 </p>
 
-<h1 align="center">
-  🏡 Casa Teva Lead System
-</h1>
+<h1 align="center">FincaRadar</h1>
 
 <p align="center">
-  <strong>Sistema inteligente de captación de leads inmobiliarios</strong><br>
-  Scraping automatizado de portales españoles + CRM integrado + Analytics Dashboard
+  <strong>CRM inmobiliario con captación automática de leads</strong><br>
+  Scraping de 4 portales españoles · Contacto automatizado · Valoraciones ACM · Analytics
 </p>
 
 <p align="center">
@@ -16,79 +14,100 @@
   <img src="https://img.shields.io/badge/Django-5.x-092e20?style=flat-square&logo=django&logoColor=white" alt="Django" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169e1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/dbt-Core-ff694b?style=flat-square&logo=dbt&logoColor=white" alt="dbt" />
-  <img src="https://img.shields.io/badge/Dagster-latest-5c4ee5?style=flat-square&logo=dagster&logoColor=white" alt="Dagster" />
-  <img src="https://img.shields.io/badge/Fly.io-Deployed-8b5cf6?style=flat-square&logo=fly.io&logoColor=white" alt="Fly.io" />
-  <img src="https://img.shields.io/badge/License-Private-red?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/Cloudflare-Tunnel-f38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare" />
+  <img src="https://img.shields.io/badge/Coste-~€4/mes-00c853?style=flat-square" alt="Coste" />
 </p>
 
 <p align="center">
-  <a href="#-características">Características</a> •
+  <a href="#-features">Features</a> •
   <a href="#-arquitectura">Arquitectura</a> •
+  <a href="#-portales">Portales</a> •
   <a href="#-inicio-rápido">Inicio Rápido</a> •
-  <a href="#-portales-soportados">Portales</a> •
-  <a href="#-documentación">Docs</a>
+  <a href="#-api">API</a>
 </p>
 
 ---
 
-## ✨ Características
+## ✨ Features
 
-| Feature | Descripción |
-|---------|-------------|
-| 🕷️ **Multi-portal Scraping** | Extrae leads de 4 portales inmobiliarios españoles simultáneamente |
-| 🎯 **Filtrado Inteligente** | Detecta y filtra automáticamente anuncios de agencias (solo particulares) |
-| 📱 **Extracción de Contactos** | Captura teléfonos de descripciones y botones de contacto |
-| 📸 **Galería de Fotos** | Descarga y almacena todas las imágenes de cada propiedad |
-| 🔄 **Deduplicación** | Identifica duplicados por listing_id único entre ejecuciones |
-| 📊 **Analytics Dashboard** | Métricas en tiempo real, embudo de conversión, comparativas |
-| 🏷️ **CRM Completo** | Gestión de estados, notas, asignaciones y seguimiento |
-| ⏰ **Schedule Optimizado** | Ejecución programada a las 12:00 y 18:00 (horarios óptimos) |
-| 🚀 **CI/CD Automático** | Deploy automático a Azure con GitHub Actions |
+### Captación
+- **Scraping multi-portal** — Habitaclia, Fotocasa, Milanuncios, Idealista
+- **Anti-bot bypass** — Botasaurus (Chrome), Camoufox (Firefox anti-detect) con proxy residencial
+- **Deduplicación cross-portal** — Por teléfono + ubicación + precio + metros
+- **Detección de bajadas de precio** — Histórico de precios con alertas (>5%)
+
+### CRM
+- **Lead scoring** — 0-90 pts: días en mercado, teléfono, fotos, precio relativo
+- **Gestión de estados** — NUEVO → EN_PROCESO → CONTACTADO → INTERESADO → CLIENTE
+- **Agenda de tareas** — Seguimiento por comercial con calendario
+- **Contacto automatizado** — Envío de mensajes a 4 portales con rate limiting
+
+### Valoraciones
+- **ACM (Análisis Comparativo de Mercado)** — Búsqueda de comparables, índice de confianza
+- **PDF de valoración** — Generación automática con datos del mercado
+- **Widget embebible** — JS snippet para webs de terceros (`/api/widget/valorar/`)
+
+### Plataforma
+- **API REST v1** — Autenticación X-API-Key, filtros, paginación, webhooks
+- **PWA** — Service Worker, Push Notifications, instalable en móvil
+- **Alertas Telegram** — Resumen diario, bajadas de precio, errores de scraping
+- **Analytics** — Dashboard con KPIs, embudo de conversión, métricas por portal/zona
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           🌐 PORTALES WEB                                    │
-│     Habitaclia    Fotocasa     Milanuncios    Idealista                     │
-└─────────────────────────────────────────────────────────────────────────────┘
+         Contabo VPS (Windows Server)              GitHub Actions
+         ─────────────────────────                  ──────────────
+         │ Camoufox + IPRoyal proxy │               │ Botasaurus  │
+         │ habitaclia, milanuncios  │               │ fotocasa    │
+         │ L-X-V 13:00 CET         │               │ Camoufox    │
+         │                          │               │ idealista   │
+         │ Django CRM (waitress)    │               │ L-X-V 12:00 │
+         │ Cloudflare Tunnel        │               └──────┬──────┘
+         └────────────┬─────────────┘                      │
+                      │                                    │
+                      ▼                                    ▼
+              ┌───────────────────────────────────────────────┐
+              │          Neon PostgreSQL (Serverless)          │
+              │                                               │
+              │  raw.raw_listings → stg_* → dim_leads (dbt)  │
+              └───────────────────────────────────────────────┘
                                     │
                                     ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      ⚙️ GITHUB ACTIONS (Scrapers)                            │
-│                      Schedule: L-X-V 12:00 UTC                              │
-│                                                                             │
-│   Botasaurus (habitaclia, fotocasa)    ScrapingBee (milanuncios, idealista)│
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    🗄️ NEON PostgreSQL (Serverless)                           │
-│                    ep-ancient-darkness-*.neon.tech                          │
-│                                                                             │
-│   raw.raw_listings ──► public_staging.stg_* ──► public_marts.dim_leads     │
-│       (JSONB)              (dbt views)             (dbt incremental)        │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        🖥️ FLY.IO (Django CRM)                                │
-│                        casatevaleads.fly.dev                                │
-│                                                                             │
-│                    HTMX + TailwindCSS + DRF + PWA                           │
-└─────────────────────────────────────────────────────────────────────────────┘
+                      https://fincaradar.com
+                      Cloudflare CDN + SSL
 ```
 
-### Costes Mensuales
+### Costes
+
 | Servicio | Coste |
 |----------|-------|
-| Fly.io | GRATIS |
-| Neon PostgreSQL | GRATIS |
-| GitHub Actions | GRATIS |
-| ScrapingBee | ~€50/mes |
-| **Total** | **~€50/mes** |
+| Contabo VPS (8GB, 2 vCPU) | €4.99/mes |
+| Neon PostgreSQL | Gratis |
+| GitHub Actions | Gratis |
+| Cloudflare (DNS + Tunnel) | Gratis |
+| 2Captcha (Habitaclia reCAPTCHA) | ~€3/mes |
+| IPRoyal proxy (Idealista DataDome) | ~€1/mes* |
+| **Total** | **~€9/mes** |
+
+<sub>*IPRoyal: compra única de $7/GB, tráfico no expira. Estimado ~100-200MB/mes.</sub>
+
+---
+
+## 🌐 Portales
+
+| Portal | Scraper | Anti-bot | Infraestructura |
+|--------|---------|----------|-----------------|
+| **Habitaclia** | Camoufox | Imperva → proxy residencial | VPS + GitHub Actions |
+| **Fotocasa** | Botasaurus | Imperva (bloquea datacenter) | GitHub Actions |
+| **Milanuncios** | Camoufox | GeeTest (bypass nativo) | VPS + GitHub Actions |
+| **Idealista** | Camoufox | DataDome → proxy residencial | GitHub Actions |
+
+**Datos extraídos**: listing_id, URL, título, precio, descripción, ubicación, teléfono, tipo de propiedad, habitaciones, baños, m², fotos, tipo de vendedor (particular/agencia).
+
+**Contacto automático**: Login en portal → formulario/chat → mensaje personalizado. Rate limit: 5/día, delay 2-5min.
 
 ---
 
@@ -97,227 +116,126 @@
 ### Prerrequisitos
 
 - Python 3.11+
-- Docker & Docker Compose
-- PostgreSQL 16 (o usar Docker)
+- PostgreSQL 16 (o [Neon](https://neon.tech) gratuito)
+- Google Chrome (para Botasaurus)
 
-### Instalación Local
+### Instalación
 
 ```bash
-# 1. Clonar repositorio
 git clone https://github.com/gilito11/casaTevaLeads.git
 cd casaTevaLeads
 
-# 2. Crear entorno virtual
 python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate     # Windows
+# .venv\Scripts\activate   # Windows
 
-# 3. Instalar dependencias
 pip install -r requirements.txt
 
-# 4. Iniciar servicios con Docker
-docker-compose up -d
+# Configurar .env en raíz del proyecto
+cp .env.example .env  # Editar con tus credenciales
 
-# 5. Aplicar migraciones
-cd backend && python manage.py migrate
-
-# 6. Crear usuario admin
+# Django
+cd backend
+python manage.py migrate
 python manage.py createsuperuser
+python manage.py runserver
 ```
 
-### URLs Locales
-
-| Servicio | URL |
-|----------|-----|
-| 🖥️ CRM Web | http://localhost:8000 |
-| ⚙️ Dagster UI | http://localhost:3000 |
-| 🐘 PostgreSQL | localhost:5432 |
-
----
-
-## 🌐 Portales Soportados
-
-| Portal | Tecnología | Coste | Datos Extraídos |
-|--------|------------|-------|-----------------|
-| ![Habitaclia](https://img.shields.io/badge/-Habitaclia-ff6b35?style=flat-square) | Botasaurus | ✅ Gratis | título, precio, m², fotos, teléfono* |
-| ![Fotocasa](https://img.shields.io/badge/-Fotocasa-1a73e8?style=flat-square) | Botasaurus | ✅ Gratis | título, precio, m², fotos, teléfono* |
-| ![Milanuncios](https://img.shields.io/badge/-Milanuncios-ffc107?style=flat-square) | ScrapingBee | 75 credits | título, precio, m², fotos, teléfono |
-| ![Idealista](https://img.shields.io/badge/-Idealista-5cb85c?style=flat-square) | ScrapingBee | 75 credits | título, precio, m², fotos, teléfono |
-
-> *Teléfono extraído de la descripción del anuncio mediante regex
-
----
-
-## 📁 Estructura del Proyecto
-
-```
-casa-teva-lead-system/
-│
-├── 🖥️ backend/                    # Django Application
-│   ├── apps/
-│   │   ├── core/                 # Modelos base, zonas, tenants
-│   │   ├── leads/                # Estados CRM, vistas de leads
-│   │   └── analytics/            # Dashboard y API de métricas
-│   ├── templates/                # HTML (HTMX + Tailwind)
-│   └── casa_teva/                # Settings Django
-│
-├── 🕷️ scrapers/                   # Web Scrapers
-│   ├── botasaurus_habitaclia.py  # Scraper Habitaclia
-│   ├── botasaurus_fotocasa.py    # Scraper Fotocasa
-│   ├── scrapingbee_milanuncios.py # Scraper Milanuncios
-│   └── scrapingbee_idealista.py  # Scraper Idealista
-│
-├── ⚙️ dagster/                    # Pipeline Orchestration
-│   ├── assets/                   # Dagster assets
-│   └── schedules/                # Programación de jobs
-│
-├── 📊 dbt_project/                # ETL Transformations
-│   ├── models/
-│   │   ├── staging/              # stg_* views
-│   │   └── marts/                # dim_leads (incremental)
-│   └── tests/                    # dbt tests
-│
-├── 🐳 docker-compose.yml         # Local development
-├── 📋 requirements.txt           # Python dependencies
-└── ⚡ .github/workflows/         # CI/CD pipelines
-```
-
----
-
-## 💻 Uso
-
-### Ejecutar Scrapers
+### Scraping manual
 
 ```bash
-# Todos los portales, todas las zonas
-python run_all_scrapers.py --postgres
+# Habitaclia (Botasaurus)
+python run_habitaclia_scraper.py --zones salou cambrils --postgres
 
-# Portales específicos
-python run_all_scrapers.py --portals habitaclia fotocasa --zones salou
+# Milanuncios (Camoufox)
+python run_camoufox_milanuncios_scraper.py --zones tarragona --max-pages 2 --postgres
 
-# Solo ScrapingBee (consume créditos)
-python run_all_scrapers.py --portals milanuncios idealista --zones reus
-```
+# Idealista (Camoufox + proxy)
+python run_camoufox_idealista_scraper.py --zones igualada --max-pages 2 --postgres
 
-### Pipeline dbt
-
-```bash
-cd dbt_project
-
-# Ejecutar staging models
-dbt run --select staging.*
-
-# Ejecutar marts
-dbt run --select dim_leads
-
-# Tests
-dbt test
+# dbt transformaciones
+cd dbt_project && dbt run --select staging marts
 ```
 
 ---
 
-## ☁️ Despliegue en Producción
+## 📡 API
 
-El sistema está desplegado con la siguiente arquitectura serverless:
+### REST API v1
 
-| Servicio | Plataforma |
-|----------|------------|
-| Django CRM | Fly.io (Docker) |
-| Scrapers | GitHub Actions |
-| Base de datos | Neon PostgreSQL (Serverless) |
-| Alertas | Telegram Bot |
+```
+GET  /api/v1/leads/              # Listar leads (filtros, paginación)
+GET  /api/v1/leads/{id}/         # Detalle de lead
+POST /api/v1/leads/{id}/estado/  # Cambiar estado CRM
+```
 
-### URLs de Producción
+Autenticación: header `X-API-Key: ctv_xxxxx...`
 
-- 🖥️ **CRM**: https://casatevaleads.fly.dev
-- 📱 **Alertas**: @casateva_alerts_bot (Telegram)
-
----
-
-## 🔧 Stack Tecnológico
-
-<table>
-  <tr>
-    <td align="center"><strong>Backend</strong></td>
-    <td align="center"><strong>Frontend</strong></td>
-    <td align="center"><strong>Data</strong></td>
-    <td align="center"><strong>Infra</strong></td>
-  </tr>
-  <tr>
-    <td>
-      <img src="https://img.shields.io/badge/Django-092e20?style=flat-square&logo=django" /><br>
-      <img src="https://img.shields.io/badge/DRF-ff1709?style=flat-square" /><br>
-      <img src="https://img.shields.io/badge/Python-3776ab?style=flat-square&logo=python&logoColor=white" />
-    </td>
-    <td>
-      <img src="https://img.shields.io/badge/HTMX-3d72d7?style=flat-square" /><br>
-      <img src="https://img.shields.io/badge/Tailwind-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white" /><br>
-      <img src="https://img.shields.io/badge/AlpineJS-8bc0d0?style=flat-square&logo=alpine.js&logoColor=white" />
-    </td>
-    <td>
-      <img src="https://img.shields.io/badge/PostgreSQL-4169e1?style=flat-square&logo=postgresql&logoColor=white" /><br>
-      <img src="https://img.shields.io/badge/dbt-ff694b?style=flat-square&logo=dbt&logoColor=white" /><br>
-      <img src="https://img.shields.io/badge/Dagster-5c4ee5?style=flat-square&logo=dagster&logoColor=white" />
-    </td>
-    <td>
-      <img src="https://img.shields.io/badge/Docker-2496ed?style=flat-square&logo=docker&logoColor=white" /><br>
-      <img src="https://img.shields.io/badge/Fly.io-8b5cf6?style=flat-square&logo=fly.io&logoColor=white" /><br>
-      <img src="https://img.shields.io/badge/Neon-00e599?style=flat-square&logo=neon&logoColor=white" /><br>
-      <img src="https://img.shields.io/badge/GitHub_Actions-2088ff?style=flat-square&logo=github-actions&logoColor=white" />
-    </td>
-  </tr>
-</table>
-
----
-
-## 📈 Analytics API
+### Analytics
 
 ```
 GET /analytics/api/kpis/                  # KPIs globales
 GET /analytics/api/embudo/                # Embudo de conversión
 GET /analytics/api/leads-por-dia/         # Tendencia diaria
-GET /analytics/api/comparativa-portales/  # Comparativa entre portales
+GET /analytics/api/comparativa-portales/  # Comparativa por portal
 GET /analytics/api/precios-por-zona/      # Precios por zona
-GET /analytics/api/export/                # Exportar a CSV
+GET /analytics/api/export/                # Exportar CSV
+```
+
+### Widget valorador
+
+```html
+<script src="https://fincaradar.com/static/widget/valorador.js"></script>
+<div id="valorador-widget" data-api-key="ctv_xxx"></div>
+```
+
+### Webhooks
+
+Eventos: `new_lead`, `status_change`, `price_drop`. Firma HMAC-SHA256 en `X-Webhook-Signature`.
+
+---
+
+## 📁 Estructura
+
+```
+casa-teva-lead-system/
+├── backend/                  # Django 5.x
+│   ├── apps/
+│   │   ├── leads/            # Lead model, CRM views, scoring, PDF
+│   │   ├── acm/              # Análisis Comparativo de Mercado
+│   │   ├── api_v1/           # REST API + API Keys
+│   │   ├── widget/           # Widget valorador embebible
+│   │   ├── analytics/        # Dashboard, métricas, export
+│   │   ├── notifications/    # Telegram + Push notifications
+│   │   └── core/             # Tenants, health, utilidades
+│   └── templates/            # HTMX + TailwindCSS
+├── scrapers/                 # Web scrapers
+│   ├── botasaurus_*.py       # Chrome headless (hab, foto)
+│   ├── camoufox_*.py         # Anti-detect Firefox (mil, ide, hab)
+│   └── contact_automation/   # Auto-contacto (4 portales)
+├── dbt_project/              # raw → staging → marts
+├── ai_agents/                # Ollama vision scoring (PoC)
+├── scripts/                  # VPS setup, cron, tunnel
+└── .github/workflows/        # Scraping + contacto (GH Actions)
 ```
 
 ---
 
-## 🔄 CI/CD & Workflows
+## 🔄 Scheduling
 
-### Scraping Automático
-```
-L-X-V 12:00 UTC → GitHub Actions → Botasaurus/ScrapingBee → Neon DB → dbt
-```
-
-### Contacto Automático
-```
-L-V 18:00 Madrid → GitHub Actions → Playwright → Portales → Telegram Alert
-```
-
-### Despliegue Web
-```
-fly deploy → Docker build → Fly.io
-```
-
-Workflows disponibles:
-- `scrape-neon.yml` - Scraping de portales (cron: L-X-V 12:00)
-- `contact-queue.yml` - Contacto automático (cron: L-V 18:00)
-
----
-
-## 🤝 Contribuir
-
-¿Encontraste un bug o tienes una idea? Revisa nuestra [guía de contribución](CONTRIBUTING.md).
+| Tarea | Schedule | Infraestructura |
+|-------|----------|-----------------|
+| Scraping habitaclia + milanuncios | L-X-V 13:00 CET | VPS (schtasks) |
+| Scraping fotocasa + idealista | L-X-V 12:00 UTC | GitHub Actions (cron) |
+| Contacto automático | L-V 18:00 CET | VPS (schtasks) |
+| Alertas Telegram | Diario + eventos | Automático |
 
 ---
 
 ## 📄 Licencia
 
-Proyecto privado - **Casa Teva Inmobiliaria** © 2026
-
----
+Proyecto privado — © 2026
 
 <p align="center">
-  <sub>Hecho con ❤️ para la captación inteligente de leads inmobiliarios</sub>
+  <sub>Hecho con Django, dbt, y mucho scraping</sub>
 </p>
