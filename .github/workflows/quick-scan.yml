@@ -36,7 +36,7 @@ jobs:
           sudo apt-get install -y google-chrome-stable xvfb
 
       - name: Install dependencies
-        run: pip install botasaurus psycopg2-binary python-decouple dbt-postgres requests
+        run: pip install botasaurus psycopg2-binary python-decouple python-dotenv dbt-postgres requests
 
       - name: Quick scan (habitaclia + fotocasa, page 1 only)
         run: |

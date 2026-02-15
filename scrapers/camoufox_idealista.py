@@ -439,6 +439,12 @@ class CamoufoxIdealista:
 
             if not items:
                 logger.warning("No listing elements found on page")
+                # Save debug HTML for diagnosis
+                debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'output', 'debug_idealista.html')
+                os.makedirs(os.path.dirname(debug_path), exist_ok=True)
+                with open(debug_path, 'w', encoding='utf-8') as f:
+                    f.write(page.content())
+                logger.warning(f"Debug HTML saved to {debug_path}")
                 return []
 
             for item in items:
