@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Start Django with waitress WSGI server (Windows-compatible).
-
-Usage:
-    python scripts/start_web.py
-
-For NSSM service:
-    nssm install CasaTevaWeb "E:\casa-teva\venv\Scripts\python.exe"
-    nssm set CasaTevaWeb AppParameters "E:\casa-teva\scripts\start_web.py"
-"""
+"""Start Django with waitress WSGI server (Windows-compatible)."""
 import os
 import sys
 
@@ -16,8 +8,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_DIR = os.path.join(PROJECT_ROOT, 'backend')
 
 # Load .env before anything else
-from dotenv import load_dotenv
-load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+except ImportError:
+    pass  # python-dotenv not installed, rely on system env vars
 
 os.chdir(BACKEND_DIR)
 sys.path.insert(0, BACKEND_DIR)
