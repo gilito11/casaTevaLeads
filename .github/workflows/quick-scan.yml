@@ -1,6 +1,6 @@
 # Quick Scan workflow - Fast new-lead detection (page 1 only, no detail enrichment)
-# Runs every 2 hours Mon-Sat for habitaclia + fotocasa (free, no proxy needed)
-# Budget: ~5 min/run x 6 runs/day x 26 days = ~780 min/month
+# Runs every 2 hours Mon-Sat for fotocasa only (habitaclia moved to VPS)
+# Budget: ~3 min/run x 6 runs/day x 26 days = ~468 min/month
 name: Quick Scan (New Listings)
 
 on:
@@ -38,10 +38,10 @@ jobs:
       - name: Install dependencies
         run: pip install botasaurus psycopg2-binary python-decouple python-dotenv dbt-postgres requests
 
-      - name: Quick scan (habitaclia + fotocasa, page 1 only)
+      - name: Quick scan (fotocasa only, habitaclia on VPS)
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
-          python run_quick_scan.py --zones ${ZONES//,/ } --postgres --portals habitaclia fotocasa
+          python run_quick_scan.py --zones ${ZONES//,/ } --postgres --portals fotocasa
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
@@ -79,6 +79,6 @@ jobs:
       - name: Summary
         run: |
           echo "## Quick Scan Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Portals: habitaclia, fotocasa" >> $GITHUB_STEP_SUMMARY
+          echo "- Portals: fotocasa" >> $GITHUB_STEP_SUMMARY
           echo "- Zones: ${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}" >> $GITHUB_STEP_SUMMARY
           echo "- Mode: Page 1 only (quick scan)" >> $GITHUB_STEP_SUMMARY

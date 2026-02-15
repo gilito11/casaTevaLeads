@@ -50,6 +50,87 @@ def health_check(request):
     return JsonResponse(health, status=status_code)
 
 
+def system_status(request):
+    """Detailed system status for remote monitoring. Requires auth or API key."""
+    from django.contrib.auth.decorators import login_required
+    from datetime import datetime, timedelta
+    import platform
+
+    # Allow API key auth for CLI access
+    api_key = request.headers.get('X-API-Key') or request.GET.get('key')
+    if not request.user.is_authenticated and not api_key:
+        return JsonResponse({'error': 'auth required'}, status=401)
+
+    if api_key:
+        from api_v1.models import APIKey
+        if not APIKey.objects.filter(is_active=True).exists():
+            return JsonResponse({'error': 'invalid key'}, status=403)
+        import hashlib
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        if not APIKey.objects.filter(key_hash=key_hash, is_active=True).exists():
+            return JsonResponse({'error': 'invalid key'}, status=403)
+
+    status = {
+        'server': {
+            'platform': platform.platform(),
+            'python': platform.python_version(),
+            'time': datetime.now().isoformat(),
+        },
+        'database': {},
+        'scraping': {},
+        'leads': {},
+    }
+
+    try:
+        with connection.cursor() as cursor:
+            # DB connectivity
+            cursor.execute('SELECT 1')
+            status['database']['connected'] = True
+
+            # Last scrape per portal
+            cursor.execute("""
+                SELECT source_portal,
+                       COUNT(*) as total,
+                       MAX(fecha_scraping) as last_scrape
+                FROM public_marts.dim_leads
+                GROUP BY source_portal
+                ORDER BY source_portal
+            """)
+            for row in cursor.fetchall():
+                status['scraping'][row[0] or 'unknown'] = {
+                    'total_leads': row[1],
+                    'last_scrape': row[2].isoformat() if row[2] else None,
+                }
+
+            # Total leads and recent activity
+            cursor.execute("""
+                SELECT COUNT(*),
+                       COUNT(*) FILTER (WHERE fecha_scraping >= NOW() - INTERVAL '24 hours'),
+                       COUNT(*) FILTER (WHERE fecha_scraping >= NOW() - INTERVAL '7 days')
+                FROM public_marts.dim_leads
+            """)
+            row = cursor.fetchone()
+            status['leads'] = {
+                'total': row[0],
+                'last_24h': row[1],
+                'last_7d': row[2],
+            }
+
+            # Contact queue status
+            cursor.execute("""
+                SELECT status, COUNT(*)
+                FROM leads_contactqueue
+                GROUP BY status
+            """)
+            status['contact_queue'] = {row[0]: row[1] for row in cursor.fetchall()}
+
+    except Exception as e:
+        status['database']['connected'] = False
+        status['database']['error'] = str(e)[:200]
+
+    return JsonResponse(status)
+
+
 def service_worker(request):
     """Serve the service worker from root path for maximum scope."""
     sw_path = settings.BASE_DIR / 'static' / 'service-worker.js'
@@ -64,8 +145,9 @@ urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
 
-    # Health check
+    # Health check & status
     path('health/', health_check, name='health_check'),
+    path('status/', system_status, name='system_status'),
 
     # PWA Service Worker (must be at root for full scope)
     path('service-worker.js', service_worker, name='service_worker'),
