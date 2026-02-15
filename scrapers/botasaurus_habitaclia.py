@@ -8,6 +8,7 @@ Habitaclia is the #1 real estate portal in Catalonia.
 """
 
 import logging
+import os
 import re
 from typing import Dict, Any, List, Optional
 
@@ -333,6 +334,12 @@ class BotasaurusHabitaclia(BotasaurusBaseScraper):
                 driver.sleep(2)
             else:
                 logger.warning("Content did not load after 30s of waiting")
+                # Dump HTML for debugging
+                debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'output', 'debug_habitaclia.html')
+                os.makedirs(os.path.dirname(debug_path), exist_ok=True)
+                with open(debug_path, 'w', encoding='utf-8') as f:
+                    f.write(driver.page_html)
+                logger.warning(f"Debug HTML saved to {debug_path}")
 
             # Scroll multiple times to load lazy content
             for i in range(4):
