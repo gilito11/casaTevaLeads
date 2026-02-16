@@ -133,6 +133,10 @@ class CamoufoxFotocasa:
             logger.error("CAPTCHA_API_KEY not set - cannot solve GeeTest")
             return False
 
+        # Clean key (remove whitespace/quotes)
+        api_key = self.captcha_api_key.strip().strip('"').strip("'")
+        logger.info(f"2Captcha key length: {len(api_key)} chars")
+
         try:
             content = page.content()
 
@@ -154,7 +158,7 @@ class CamoufoxFotocasa:
             submit_resp = http_requests.post(
                 "https://2captcha.com/in.php",
                 data={
-                    'key': self.captcha_api_key,
+                    'key': api_key,
                     'method': 'geetest',
                     'gt': gt,
                     'challenge': challenge,
@@ -178,7 +182,7 @@ class CamoufoxFotocasa:
                 poll_resp = http_requests.get(
                     "https://2captcha.com/res.php",
                     params={
-                        'key': self.captcha_api_key,
+                        'key': api_key,
                         'action': 'get',
                         'id': request_id,
                         'json': 1,

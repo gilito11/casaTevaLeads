@@ -418,18 +418,27 @@ class CamoufoxIdealista:
         listings = []
 
         try:
-            # Wait for listings
+            # Log page state for debugging
+            page_title = page.title()
+            html_len = len(page.content())
+            logger.info(f"Page state: title='{page_title[:60]}', HTML={html_len} bytes")
+
+            # Wait for listings - try multiple selectors with generous timeout
             selectors = [
                 'article.item',
                 'article[data-element-id]',
                 '.item-info-container',
-                '.items-container article'
+                '.items-container article',
+                'article[class*="item"]',
+                'section.items-list article',
+                '[class*="listing"] article',
+                'main article',
             ]
             items = []
 
             for selector in selectors:
                 try:
-                    page.wait_for_selector(selector, timeout=10000)
+                    page.wait_for_selector(selector, timeout=15000)
                     items = page.query_selector_all(selector)
                     if items:
                         logger.info(f"Found {len(items)} listings using selector: {selector}")
@@ -439,11 +448,21 @@ class CamoufoxIdealista:
 
             if not items:
                 logger.warning("No listing elements found on page")
+                content = page.content()
+                logger.info(f"Debug: HTML={len(content)} bytes, title='{page.title()}'")
+                # Log any article/section/div elements for diagnosis
+                all_articles = page.query_selector_all('article')
+                all_sections = page.query_selector_all('section')
+                logger.info(f"Debug: {len(all_articles)} <article>, {len(all_sections)} <section> elements")
+                if all_articles:
+                    for i, art in enumerate(all_articles[:3]):
+                        cls = art.get_attribute('class') or 'no-class'
+                        logger.info(f"  article[{i}]: class='{cls[:60]}'")
                 # Save debug HTML for diagnosis
                 debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'output', 'debug_idealista.html')
                 os.makedirs(os.path.dirname(debug_path), exist_ok=True)
                 with open(debug_path, 'w', encoding='utf-8') as f:
-                    f.write(page.content())
+                    f.write(content)
                 logger.warning(f"Debug HTML saved to {debug_path}")
                 return []
 
