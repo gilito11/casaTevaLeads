@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
 import psycopg2
+import requests as http_requests
 
 from scrapers.botasaurus_fotocasa import ZONAS_GEOGRAFICAS
 
@@ -54,6 +55,7 @@ class CamoufoxFotocasa:
         self.postgres = postgres
         self.tenant_id = tenant_id
         self.postgres_conn = None
+        self.captcha_api_key = os.environ.get('CAPTCHA_API_KEY', '')
         self.stats = {
             'pages_scraped': 0,
             'listings_found': 0,
@@ -113,6 +115,112 @@ class CamoufoxFotocasa:
             pass
 
         return False
+
+    def _check_geetest_blocked(self, page) -> bool:
+        """Check if page is a GeeTest captcha challenge."""
+        try:
+            content = page.content()
+            if 'SENTIMOS LA INTERRUPCI' in content or 'geetest' in content.lower():
+                logger.warning("GeeTest captcha detected")
+                return True
+        except:
+            pass
+        return False
+
+    def _solve_geetest(self, page) -> bool:
+        """Solve GeeTest captcha using 2Captcha API."""
+        if not self.captcha_api_key:
+            logger.error("CAPTCHA_API_KEY not set - cannot solve GeeTest")
+            return False
+
+        try:
+            content = page.content()
+
+            # Extract GeeTest params from HTML
+            gt_match = re.search(r'gt:\s*"([^"]+)"', content)
+            challenge_match = re.search(r'challenge:\s*"([^"]+)"', content)
+
+            if not gt_match or not challenge_match:
+                logger.error("Could not extract GeeTest gt/challenge from page")
+                return False
+
+            gt = gt_match.group(1)
+            challenge = challenge_match.group(1)
+            page_url = page.url
+
+            logger.info(f"Solving GeeTest: gt={gt[:16]}... challenge={challenge[:16]}...")
+
+            # Submit to 2Captcha
+            submit_resp = http_requests.post(
+                "https://2captcha.com/in.php",
+                data={
+                    'key': self.captcha_api_key,
+                    'method': 'geetest',
+                    'gt': gt,
+                    'challenge': challenge,
+                    'pageurl': page_url,
+                    'json': 1,
+                },
+                timeout=30,
+            )
+            result = submit_resp.json()
+
+            if result.get('status') != 1:
+                logger.error(f"2Captcha submit error: {result}")
+                return False
+
+            request_id = result['request']
+            logger.info(f"2Captcha request ID: {request_id}")
+
+            # Poll for solution
+            for _ in range(30):  # Max 150s
+                time.sleep(5)
+                poll_resp = http_requests.get(
+                    "https://2captcha.com/res.php",
+                    params={
+                        'key': self.captcha_api_key,
+                        'action': 'get',
+                        'id': request_id,
+                        'json': 1,
+                    },
+                    timeout=30,
+                )
+                poll_result = poll_resp.json()
+
+                if poll_result.get('status') == 1:
+                    solution = poll_result['request']
+                    logger.info("GeeTest solved successfully")
+
+                    # Submit the solution back to the page
+                    page.evaluate(f'''
+                        solvedCaptcha({{
+                            geetest_challenge: "{solution['geetest_challenge']}",
+                            geetest_validate: "{solution['geetest_validate']}",
+                            geetest_seccode: "{solution['geetest_seccode']}"
+                        }});
+                    ''')
+                    time.sleep(5)
+
+                    # Check if we're past the captcha
+                    if not self._check_geetest_blocked(page):
+                        logger.info("GeeTest bypass successful")
+                        return True
+                    else:
+                        logger.warning("GeeTest solution submitted but still blocked")
+                        return False
+
+                elif 'CAPCHA_NOT_READY' in str(poll_result):
+                    continue
+                else:
+                    logger.error(f"2Captcha error: {poll_result}")
+                    return False
+
+            logger.error("2Captcha timeout waiting for GeeTest solution")
+            return False
+
+        except Exception as e:
+            logger.error(f"GeeTest solving error: {e}")
+            return False
 
     def _wait_for_listings(self, page, timeout=20) -> bool:
         """Wait for listing links to appear in the DOM."""
@@ -349,6 +457,13 @@ class CamoufoxFotocasa:
                 logger.info("Warming up: visiting homepage...")
                 page.goto(self.BASE_URL, wait_until='domcontentloaded')
                 self._human_delay(3, 5)
+
+                # Check for GeeTest on homepage
+                if self._check_geetest_blocked(page):
+                    if not self._solve_geetest(page):
+                        logger.error("Failed to solve GeeTest on homepage")
+                        return self.stats
+
                 self._accept_cookies(page)
                 self._human_delay(2, 3)
 
@@ -386,6 +501,15 @@ class CamoufoxFotocasa:
         try:
             page.goto(url, wait_until='domcontentloaded', timeout=30000)
             self._human_delay(2, 3)
+
+            # Check for GeeTest captcha
+            if self._check_geetest_blocked(page):
+                logger.info("GeeTest detected on search page - solving...")
+                if not self._solve_geetest(page):
+                    logger.error("Failed to solve GeeTest on search page")
+                    self.stats['errors'] += 1
+                    return
+
             self._accept_cookies(page)
 
             # Wait for network to settle

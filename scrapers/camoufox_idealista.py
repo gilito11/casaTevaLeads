@@ -707,7 +707,7 @@ class CamoufoxIdealista:
                             url = self.build_search_url(zona_key, page_num)
                             logger.info(f"Page {page_num}: {url}")
 
-                            page.goto(url, wait_until='domcontentloaded', timeout=60000)
+                            page.goto(url, wait_until='load', timeout=60000)
                             self._human_delay(2, 3)
 
                             # Accept cookies FIRST (may block content rendering)
@@ -718,6 +718,18 @@ class CamoufoxIdealista:
                                 page.wait_for_load_state('networkidle', timeout=15000)
                             except:
                                 pass
+
+                            # Verify we're on the correct page (not redirected)
+                            current_url = page.url
+                            logger.info(f"Current URL after load: {current_url}")
+                            if 'venta-viviendas' not in current_url:
+                                logger.warning(f"Redirected away from search page: {current_url}")
+                                # Try navigating again
+                                page.goto(url, wait_until='load', timeout=60000)
+                                self._human_delay(3, 5)
+                                self._accept_cookies(page)
+                                current_url = page.url
+                                logger.info(f"Retry URL: {current_url}")
 
                             self._human_delay(1, 2)
 
