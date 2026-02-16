@@ -127,107 +127,220 @@ class CamoufoxFotocasa:
             pass
         return False
 
-    def _solve_geetest(self, page) -> bool:
-        """Solve GeeTest captcha using 2Captcha API."""
+    def _get_2captcha_key(self) -> str:
+        """Clean and return the 2Captcha API key."""
+        api_key = self.captcha_api_key.strip().strip('"').strip("'").strip()
+        api_key = re.sub(r'[^a-fA-F0-9]', '', api_key)
+        if len(api_key) > 32:
+            api_key = api_key[-32:]
+        return api_key
+
+    def _solve_geetest(self, page, max_attempts=2) -> bool:
+        """Solve GeeTest captcha using 2Captcha API with retry."""
         if not self.captcha_api_key:
             logger.error("CAPTCHA_API_KEY not set - cannot solve GeeTest")
             return False
 
-        # Clean key: strip whitespace/quotes, keep only hex chars, take last 32
-        api_key = self.captcha_api_key.strip().strip('"').strip("'").strip()
-        api_key = re.sub(r'[^a-fA-F0-9]', '', api_key)
-        if len(api_key) > 32:
-            logger.warning(f"2Captcha key too long ({len(api_key)} chars), taking last 32")
-            api_key = api_key[-32:]
+        api_key = self._get_2captcha_key()
         logger.info(f"2Captcha key length: {len(api_key)} chars")
 
-        try:
-            content = page.content()
+        for attempt in range(max_attempts):
+            if attempt > 0:
+                logger.info(f"GeeTest solve attempt {attempt + 1}/{max_attempts}")
+                # Reload to get a fresh challenge
+                page.reload(wait_until='domcontentloaded', timeout=30000)
+                time.sleep(3)
 
-            # Extract GeeTest params from HTML
-            gt_match = re.search(r'gt:\s*"([^"]+)"', content)
-            challenge_match = re.search(r'challenge:\s*"([^"]+)"', content)
+            try:
+                content = page.content()
 
-            if not gt_match or not challenge_match:
-                logger.error("Could not extract GeeTest gt/challenge from page")
-                return False
+                # Extract GeeTest v3 params
+                gt_match = re.search(r'gt:\s*"([^"]+)"', content)
+                challenge_match = re.search(r'challenge:\s*"([^"]+)"', content)
+                api_server_match = re.search(r'api_server:\s*"([^"]+)"', content)
 
-            gt = gt_match.group(1)
-            challenge = challenge_match.group(1)
-            page_url = page.url
+                # Also try alternative param locations (data attributes, JSON)
+                if not gt_match:
+                    gt_match = re.search(r'"gt"\s*:\s*"([^"]+)"', content)
+                if not challenge_match:
+                    challenge_match = re.search(r'"challenge"\s*:\s*"([^"]+)"', content)
 
-            logger.info(f"Solving GeeTest: gt={gt[:16]}... challenge={challenge[:16]}...")
+                if not gt_match or not challenge_match:
+                    # Check for GeeTest v4 (captcha_id)
+                    v4_match = re.search(r'captcha_id["\s:]+["\']([\w]+)', content)
+                    if v4_match:
+                        logger.info("Detected GeeTest v4, attempting v4 solve...")
+                        result = self._solve_geetest_v4(page, api_key, v4_match.group(1))
+                        if result:
+                            return True
+                        continue
+                    logger.error("Could not extract GeeTest gt/challenge from page")
+                    continue
 
-            # Submit to 2Captcha
-            submit_resp = http_requests.post(
-                "https://2captcha.com/in.php",
-                data={
+                gt = gt_match.group(1)
+                challenge = challenge_match.group(1)
+                api_server = api_server_match.group(1) if api_server_match else None
+                page_url = page.url
+
+                logger.info(f"GeeTest v3: gt={gt[:16]}... challenge={challenge[:16]}...")
+                if api_server:
+                    logger.info(f"  api_server: {api_server}")
+
+                # Submit to 2Captcha
+                submit_data = {
                     'key': api_key,
                     'method': 'geetest',
                     'gt': gt,
                     'challenge': challenge,
                     'pageurl': page_url,
                     'json': 1,
+                }
+                if api_server:
+                    submit_data['api_server'] = api_server
+
+                submit_resp = http_requests.post(
+                    "https://2captcha.com/in.php",
+                    data=submit_data,
+                    timeout=30,
+                )
+                result = submit_resp.json()
+
+                if result.get('status') != 1:
+                    logger.error(f"2Captcha submit error: {result}")
+                    continue
+
+                request_id = result['request']
+                logger.info(f"2Captcha request ID: {request_id}")
+
+                # Poll for solution
+                solved = False
+                for _ in range(30):  # Max 150s
+                    time.sleep(5)
+                    poll_resp = http_requests.get(
+                        "https://2captcha.com/res.php",
+                        params={
+                            'key': api_key,
+                            'action': 'get',
+                            'id': request_id,
+                            'json': 1,
+                        },
+                        timeout=30,
+                    )
+                    poll_result = poll_resp.json()
+
+                    if poll_result.get('status') == 1:
+                        solution = poll_result['request']
+                        logger.info("GeeTest solved by 2Captcha")
+
+                        # Submit the solution back to the page
+                        page.evaluate(f'''() => {{
+                            if (typeof solvedCaptcha === 'function') {{
+                                solvedCaptcha({{
+                                    geetest_challenge: "{solution['geetest_challenge']}",
+                                    geetest_validate: "{solution['geetest_validate']}",
+                                    geetest_seccode: "{solution['geetest_seccode']}"
+                                }});
+                            }} else if (typeof geetestCallback === 'function') {{
+                                geetestCallback({{
+                                    geetest_challenge: "{solution['geetest_challenge']}",
+                                    geetest_validate: "{solution['geetest_validate']}",
+                                    geetest_seccode: "{solution['geetest_seccode']}"
+                                }});
+                            }} else {{
+                                // Try submitting via form
+                                var form = document.querySelector('form');
+                                if (form) {{
+                                    var inputs = {{
+                                        'geetest_challenge': '{solution['geetest_challenge']}',
+                                        'geetest_validate': '{solution['geetest_validate']}',
+                                        'geetest_seccode': '{solution['geetest_seccode']}'
+                                    }};
+                                    for (var key in inputs) {{
+                                        var inp = document.querySelector('[name="' + key + '"]');
+                                        if (inp) inp.value = inputs[key];
+                                        else {{
+                                            inp = document.createElement('input');
+                                            inp.type = 'hidden';
+                                            inp.name = key;
+                                            inp.value = inputs[key];
+                                            form.appendChild(inp);
+                                        }}
+                                    }}
+                                    form.submit();
+                                }}
+                            }}
+                        }}''')
+                        time.sleep(5)
+
+                        if not self._check_geetest_blocked(page):
+                            logger.info("GeeTest bypass successful!")
+                            return True
+                        else:
+                            logger.warning("GeeTest solution submitted but still blocked")
+                            solved = True  # Don't retry 2Captcha, challenge changed
+                            break
+
+                    elif 'CAPCHA_NOT_READY' in str(poll_result):
+                        continue
+                    elif 'ERROR_CAPTCHA_UNSOLVABLE' in str(poll_result):
+                        logger.warning("2Captcha: challenge unsolvable, will retry with fresh challenge")
+                        break  # Get fresh challenge
+                    else:
+                        logger.error(f"2Captcha error: {poll_result}")
+                        break
+
+                if solved:
+                    continue  # Try another attempt
+
+            except Exception as e:
+                logger.error(f"GeeTest solving error: {e}")
+                continue
+
+        logger.error(f"GeeTest solving failed after {max_attempts} attempts")
+        return False
+
+    def _solve_geetest_v4(self, page, api_key: str, captcha_id: str) -> bool:
+        """Solve GeeTest v4 captcha."""
+        try:
+            submit_resp = http_requests.post(
+                "https://2captcha.com/in.php",
+                data={
+                    'key': api_key,
+                    'method': 'geetest_v4',
+                    'captcha_id': captcha_id,
+                    'pageurl': page.url,
+                    'json': 1,
                 },
                 timeout=30,
             )
             result = submit_resp.json()
-
             if result.get('status') != 1:
-                logger.error(f"2Captcha submit error: {result}")
+                logger.error(f"2Captcha v4 submit error: {result}")
                 return False
 
             request_id = result['request']
-            logger.info(f"2Captcha request ID: {request_id}")
+            logger.info(f"2Captcha v4 request ID: {request_id}")
 
-            # Poll for solution
-            for _ in range(30):  # Max 150s
+            for _ in range(30):
                 time.sleep(5)
                 poll_resp = http_requests.get(
                     "https://2captcha.com/res.php",
-                    params={
-                        'key': api_key,
-                        'action': 'get',
-                        'id': request_id,
-                        'json': 1,
-                    },
+                    params={'key': api_key, 'action': 'get', 'id': request_id, 'json': 1},
                     timeout=30,
                 )
                 poll_result = poll_resp.json()
-
                 if poll_result.get('status') == 1:
-                    solution = poll_result['request']
-                    logger.info("GeeTest solved successfully")
-
-                    # Submit the solution back to the page
-                    page.evaluate(f'''
-                        solvedCaptcha({{
-                            geetest_challenge: "{solution['geetest_challenge']}",
-                            geetest_validate: "{solution['geetest_validate']}",
-                            geetest_seccode: "{solution['geetest_seccode']}"
-                        }});
-                    ''')
-                    time.sleep(5)
-
-                    # Check if we're past the captcha
-                    if not self._check_geetest_blocked(page):
-                        logger.info("GeeTest bypass successful")
-                        return True
-                    else:
-                        logger.warning("GeeTest solution submitted but still blocked")
-                        return False
-
+                    logger.info("GeeTest v4 solved")
+                    # v4 solutions need different injection - TBD based on actual page
+                    return False  # Placeholder - need to see actual v4 page first
                 elif 'CAPCHA_NOT_READY' in str(poll_result):
                     continue
                 else:
-                    logger.error(f"2Captcha error: {poll_result}")
+                    logger.error(f"2Captcha v4 error: {poll_result}")
                     return False
-
-            logger.error("2Captcha timeout waiting for GeeTest solution")
             return False
-
         except Exception as e:
-            logger.error(f"GeeTest solving error: {e}")
+            logger.error(f"GeeTest v4 error: {e}")
             return False
 
     def _wait_for_listings(self, page, timeout=20) -> bool:
