@@ -53,12 +53,15 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
-      - name: Run Fotocasa scraper (with Xvfb virtual display)
+      - name: Run Fotocasa scraper (Camoufox)
         if: contains(github.event.inputs.portals || 'fotocasa,idealista', 'fotocasa')
+        continue-on-error: true
         run: |
           ZONES="${{ github.event.inputs.zones || 'salou,cambrils,tarragona' }}"
-          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-            python run_fotocasa_scraper.py --zones ${ZONES//,/ } --postgres
+          python run_camoufox_fotocasa_scraper.py \
+            --zones ${ZONES//,/ } \
+            --virtual \
+            --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 

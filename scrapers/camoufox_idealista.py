@@ -707,7 +707,18 @@ class CamoufoxIdealista:
                             logger.info(f"Page {page_num}: {url}")
 
                             page.goto(url, wait_until='domcontentloaded', timeout=60000)
-                            self._human_delay(3, 5)
+                            self._human_delay(2, 3)
+
+                            # Accept cookies FIRST (may block content rendering)
+                            self._accept_cookies(page)
+
+                            # Wait for network to settle (JS rendering)
+                            try:
+                                page.wait_for_load_state('networkidle', timeout=15000)
+                            except:
+                                pass
+
+                            self._human_delay(1, 2)
 
                             # Scroll to load lazy content
                             for _ in range(3):
@@ -725,9 +736,6 @@ class CamoufoxIdealista:
                                 self.stats['errors'] += 1
                                 logger.error("Blocked - stopping this zone")
                                 break
-
-                            # Accept cookies
-                            self._accept_cookies(page)
 
                             # Extract listings
                             listings = self._extract_listings_from_page(page, zona_key)
