@@ -549,21 +549,23 @@ class CamoufoxFotocasa:
                 'zona_geografica': listing.get('zona_geografica'),
             }
 
-            lead_id = hashlib.md5(f"fotocasa_{listing['anuncio_id']}".encode()).hexdigest()
+            anuncio_id = listing.get('anuncio_id', '')
+            now = datetime.utcnow()
+            data_lake_path = f"camoufox/{self.PORTAL_NAME}/{now.strftime('%Y/%m/%d')}/{anuncio_id}"
 
             with self.postgres_conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO raw.raw_listings (tenant_id, portal, data_lake_path, raw_data, scraping_timestamp)
                     VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (tenant_id, portal, data_lake_path) DO UPDATE SET
-                        raw_data = EXCLUDED.raw_data,
-                        scraping_timestamp = EXCLUDED.scraping_timestamp
+                    ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
+                    WHERE raw_data->>'anuncio_id' IS NOT NULL
+                    DO NOTHING
                 """, (
                     self.tenant_id,
                     self.PORTAL_NAME,
-                    lead_id,
+                    data_lake_path,
                     json.dumps(raw_data, ensure_ascii=False),
-                    datetime.utcnow(),
+                    now,
                 ))
             self.postgres_conn.commit()
             return True
