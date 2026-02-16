@@ -394,15 +394,29 @@ class CamoufoxFotocasa:
             except:
                 pass
 
+            # Log page state
+            html_len = len(page.content())
+            page_url = page.url
+            logger.info(f"Page loaded: {page_url} ({html_len} bytes)")
+
             # Wait for listing links
             if not self._wait_for_listings(page):
                 logger.warning(f"No listings loaded for {zona_key}")
+                content = page.content()
+                logger.info(f"HTML length: {len(content)}")
+
+                # Log any links found (for debugging selector issues)
+                all_links = re.findall(r'href="(/es/[^"]+)"', content)
+                logger.info(f"All /es/ links found: {len(all_links)}")
+                for link in all_links[:10]:
+                    logger.info(f"  Link: {link[:80]}")
+
                 # Save debug HTML
                 debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                           'output', 'debug_fotocasa.html')
                 os.makedirs(os.path.dirname(debug_path), exist_ok=True)
                 with open(debug_path, 'w', encoding='utf-8') as f:
-                    f.write(page.content())
+                    f.write(content)
                 logger.warning(f"Debug HTML saved to {debug_path}")
                 return
 

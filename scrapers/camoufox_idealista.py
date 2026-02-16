@@ -682,6 +682,7 @@ class CamoufoxIdealista:
         logger.info(f"  Max pages: {self.max_pages_per_zone}")
         logger.info(f"  Headless: {self.headless}")
         logger.info(f"  Proxy: {'configured' if proxy_config else 'none'}")
+        logger.info(f"  GeoIP: {camoufox_opts.get('geoip', 'not set')}")
 
         try:
             with Camoufox(**camoufox_opts) as browser:
