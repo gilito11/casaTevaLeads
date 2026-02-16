@@ -133,8 +133,10 @@ class CamoufoxFotocasa:
             logger.error("CAPTCHA_API_KEY not set - cannot solve GeeTest")
             return False
 
-        # Clean key (remove whitespace/quotes)
-        api_key = self.captcha_api_key.strip().strip('"').strip("'")
+        # Clean key (remove whitespace/quotes/newlines)
+        api_key = self.captcha_api_key.strip().strip('"').strip("'").strip()
+        # Remove any non-alphanumeric chars (2Captcha keys are 32 hex chars)
+        api_key = re.sub(r'[^a-fA-F0-9]', '', api_key)
         logger.info(f"2Captcha key length: {len(api_key)} chars")
 
         try:

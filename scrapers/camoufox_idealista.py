@@ -396,17 +396,17 @@ class CamoufoxIdealista:
             return listing
 
     def build_search_url(self, zona_key: str, page_num: int = 1) -> str:
-        """Build Idealista search URL."""
+        """Build Idealista search URL.
+
+        Note: /con-publicado_particular/ filter returns 404 (Idealista removed it).
+        We scrape all listings and filter particulares at detail page level.
+        """
         zona = ZONAS_GEOGRAFICAS.get(zona_key)
         if not zona:
             raise ValueError(f"Zone not found: {zona_key}")
 
         url_path = zona['url_path']
-
-        if self.only_particulares:
-            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/con-publicado_particular/"
-        else:
-            base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
+        base_url = f"{self.BASE_URL}/venta-viviendas/{url_path}/"
 
         if page_num > 1:
             base_url = base_url.rstrip('/') + f'/pagina-{page_num}.htm'
@@ -423,22 +423,19 @@ class CamoufoxIdealista:
             html_len = len(page.content())
             logger.info(f"Page state: title='{page_title[:60]}', HTML={html_len} bytes")
 
-            # Wait for listings - try multiple selectors with generous timeout
+            # Try multiple selectors (content wait already done in scrape loop)
             selectors = [
                 'article.item',
                 'article[data-element-id]',
                 '.item-info-container',
                 '.items-container article',
                 'article[class*="item"]',
-                'section.items-list article',
-                '[class*="listing"] article',
                 'main article',
             ]
             items = []
 
             for selector in selectors:
                 try:
-                    page.wait_for_selector(selector, timeout=15000)
                     items = page.query_selector_all(selector)
                     if items:
                         logger.info(f"Found {len(items)} listings using selector: {selector}")
@@ -738,17 +735,28 @@ class CamoufoxIdealista:
                             except:
                                 pass
 
-                            # Verify we're on the correct page (not redirected)
-                            current_url = page.url
-                            logger.info(f"Current URL after load: {current_url}")
-                            if 'venta-viviendas' not in current_url:
-                                logger.warning(f"Redirected away from search page: {current_url}")
-                                # Try navigating again
-                                page.goto(url, wait_until='load', timeout=60000)
-                                self._human_delay(3, 5)
-                                self._accept_cookies(page)
-                                current_url = page.url
-                                logger.info(f"Retry URL: {current_url}")
+                            # Detect 404 via utag_data statusCode
+                            is_404 = page.evaluate('''() => {
+                                try {
+                                    return window.utag_data &&
+                                           window.utag_data.response &&
+                                           window.utag_data.response.statusCode === "404";
+                                } catch(e) { return false; }
+                            }''')
+                            if is_404:
+                                logger.error(f"Server returned 404 for: {url}")
+                                self.stats['errors'] += 1
+                                break
+
+                            # Wait for actual listing content to render (React SSR/CSR)
+                            try:
+                                page.wait_for_selector(
+                                    'article.item, article[data-element-id], .items-container',
+                                    timeout=30000
+                                )
+                                logger.info("Listing content detected in DOM")
+                            except:
+                                logger.warning("Timeout waiting for listing content (30s)")
 
                             self._human_delay(1, 2)
 
