@@ -785,22 +785,28 @@ class CamoufoxIdealista:
                                 logger.info("No listings found, stopping pagination")
                                 break
 
-                            # Verify each listing by visiting detail page
+                            # Save all listings to raw; visit detail pages only for particular candidates
+                            particulares_count = 0
+                            professionals_count = 0
                             for listing in listings:
                                 self.stats['listings_found'] += 1
 
-                                # Visit detail page to verify particular and get phone
-                                listing = self._verify_listing_detail(page, listing)
+                                # Card-level heuristic marks obvious professionals
+                                if listing.get('es_particular', True):
+                                    # Candidate particular - visit detail page to verify + get phone
+                                    listing = self._verify_listing_detail(page, listing)
+                                    self._human_delay(1, 2)
 
-                                # Only save if particular (when filtering enabled)
-                                if self.only_particulares and not listing.get('es_particular'):
-                                    logger.debug(f"Skipping professional: {listing.get('anuncio_id')}")
-                                    continue
+                                if listing.get('es_particular'):
+                                    particulares_count += 1
+                                else:
+                                    professionals_count += 1
 
+                                # Save ALL to raw (dbt handles filtering)
                                 if self.save_to_postgres(listing):
                                     self.stats['listings_saved'] += 1
 
-                                self._human_delay(1, 2)
+                            logger.info(f"Page {page_num}: {particulares_count} particular, {professionals_count} professional")
 
                         except Exception as e:
                             logger.error(f"Error on page {page_num}: {e}")
