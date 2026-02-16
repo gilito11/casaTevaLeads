@@ -222,42 +222,78 @@ class BotasaurusFotocasa(BotasaurusBaseScraper):
             driver.sleep(3)
 
             # Accept cookies via TCF API (Fotocasa uses iframe-based TCF consent)
-            try:
-                driver.run_js('''
-                    // Method 1: Use TCF API directly to grant all consent
-                    if (window.__tcfapi) {
-                        window.__tcfapi('postCustomConsent', 2, function(){}, [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]);
-                    }
-                    // Method 2: Click any visible accept/consent button
-                    const selectors = [
-                        '[data-testid="TcfAccept"]',
-                        'button[id*="accept"]',
-                        'button[class*="accept"]',
-                        '.sui-AtomButton--primary',
-                        '#didomi-notice-agree-button',
-                        'button[aria-label*="accept" i]',
-                        'button[aria-label*="aceptar" i]',
-                    ];
-                    for (const sel of selectors) {
-                        const btn = document.querySelector(sel);
-                        if (btn && btn.offsetParent !== null) { btn.click(); break; }
-                    }
-                ''')
-                driver.sleep(1)
-            except:
-                pass
+            def _accept_consent(drv):
+                try:
+                    result = drv.run_js('''
+                        let accepted = false;
+                        // Method 1: Use TCF API directly to grant all consent
+                        if (window.__tcfapi) {
+                            window.__tcfapi('postCustomConsent', 2, function(){}, [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,6,7,8,9,10]);
+                            accepted = true;
+                        }
+                        // Method 2: Click any visible accept/consent button
+                        const selectors = [
+                            '[data-testid="TcfAccept"]',
+                            'button[id*="accept"]',
+                            'button[class*="accept"]',
+                            '.sui-AtomButton--primary',
+                            '#didomi-notice-agree-button',
+                            'button[aria-label*="accept" i]',
+                            'button[aria-label*="aceptar" i]',
+                            '.fc-button-label',
+                            '[class*="consent"] button',
+                            '[class*="cookie"] button',
+                        ];
+                        for (const sel of selectors) {
+                            const btn = document.querySelector(sel);
+                            if (btn && btn.offsetParent !== null) { btn.click(); accepted = true; break; }
+                        }
+                        return accepted;
+                    ''')
+                    if result:
+                        logger.info("Consent accepted via TCF API or button click")
+                    else:
+                        logger.warning("No consent banner found (may already be accepted)")
+                except Exception as e:
+                    logger.warning(f"Consent handling error: {e}")
+
+            _accept_consent(driver)
+            driver.sleep(3)
 
             # Wait for React to hydrate and listing links to appear
+            content_loaded = False
             for attempt in range(15):
                 has_content = driver.run_js('''
                     return document.querySelectorAll('a[href*="/es/comprar/vivienda/"]').length;
                 ''')
                 if has_content and has_content > 0:
                     logger.info(f"Content loaded after {(attempt+1)*2}s: {has_content} listing links found")
+                    content_loaded = True
                     break
+                # Re-try consent every 10s in case it reappeared
+                if attempt == 5:
+                    logger.info("Retrying consent acceptance...")
+                    _accept_consent(driver)
                 driver.sleep(2)
-            else:
-                logger.warning("Content did not load after 30s of waiting")
+
+            if not content_loaded:
+                logger.warning("Content did not load after 30s - reloading page and retrying")
+                driver.run_js('location.reload()')
+                driver.sleep(5)
+                _accept_consent(driver)
+                driver.sleep(3)
+                # Final wait attempt
+                for attempt in range(10):
+                    has_content = driver.run_js('''
+                        return document.querySelectorAll('a[href*="/es/comprar/vivienda/"]').length;
+                    ''')
+                    if has_content and has_content > 0:
+                        logger.info(f"Content loaded after reload + {(attempt+1)*2}s: {has_content} links")
+                        content_loaded = True
+                        break
+                    driver.sleep(2)
+                if not content_loaded:
+                    logger.error("Content failed to load after retry - possible anti-bot blocking")
 
             # Scroll to load lazy content
             for i in range(6):

@@ -671,9 +671,7 @@ class CamoufoxIdealista:
         proxy_config = parse_proxy(self.proxy)
         if proxy_config:
             camoufox_opts["proxy"] = proxy_config
-            # Only use geoip when NOT in virtual/CI mode (can cause fingerprint inconsistency)
-            if self.headless != "virtual":
-                camoufox_opts["geoip"] = True
+            camoufox_opts["geoip"] = True
             logger.info(f"Using proxy: {proxy_config['server']}")
         else:
             camoufox_opts["geoip"] = True
