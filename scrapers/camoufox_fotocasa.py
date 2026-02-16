@@ -49,12 +49,13 @@ class CamoufoxFotocasa:
     PORTAL_NAME = 'fotocasa'
     BASE_URL = 'https://www.fotocasa.es'
 
-    def __init__(self, zones=None, headless=True, postgres=False, tenant_id=1):
+    def __init__(self, zones=None, headless=True, postgres=False, tenant_id=1, proxy=None):
         self.zones = zones or ['salou']
         self.headless = headless
         self.postgres = postgres
         self.tenant_id = tenant_id
         self.postgres_conn = None
+        self.proxy = proxy or os.environ.get('DATADOME_PROXY', '')
         self.captcha_api_key = os.environ.get('CAPTCHA_API_KEY', '')
         self.stats = {
             'pages_scraped': 0,
@@ -73,6 +74,22 @@ class CamoufoxFotocasa:
 
     def _human_delay(self, min_s=1, max_s=3):
         time.sleep(random.uniform(min_s, max_s))
+
+    @staticmethod
+    def _parse_proxy(proxy_str: str):
+        """Parse proxy string to Camoufox format. Input: user:pass@host:port"""
+        if not proxy_str:
+            return None
+        try:
+            if "@" in proxy_str:
+                auth, addr = proxy_str.rsplit("@", 1)
+                user, passwd = auth.split(":", 1)
+                host, port = addr.split(":")
+                return {"server": f"http://{host}:{port}", "username": user, "password": passwd}
+            return {"server": f"http://{proxy_str}"}
+        except Exception as e:
+            logger.error(f"Invalid proxy format: {e}")
+            return None
 
     def build_url(self, zona_key: str) -> str:
         zona = ZONAS_GEOGRAFICAS.get(zona_key, {})
@@ -501,11 +518,22 @@ class CamoufoxFotocasa:
             logger.error(f"Error parsing detail {url[:60]}: {e}")
             return None
 
+    def _ensure_postgres_connection(self):
+        """Reconnect if Neon dropped the idle SSL connection."""
+        try:
+            if self.postgres_conn and not self.postgres_conn.closed:
+                self.postgres_conn.cursor().execute("SELECT 1")
+                return
+        except Exception:
+            logger.warning("PostgreSQL connection dropped, reconnecting...")
+        self._init_postgres()
+
     def save_to_postgres(self, listing: Dict) -> bool:
         if not self.postgres_conn:
             return False
 
         try:
+            self._ensure_postgres_connection()
             raw_data = {
                 'anuncio_id': listing.get('anuncio_id'),
                 'titulo': listing.get('titulo'),
@@ -566,9 +594,16 @@ class CamoufoxFotocasa:
             "locale": ["es-ES", "es"],
         }
 
+        # Add proxy if configured (residential IP avoids GeeTest trigger)
+        proxy_config = self._parse_proxy(self.proxy)
+        if proxy_config:
+            camoufox_opts["proxy"] = proxy_config
+            logger.info(f"Using proxy: {proxy_config['server']}")
+
         logger.info(f"Starting Camoufox Fotocasa scraper")
         logger.info(f"  Zones: {self.zones}")
         logger.info(f"  Headless: {self.headless}")
+        logger.info(f"  Proxy: {'configured' if proxy_config else 'none'}")
 
         try:
             with Camoufox(**camoufox_opts) as browser:
