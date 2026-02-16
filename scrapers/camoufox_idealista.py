@@ -576,12 +576,23 @@ class CamoufoxIdealista:
         except:
             return None
 
+    def _ensure_postgres_connection(self):
+        """Reconnect to PostgreSQL if the connection was dropped (Neon idle timeout)."""
+        try:
+            if self.postgres_conn and not self.postgres_conn.closed:
+                self.postgres_conn.cursor().execute("SELECT 1")
+                return
+        except Exception:
+            logger.warning("PostgreSQL connection dropped, reconnecting...")
+        self._init_postgres()
+
     def save_to_postgres(self, listing: Dict[str, Any]) -> bool:
         """Save listing to PostgreSQL."""
         if not self.postgres_conn:
             return False
 
         try:
+            self._ensure_postgres_connection()
             cursor = self.postgres_conn.cursor()
 
             anuncio_id = str(listing.get('anuncio_id', ''))
