@@ -180,6 +180,7 @@ class CamoufoxIdealista:
         self.proxy = proxy or os.environ.get('DATADOME_PROXY')
 
         self.postgres_conn = None
+        self._scraped_listings = []
         self.stats = {
             'pages_scraped': 0,
             'listings_found': 0,
@@ -231,30 +232,65 @@ class CamoufoxIdealista:
         """Random delay to simulate human behavior."""
         time.sleep(random.uniform(min_sec, max_sec))
 
-    def _warmup_navigation(self, page):
+    def _warmup_navigation(self, page, max_attempts: int = 3):
         """
         Simulate human warmup: visit homepage first, then navigate.
-        This improves trust score with anti-bot systems.
+        Retries up to max_attempts times with 30s delay between attempts.
         """
-        logger.info("Warming up: visiting homepage first...")
+        for attempt in range(1, max_attempts + 1):
+            logger.info(f"Warmup attempt {attempt}/{max_attempts}: visiting homepage...")
 
-        page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=60000)
-        self._human_delay(2, 4)
+            try:
+                page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=60000)
+                self._human_delay(2, 4)
 
-        # Scroll a bit
-        page.mouse.wheel(0, random.randint(100, 300))
-        self._human_delay(1, 2)
+                # Scroll a bit
+                page.mouse.wheel(0, random.randint(100, 300))
+                self._human_delay(1, 2)
 
-        # Check for DataDome
-        if self._check_blocked(page):
-            logger.warning("Blocked on homepage warmup")
-            return False
+                # Check for DataDome
+                if self._check_blocked(page):
+                    logger.warning(f"Blocked on warmup attempt {attempt}/{max_attempts}")
+                    if attempt < max_attempts:
+                        delay = 30 + random.uniform(0, 10)
+                        logger.info(f"Waiting {delay:.0f}s before retry...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        logger.error("All warmup attempts failed - DataDome blocked")
+                        self._send_warmup_failure_alert()
+                        return False
 
-        # Accept cookies
-        self._accept_cookies(page)
+                # Accept cookies
+                self._accept_cookies(page)
 
-        logger.info("Warmup complete")
-        return True
+                logger.info(f"Warmup complete on attempt {attempt}")
+                return True
+
+            except Exception as e:
+                logger.warning(f"Warmup attempt {attempt} error: {e}")
+                if attempt < max_attempts:
+                    delay = 30 + random.uniform(0, 10)
+                    logger.info(f"Waiting {delay:.0f}s before retry...")
+                    time.sleep(delay)
+                else:
+                    logger.error(f"All warmup attempts failed with error: {e}")
+                    self._send_warmup_failure_alert()
+                    return False
+
+        return False
+
+    def _send_warmup_failure_alert(self):
+        """Send Telegram alert when warmup fails after all retries."""
+        try:
+            from scrapers.utils.telegram_alerts import send_scraping_error
+            send_scraping_error(
+                portal="idealista",
+                error="DataDome warmup failed after 3 attempts. Scraping aborted.",
+                zones=self.zones,
+            )
+        except Exception as e:
+            logger.debug(f"Could not send Telegram alert: {e}")
 
     def _check_blocked(self, page) -> bool:
         """Check if blocked by DataDome."""
@@ -715,9 +751,9 @@ class CamoufoxIdealista:
             with Camoufox(**camoufox_opts) as browser:
                 page = browser.new_page()
 
-                # Warmup navigation
+                # Warmup navigation (retries 3 times with 30s delay)
                 if not self._warmup_navigation(page):
-                    logger.error("Failed warmup - likely blocked")
+                    logger.error("Failed warmup after retries - likely blocked by DataDome")
                     self.stats['errors'] += 1
                     return self.stats
 
@@ -814,6 +850,7 @@ class CamoufoxIdealista:
                                     professionals_count += 1
 
                                 # Save ALL to raw (dbt handles filtering)
+                                self._scraped_listings.append(listing)
                                 if self.save_to_postgres(listing):
                                     self.stats['listings_saved'] += 1
 
@@ -835,6 +872,18 @@ class CamoufoxIdealista:
         finally:
             if self.postgres_conn:
                 self.postgres_conn.close()
+
+        # Validate results and send alerts
+        try:
+            from scrapers.error_handling import validate_scraping_results, generate_scraping_report
+            validate_scraping_results(
+                listings=self._scraped_listings,
+                portal_name=self.PORTAL_NAME,
+                expected_min_count=5,
+                required_fields=['titulo', 'precio', 'url_anuncio'],
+            )
+        except Exception as e:
+            logger.debug(f"Post-scrape validation error: {e}")
 
         logger.info(f"Scraping complete. Stats: {self.stats}")
         return self.stats

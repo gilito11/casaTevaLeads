@@ -210,6 +210,7 @@ class CamoufoxMilanuncios:
         self.proxy = proxy or os.environ.get('DATADOME_PROXY')
 
         self.postgres_conn = None
+        self._scraped_listings = []
         self.stats = {
             'pages_scraped': 0,
             'listings_found': 0,
@@ -397,9 +398,9 @@ class CamoufoxMilanuncios:
         # Check if JSON seller classification is broken (all marked professional)
         seller_types = [ad.get('sellerType', '').lower() for ad in ads if ad.get('sellerType')]
         all_same_type = len(set(seller_types)) <= 1 and len(seller_types) > 3
-        if all_same_type and seller_types and seller_types[0] == 'professional':
-            logger.warning(f"JSON classifies ALL {len(ads)} ads as 'professional' - likely broken, skipping JSON filter")
-            return []  # Fall through to DOM extraction
+        seller_filter_broken = all_same_type and seller_types and seller_types[0] == 'professional'
+        if seller_filter_broken:
+            logger.warning(f"JSON classifies ALL {len(ads)} ads as 'professional' - treating as broken, will verify on detail page")
 
         for ad in ads:
             try:
@@ -414,7 +415,8 @@ class CamoufoxMilanuncios:
                     or user_type == 'professional'
                 )
 
-                if self.only_particulares and is_professional:
+                # When seller filter is broken, don't skip here - verify on detail page
+                if self.only_particulares and is_professional and not seller_filter_broken:
                     skipped_pro += 1
                     continue
 
@@ -702,57 +704,65 @@ class CamoufoxMilanuncios:
             except Exception as e:
                 logger.debug(f"Could not get phone from button: {e}")
 
-            # Get full description - try multiple selectors
+            # Get full description
             try:
-                desc_selectors = [
-                    '[data-testid="AD_DESCRIPTION"]',
-                    '.ma-AdDetail-description',
-                    '[class*="AdDescription"]',
-                    '[class*="adDescription"]',
-                    '[class*="Description__container"]',
-                    '[class*="description-content"]',
-                    'section[class*="description"] p',
-                    '[class*="Description"] p',
-                    '[class*="description"]:not(meta)',
-                ]
-                for desc_sel in desc_selectors:
-                    try:
-                        desc_elem = page.query_selector(desc_sel)
-                        if desc_elem:
-                            full_desc = desc_elem.inner_text().strip()
-                            if full_desc and len(full_desc) > len(listing.get('descripcion', '')):
-                                listing['descripcion'] = full_desc[:2000]
-                                break
-                    except:
-                        continue
+                # Method 1: Extract from __INITIAL_PROPS__ or __NEXT_DATA__ JSON on detail page
+                detail_json = page.evaluate("""
+                    () => {
+                        try {
+                            if (window.__INITIAL_PROPS__) {
+                                const p = window.__INITIAL_PROPS__;
+                                if (p.adDetail && p.adDetail.description) return p.adDetail.description;
+                                if (p.ad && p.ad.description) return p.ad.description;
+                                if (p.description) return p.description;
+                            }
+                            if (window.__NEXT_DATA__ && window.__NEXT_DATA__.props) {
+                                const pp = window.__NEXT_DATA__.props.pageProps;
+                                if (pp && pp.ad && pp.ad.description) return pp.ad.description;
+                                if (pp && pp.adDetail && pp.adDetail.description) return pp.adDetail.description;
+                            }
+                        } catch(e) {}
+                        return null;
+                    }
+                """)
+                if detail_json and len(str(detail_json)) > len(listing.get('descripcion', '')):
+                    listing['descripcion'] = str(detail_json)[:2000]
 
-                # Fallback: extract from page content via regex
-                if not listing.get('descripcion'):
+                # Method 2: DOM selectors
+                if not listing.get('descripcion') or len(listing.get('descripcion', '')) < 20:
+                    desc_selectors = [
+                        '[data-testid="AD_DESCRIPTION"]',
+                        '[class*="AdDescription"]',
+                        '[class*="adDescription"]',
+                        '[class*="Description__container"]',
+                        '[class*="description-content"]',
+                        '.ma-AdDetail-description',
+                        'section[class*="description"] p',
+                        '[class*="Description"] p',
+                        '[class*="description"]:not(meta)',
+                    ]
+                    for desc_sel in desc_selectors:
+                        try:
+                            desc_elem = page.query_selector(desc_sel)
+                            if desc_elem:
+                                full_desc = desc_elem.inner_text().strip()
+                                if full_desc and len(full_desc) > len(listing.get('descripcion', '')):
+                                    listing['descripcion'] = full_desc[:2000]
+                                    break
+                        except:
+                            continue
+
+                # Method 3: Regex fallback on raw HTML
+                if not listing.get('descripcion') or len(listing.get('descripcion', '')) < 20:
                     try:
                         content = page.content()
-                        # Look for description in JSON-LD or inline data
-                        import re as _re
-                        desc_match = _re.search(
+                        desc_match = re.search(
                             r'"description"\s*:\s*"([^"]{20,})"',
                             content
                         )
                         if desc_match:
                             desc_text = desc_match.group(1).replace('\\n', '\n').replace('\\"', '"')
                             listing['descripcion'] = desc_text[:2000]
-                        else:
-                            # Try article or main content area
-                            for tag_sel in ['article', 'main', '[role="main"]']:
-                                try:
-                                    el = page.query_selector(tag_sel)
-                                    if el:
-                                        text = el.inner_text().strip()
-                                        # Filter out very short or navigation-only text
-                                        if len(text) > 100:
-                                            # Take first 2000 chars, skip if too short
-                                            listing['descripcion'] = text[:2000]
-                                            break
-                                except:
-                                    continue
                     except:
                         pass
 
@@ -1046,6 +1056,7 @@ class CamoufoxMilanuncios:
                                     except:
                                         pass
 
+                                self._scraped_listings.append(listing)
                                 if self.save_to_postgres(listing):
                                     self.stats['listings_saved'] += 1
 
@@ -1066,6 +1077,18 @@ class CamoufoxMilanuncios:
         finally:
             if self.postgres_conn:
                 self.postgres_conn.close()
+
+        # Validate results and send alerts
+        try:
+            from scrapers.error_handling import validate_scraping_results
+            validate_scraping_results(
+                listings=self._scraped_listings,
+                portal_name=self.PORTAL_NAME,
+                expected_min_count=3,
+                required_fields=['titulo', 'precio', 'url_anuncio'],
+            )
+        except Exception as e:
+            logger.debug(f"Post-scrape validation error: {e}")
 
         logger.info(f"Scraping complete. Stats: {self.stats}")
         return self.stats

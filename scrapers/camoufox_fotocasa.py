@@ -57,6 +57,7 @@ class CamoufoxFotocasa:
         self.postgres_conn = None
         self.proxy = proxy or os.environ.get('DATADOME_PROXY', '')
         self.captcha_api_key = os.environ.get('CAPTCHA_API_KEY', '')
+        self._scraped_listings = []
         self.stats = {
             'pages_scraped': 0,
             'listings_found': 0,
@@ -646,6 +647,18 @@ class CamoufoxFotocasa:
             if self.postgres_conn:
                 self.postgres_conn.close()
 
+        # Validate results and send alerts
+        try:
+            from scrapers.error_handling import validate_scraping_results
+            validate_scraping_results(
+                listings=self._scraped_listings,
+                portal_name='fotocasa',
+                expected_min_count=3,
+                required_fields=['titulo', 'precio', 'url_anuncio'],
+            )
+        except Exception as e:
+            logger.debug(f"Post-scrape validation error: {e}")
+
         logger.info(f"Scraping complete. Stats: {self.stats}")
         return self.stats
 
@@ -733,6 +746,7 @@ class CamoufoxFotocasa:
                     logger.info(f"  Skipped (agency): {listing.get('titulo', '')[:40]}")
                     continue
 
+                self._scraped_listings.append(listing)
                 if self.postgres and self.save_to_postgres(listing):
                     self.stats['listings_saved'] += 1
                     logger.info(f"  Saved: {listing.get('titulo', '')[:40]} | {listing.get('precio')}€")

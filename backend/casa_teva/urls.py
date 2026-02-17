@@ -131,6 +131,103 @@ def system_status(request):
     return JsonResponse(status)
 
 
+def scraper_health(request):
+    """Scraper health dashboard - shows last scrape per portal with freshness indicator."""
+    from datetime import datetime, timedelta
+
+    portals = ['habitaclia', 'fotocasa', 'milanuncios', 'idealista']
+    now = datetime.now()
+    portal_health = {}
+
+    try:
+        with connection.cursor() as cursor:
+            # Last scrape per portal from raw.raw_listings
+            cursor.execute("""
+                SELECT
+                    portal,
+                    COUNT(*) as total_all_time,
+                    COUNT(*) FILTER (WHERE scraping_timestamp >= NOW() - INTERVAL '24 hours') as last_24h,
+                    COUNT(*) FILTER (WHERE scraping_timestamp >= NOW() - INTERVAL '7 days') as last_7d,
+                    MAX(scraping_timestamp) as last_scrape,
+                    COUNT(*) FILTER (
+                        WHERE scraping_timestamp >= NOW() - INTERVAL '7 days'
+                        AND raw_data->>'es_particular' = 'true'
+                    ) as particulares_7d
+                FROM raw.raw_listings
+                WHERE portal = ANY(%s)
+                GROUP BY portal
+            """, [portals])
+
+            for row in cursor.fetchall():
+                portal_name = row[0]
+                last_scrape = row[4]
+                hours_ago = (now - last_scrape.replace(tzinfo=None)).total_seconds() / 3600 if last_scrape else None
+
+                # Freshness: green (<48h), yellow (48-96h), red (>96h or no data)
+                if hours_ago is None:
+                    status = 'red'
+                elif hours_ago < 48:
+                    status = 'green'
+                elif hours_ago < 96:
+                    status = 'yellow'
+                else:
+                    status = 'red'
+
+                portal_health[portal_name] = {
+                    'status': status,
+                    'total_all_time': row[1],
+                    'last_24h': row[2],
+                    'last_7d': row[3],
+                    'last_scrape': last_scrape.isoformat() if last_scrape else None,
+                    'hours_ago': round(hours_ago, 1) if hours_ago else None,
+                    'particulares_7d': row[5],
+                }
+
+            # Fill missing portals
+            for p in portals:
+                if p not in portal_health:
+                    portal_health[p] = {
+                        'status': 'red',
+                        'total_all_time': 0,
+                        'last_24h': 0,
+                        'last_7d': 0,
+                        'last_scrape': None,
+                        'hours_ago': None,
+                        'particulares_7d': 0,
+                    }
+
+            # Contact queue summary
+            contact_queue = {}
+            try:
+                cursor.execute("""
+                    SELECT status, COUNT(*)
+                    FROM leads_contactqueue
+                    GROUP BY status
+                """)
+                contact_queue = {row[0]: row[1] for row in cursor.fetchall()}
+            except:
+                pass
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)[:200]}, status=500)
+
+    # Overall system status
+    all_statuses = [v['status'] for v in portal_health.values()]
+    if all(s == 'green' for s in all_statuses):
+        overall = 'green'
+    elif any(s == 'red' for s in all_statuses):
+        overall = 'red'
+    else:
+        overall = 'yellow'
+
+    return JsonResponse({
+        'overall': overall,
+        'portals': portal_health,
+        'contact_queue': contact_queue,
+        'checked_at': now.isoformat(),
+    })
+
+
 def service_worker(request):
     """Serve the service worker from root path for maximum scope."""
     sw_path = settings.BASE_DIR / 'static' / 'service-worker.js'
@@ -148,6 +245,7 @@ urlpatterns = [
     # Health check & status
     path('health/', health_check, name='health_check'),
     path('status/', system_status, name='system_status'),
+    path('status/scrapers/', scraper_health, name='scraper_health'),
 
     # PWA Service Worker (must be at root for full scope)
     path('service-worker.js', service_worker, name='service_worker'),

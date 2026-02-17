@@ -134,7 +134,7 @@ def send_alert(
     webhook_url: Optional[str] = None,
 ) -> bool:
     """
-    Send alert via webhook (Discord/Telegram/Slack compatible).
+    Send alert via Telegram (primary) or webhook fallback.
 
     Args:
         title: Alert title
@@ -146,12 +146,6 @@ def send_alert(
     Returns:
         True if alert sent successfully
     """
-    url = webhook_url or get_webhook_url()
-
-    if not url:
-        logger.debug("No webhook URL configured, skipping alert")
-        return False
-
     # Emoji based on severity
     emoji_map = {
         AlertSeverity.INFO: "ℹ️",
@@ -163,40 +157,49 @@ def send_alert(
 
     timestamp = get_madrid_time().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Build message content
+    # Build Telegram message (HTML format)
     content_parts = [
-        f"{emoji} **{title}**",
-        f"_{severity.upper()}_ - {timestamp}",
+        f"{emoji} <b>{title}</b>",
+        f"<i>{severity.upper()}</i> - {timestamp}",
         "",
         message,
     ]
 
     if details:
         content_parts.append("")
-        content_parts.append("**Details:**")
         for key, value in details.items():
-            content_parts.append(f"• {key}: `{value}`")
+            content_parts.append(f"  {key}: <code>{value}</code>")
 
     content = "\n".join(content_parts)
 
-    # Try Discord format first
-    payload = {"content": content}
+    # Try Telegram first
+    try:
+        from scrapers.utils.telegram_alerts import send_telegram_alert
+        if send_telegram_alert(content):
+            logger.info(f"Telegram alert sent: {title}")
+            return True
+    except Exception as e:
+        logger.debug(f"Telegram alert failed: {e}")
+
+    # Fallback to webhook
+    url = webhook_url or get_webhook_url()
+    if not url:
+        logger.debug("No webhook URL configured, skipping alert")
+        return False
 
     try:
         response = requests.post(
             url,
-            json=payload,
+            json={"content": content},
             timeout=10,
             headers={"Content-Type": "application/json"}
         )
-
         if response.status_code in (200, 204):
-            logger.info(f"Alert sent: {title}")
+            logger.info(f"Webhook alert sent: {title}")
             return True
         else:
             logger.warning(f"Webhook returned {response.status_code}: {response.text[:100]}")
             return False
-
     except Exception as e:
         logger.error(f"Failed to send alert: {e}")
         return False

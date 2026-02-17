@@ -82,6 +82,7 @@ class CamoufoxHabitaclia:
         self.quick_scan = quick_scan
         self.proxy = proxy or os.environ.get('DATADOME_PROXY')
         self.postgres_conn = None
+        self._scraped_listings = []
         self.stats = {
             'total_listings': 0,
             'filtered_out': 0,
@@ -465,6 +466,18 @@ class CamoufoxHabitaclia:
             if self.postgres_conn:
                 self.postgres_conn.close()
 
+        # Validate results and send alerts
+        try:
+            from scrapers.error_handling import validate_scraping_results
+            validate_scraping_results(
+                listings=self._scraped_listings,
+                portal_name='habitaclia',
+                expected_min_count=3,
+                required_fields=['titulo', 'precio', 'url'],
+            )
+        except Exception as e:
+            logger.debug(f"Post-scrape validation error: {e}")
+
         logger.info(f"Stats: {self.stats}")
         return self.stats
 
@@ -525,6 +538,7 @@ class CamoufoxHabitaclia:
                 # Save basic listings without enrichment
                 for listing in basic_listings:
                     self.stats['total_listings'] += 1
+                    self._scraped_listings.append(listing)
                     if self.save_to_postgres(listing):
                         self.stats['saved'] += 1
                     else:
@@ -535,6 +549,7 @@ class CamoufoxHabitaclia:
             for listing in basic_listings[:10]:
                 self.stats['total_listings'] += 1
                 enriched = self._enrich_listing(page, listing)
+                self._scraped_listings.append(enriched)
                 if self.save_to_postgres(enriched):
                     self.stats['saved'] += 1
                 else:
