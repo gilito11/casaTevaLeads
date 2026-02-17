@@ -163,6 +163,58 @@ def scraper_health(request):
                 last_scrape = row[4]
                 hours_ago = (now - last_scrape.replace(tzinfo=None)).total_seconds() / 3600 if last_scrape else None
 
+                portal_health[portal_name] = {
+                    'total_all_time': row[1],
+                    'last_24h': row[2],
+                    'last_7d': row[3],
+                    'last_new_data': last_scrape.isoformat() if last_scrape else None,
+                    'particulares_7d': row[5],
+                }
+
+            # Check scraper_runs for last run time (more reliable than raw_listings)
+            try:
+                cursor.execute("""
+                    SELECT DISTINCT ON (portal)
+                        portal, finished_at, listings_found, listings_saved, errors, status
+                    FROM raw.scraper_runs
+                    WHERE portal = ANY(%s)
+                    ORDER BY portal, finished_at DESC
+                """, [portals])
+
+                for row in cursor.fetchall():
+                    portal_name = row[0]
+                    last_run = row[1]
+                    if portal_name not in portal_health:
+                        portal_health[portal_name] = {}
+                    portal_health[portal_name]['last_run'] = last_run.isoformat() if last_run else None
+                    portal_health[portal_name]['last_run_found'] = row[2]
+                    portal_health[portal_name]['last_run_saved'] = row[3]
+                    portal_health[portal_name]['last_run_errors'] = row[4]
+                    portal_health[portal_name]['last_run_status'] = row[5]
+            except Exception:
+                pass  # Table may not exist yet
+
+            # Determine freshness per portal (prefer last_run over last_new_data)
+            for p in portals:
+                if p not in portal_health:
+                    portal_health[p] = {
+                        'total_all_time': 0, 'last_24h': 0, 'last_7d': 0,
+                        'last_new_data': None, 'particulares_7d': 0,
+                    }
+                ph = portal_health[p]
+
+                # Use last_run if available, otherwise fall back to last_new_data
+                last_ts = ph.get('last_run') or ph.get('last_new_data')
+                if last_ts:
+                    from datetime import datetime as dt_cls
+                    try:
+                        ts = dt_cls.fromisoformat(last_ts.replace('+00:00', '').replace('Z', ''))
+                        hours_ago = (now - ts).total_seconds() / 3600
+                    except:
+                        hours_ago = None
+                else:
+                    hours_ago = None
+
                 # Freshness: green (<48h), yellow (48-96h), red (>96h or no data)
                 if hours_ago is None:
                     status = 'red'
@@ -173,28 +225,8 @@ def scraper_health(request):
                 else:
                     status = 'red'
 
-                portal_health[portal_name] = {
-                    'status': status,
-                    'total_all_time': row[1],
-                    'last_24h': row[2],
-                    'last_7d': row[3],
-                    'last_scrape': last_scrape.isoformat() if last_scrape else None,
-                    'hours_ago': round(hours_ago, 1) if hours_ago else None,
-                    'particulares_7d': row[5],
-                }
-
-            # Fill missing portals
-            for p in portals:
-                if p not in portal_health:
-                    portal_health[p] = {
-                        'status': 'red',
-                        'total_all_time': 0,
-                        'last_24h': 0,
-                        'last_7d': 0,
-                        'last_scrape': None,
-                        'hours_ago': None,
-                        'particulares_7d': 0,
-                    }
+                ph['status'] = status
+                ph['hours_ago'] = round(hours_ago, 1) if hours_ago else None
 
             # Contact queue summary
             contact_queue = {}

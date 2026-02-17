@@ -692,3 +692,70 @@ def generate_scraping_report(
             )
 
     return report
+
+
+# =============================================================================
+# SCRAPER RUN LOGGING
+# =============================================================================
+
+def log_scraper_run(
+    portal: str,
+    stats: Dict[str, Any],
+    tenant_id: int = 1,
+    conn=None,
+) -> bool:
+    """
+    Log a scraper run to raw.scraper_runs for health monitoring.
+
+    Args:
+        portal: Portal name (habitaclia, fotocasa, etc.)
+        stats: Stats dict from scraper (listings_found, listings_saved, errors)
+        tenant_id: Tenant ID
+        conn: Optional existing psycopg2 connection. If None, creates new one.
+
+    Returns:
+        True if logged successfully
+    """
+    import json
+
+    close_conn = False
+    try:
+        if conn is None:
+            import psycopg2
+            from urllib.parse import urlparse
+            database_url = os.environ.get('DATABASE_URL') or os.environ.get('NEON_DATABASE_URL', '')
+            if not database_url:
+                return False
+            parsed = urlparse(database_url)
+            conn = psycopg2.connect(
+                host=parsed.hostname, port=parsed.port or 5432,
+                database=parsed.path.lstrip('/').split('?')[0],
+                user=parsed.username, password=parsed.password,
+                sslmode='require',
+            )
+            close_conn = True
+
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO raw.scraper_runs (portal, tenant_id, finished_at, listings_found, listings_saved, errors, status, stats)
+            VALUES (%s, %s, NOW(), %s, %s, %s, %s, %s)
+        """, (
+            portal,
+            tenant_id,
+            stats.get('listings_found', stats.get('total_listings', 0)),
+            stats.get('listings_saved', stats.get('saved', 0)),
+            stats.get('errors', 0),
+            'error' if stats.get('errors', 0) > 0 else 'ok',
+            json.dumps(stats),
+        ))
+        conn.commit()
+        cursor.close()
+        logger.info(f"Scraper run logged: {portal}")
+        return True
+
+    except Exception as e:
+        logger.debug(f"Failed to log scraper run: {e}")
+        return False
+    finally:
+        if close_conn and conn:
+            conn.close()

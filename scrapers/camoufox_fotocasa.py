@@ -647,17 +647,18 @@ class CamoufoxFotocasa:
             if self.postgres_conn:
                 self.postgres_conn.close()
 
-        # Validate results and send alerts
+        # Validate results and log run
         try:
-            from scrapers.error_handling import validate_scraping_results
+            from scrapers.error_handling import validate_scraping_results, log_scraper_run
             validate_scraping_results(
                 listings=self._scraped_listings,
                 portal_name='fotocasa',
                 expected_min_count=3,
                 required_fields=['titulo', 'precio', 'url_anuncio'],
             )
+            log_scraper_run('fotocasa', self.stats, self.tenant_id)
         except Exception as e:
-            logger.debug(f"Post-scrape validation error: {e}")
+            logger.debug(f"Post-scrape validation/logging error: {e}")
 
         logger.info(f"Scraping complete. Stats: {self.stats}")
         return self.stats
