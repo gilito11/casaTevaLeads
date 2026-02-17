@@ -282,6 +282,12 @@ urlpatterns = [
     # PWA Service Worker (must be at root for full scope)
     path('service-worker.js', service_worker, name='service_worker'),
 
+    # Static files at root for crawlers
+    path('robots.txt', lambda r: FileResponse(
+        open(settings.BASE_DIR / 'static' / 'robots.txt', 'rb'),
+        content_type='text/plain',
+    )),
+
     # Push notifications API
     path('api/push/', include('notifications.urls', namespace='notifications')),
 
