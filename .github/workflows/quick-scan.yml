@@ -1,11 +1,11 @@
-# Quick Scan workflow - Fast new-lead detection (page 1 only, no detail enrichment)
-# Runs every 2 hours Mon-Sat for fotocasa only (habitaclia moved to VPS)
-# Budget: ~3 min/run x 6 runs/day x 26 days = ~468 min/month
+# Quick Scan workflow - DISABLED: Botasaurus blocked by Imperva on fotocasa
+# Fotocasa now handled by Camoufox + proxy in scrape-neon.yml
+# Keeping workflow_dispatch for manual runs if needed
 name: Quick Scan (New Listings)
 
 on:
-  schedule:
-    - cron: '0 8,10,12,14,16,18 * * 1-6'
+  # schedule disabled - Botasaurus blocked by Imperva, 0 listings per run
+  # - cron: '0 8,10,12,14,16,18 * * 1-6'
   workflow_dispatch:
     inputs:
       zones:

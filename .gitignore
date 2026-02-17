@@ -184,6 +184,7 @@ data/raw/
 data/staging/
 *.csv
 *.json
+!backend/static/manifest.json
 *.parquet
 
 # Logs

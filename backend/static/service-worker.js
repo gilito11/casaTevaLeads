@@ -1,6 +1,6 @@
-const CACHE_NAME = 'casa-teva-v1';
-const STATIC_CACHE = 'casa-teva-static-v1';
-const DYNAMIC_CACHE = 'casa-teva-dynamic-v1';
+const CACHE_NAME = 'fincaradar-v1';
+const STATIC_CACHE = 'fincaradar-static-v1';
+const DYNAMIC_CACHE = 'fincaradar-dynamic-v1';
 
 const STATIC_ASSETS = [
   '/',
@@ -127,7 +127,7 @@ self.addEventListener('push', event => {
     ]
   };
 
-  let data = { title: 'Casa Teva CRM', body: 'Nueva notificacion' };
+  let data = { title: 'FincaRadar', body: 'Nueva notificacion' };
 
   if (event.data) {
     try {

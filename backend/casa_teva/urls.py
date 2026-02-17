@@ -287,6 +287,10 @@ urlpatterns = [
         open(settings.BASE_DIR / 'static' / 'robots.txt', 'rb'),
         content_type='text/plain',
     )),
+    path('favicon.ico', lambda r: FileResponse(
+        open(settings.BASE_DIR / 'static' / 'favicon.ico', 'rb'),
+        content_type='image/x-icon',
+    )),
 
     # Push notifications API
     path('api/push/', include('notifications.urls', namespace='notifications')),
