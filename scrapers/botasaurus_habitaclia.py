@@ -163,6 +163,10 @@ ZONAS_GEOGRAFICAS = {
     'vila_seca': {'nombre': 'Vila-seca', 'url_slug': 'vila-seca'},
     'ametlla_mar': {'nombre': "L'Ametlla de Mar", 'url_slug': 'l_ametlla_de_mar'},
     'sant_carles_rapita': {'nombre': 'Sant Carles de la Ràpita', 'url_slug': 'sant_carles_de_la_rapita'},
+
+    # -- MADRID DISTRICTS (Tenant 2: Look and Find) --
+    'chamartin': {'nombre': 'Chamartín', 'url_slug': 'distrito_chamartin-madrid'},
+    'hortaleza': {'nombre': 'Hortaleza', 'url_slug': 'distrito_hortaleza-madrid'},
 }
 
 

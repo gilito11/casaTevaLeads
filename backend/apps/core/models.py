@@ -76,6 +76,14 @@ ZONAS_POR_REGION = {
             'sant_carles_rapita': {'nombre': 'Sant Carles de la Ràpita', 'lat': 40.6167, 'lon': 0.5917, 'provincia_id': 43, 'radio_default': 10},
         }
     },
+    # Madrid (Tenant 2: Find&Look)
+    'madrid_norte': {
+        'nombre': 'Madrid Norte',
+        'zonas': {
+            'chamartin': {'nombre': 'Chamartín', 'lat': 40.4597, 'lon': -3.6772, 'provincia_id': 28, 'radio_default': 5},
+            'hortaleza': {'nombre': 'Hortaleza', 'lat': 40.4697, 'lon': -3.6407, 'provincia_id': 28, 'radio_default': 5},
+        }
+    },
 }
 
 # Dict plano para compatibilidad con código existente

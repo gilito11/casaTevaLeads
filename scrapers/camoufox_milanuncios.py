@@ -134,6 +134,15 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Deltebre',
         'url_path': 'pisos-en-deltebre-tarragona/',
     },
+    # Madrid Districts (Tenant 2: Look and Find)
+    'chamartin': {
+        'nombre': 'Chamartín',
+        'url_path': 'venta-de-pisos-en-chamartin-madrid-madrid/',
+    },
+    'hortaleza': {
+        'nombre': 'Hortaleza',
+        'url_path': 'venta-de-pisos-en-hortaleza-madrid-madrid/',
+    },
 }
 
 

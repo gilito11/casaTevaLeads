@@ -94,6 +94,15 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Igualada',
         'url_path': 'igualada-barcelona',
     },
+    # Madrid Districts (Tenant 2: Look and Find)
+    'chamartin': {
+        'nombre': 'Chamartín',
+        'url_path': 'madrid/chamartin',
+    },
+    'hortaleza': {
+        'nombre': 'Hortaleza',
+        'url_path': 'madrid/hortaleza',
+    },
 }
 
 

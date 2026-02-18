@@ -30,6 +30,10 @@ LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
 DBT_DIR = os.path.join(PROJECT_ROOT, 'dbt_project')
 ZONES = os.environ.get('SCRAPE_ZONES', 'salou cambrils tarragona reus').split()
 
+# Tenant 2: Look and Find (Madrid)
+MADRID_ZONES = os.environ.get('SCRAPE_ZONES_MADRID', 'chamartin hortaleza').split()
+MADRID_TENANT_ID = 2
+
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
@@ -93,15 +97,27 @@ def main():
 
     results = {}
 
-    # 1. Scrapers (only portals that work from VPS)
+    # 1a. Scrapers Tenant 1 (Casa Teva - Catalonia)
     # fotocasa (Imperva) and idealista (DataDome) are blocked → GitHub Actions only
     results['habitaclia'] = run_step(
-        "Habitaclia",
+        "Habitaclia (Catalonia)",
         [PYTHON, "run_habitaclia_scraper.py", "--zones"] + ZONES + ["--postgres"],
     )
     results['milanuncios'] = run_step(
-        "Milanuncios",
+        "Milanuncios (Catalonia)",
         [PYTHON, "run_camoufox_milanuncios_scraper.py", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
+        allow_fail=True,
+    )
+
+    # 1b. Scrapers Tenant 2 (Look and Find - Madrid)
+    results['habitaclia_madrid'] = run_step(
+        "Habitaclia (Madrid)",
+        [PYTHON, "run_habitaclia_scraper.py", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--postgres"],
+        allow_fail=True,
+    )
+    results['milanuncios_madrid'] = run_step(
+        "Milanuncios (Madrid)",
+        [PYTHON, "run_camoufox_milanuncios_scraper.py", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--max-pages", "2", "--postgres"],
         allow_fail=True,
     )
 

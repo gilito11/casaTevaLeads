@@ -128,6 +128,12 @@ ZONAS_GEOGRAFICAS = {
     'sant_carles_rapita': {'nombre': 'Sant Carles de la Ràpita', 'url_path': 'sant-carles-de-la-rapita/todas-las-zonas'},
     'la_pineda': {'nombre': 'La Pineda', 'url_path': 'la-pineda/todas-las-zonas'},
     'montroig_camp': {'nombre': 'Mont-roig del Camp', 'url_path': 'mont-roig-del-camp/todas-las-zonas'},
+
+    # =============================================================
+    # MADRID DISTRICTS (Tenant 2: Look and Find)
+    # =============================================================
+    'chamartin': {'nombre': 'Chamartín', 'url_path': 'madrid-capital/chamartin'},
+    'hortaleza': {'nombre': 'Hortaleza', 'url_path': 'madrid-capital/hortaleza'},
 }
 
 
