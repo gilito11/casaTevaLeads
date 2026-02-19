@@ -1,0 +1,58 @@
+name: dbt Full Refresh
+
+on:
+  workflow_dispatch:
+
+env:
+  DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+
+jobs:
+  dbt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dbt
+        run: pip install dbt-postgres
+
+      - name: Run dbt full refresh
+        run: |
+          cd dbt_project
+          mkdir -p /tmp/dbt_profiles
+          cat > /tmp/dbt_profiles/profiles.yml << EOF
+          casa_teva:
+            target: prod
+            outputs:
+              prod:
+                type: postgres
+                host: ep-ancient-darkness-agqilf7l-pooler.c-2.eu-central-1.aws.neon.tech
+                port: 5432
+                user: neondb_owner
+                password: "$DBT_PASSWORD"
+                dbname: neondb
+                schema: public
+                threads: 4
+                sslmode: require
+          EOF
+          dbt deps --profiles-dir /tmp/dbt_profiles || true
+          dbt run --select staging --profiles-dir /tmp/dbt_profiles
+          dbt run --full-refresh --select marts --profiles-dir /tmp/dbt_profiles
+        env:
+          DBT_PASSWORD: ${{ secrets.NEON_DB_PASSWORD }}
+
+      - name: Notify
+        if: always()
+        run: |
+          STATUS=${{ job.status }}
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode=HTML \
+            -d text="<b>dbt Full Refresh: ${STATUS}</b>"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
