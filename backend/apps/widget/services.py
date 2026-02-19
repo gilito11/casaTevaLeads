@@ -202,24 +202,23 @@ def guardar_lead_widget(
         'captado_en': datetime.utcnow().isoformat(),
     }
 
+    listing_data['anuncio_id'] = lead_id
+
     with connection.cursor() as cursor:
         cursor.execute("""
             INSERT INTO raw.raw_listings (
-                tenant_id, portal, listing_id, listing_url, data, scraped_at
+                tenant_id, portal, data_lake_path, raw_data, scraping_timestamp
             ) VALUES (
-                %s, 'widget', %s, %s, %s, NOW()
+                %s, 'widget', %s, %s, NOW()
             )
-            ON CONFLICT (tenant_id, portal, listing_id)
-            DO UPDATE SET data = EXCLUDED.data, scraped_at = NOW()
-            RETURNING listing_id
+            ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
+            WHERE raw_data->>'anuncio_id' IS NOT NULL
+            DO UPDATE SET raw_data = EXCLUDED.raw_data, scraping_timestamp = NOW()
         """, [
             tenant_id,
-            lead_id,
             f"widget://{lead_id}",
             json.dumps(listing_data),
         ])
-
-        result = cursor.fetchone()
 
     logger.info(f"Lead widget guardado: {lead_id} para tenant {tenant_id}")
 

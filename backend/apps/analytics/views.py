@@ -168,7 +168,7 @@ def analytics_dashboard_view(request):
                     SELECT
                         l.*,
                         COALESCE(e.estado, 'NUEVO') as estado_real,
-                        e.fecha_primer_contacto
+                        e.fecha_primer_contacto as estado_fecha_contacto
                     FROM public_marts.dim_leads l
                     LEFT JOIN leads_lead_estado e ON l.lead_id = e.lead_id
                     WHERE l.tenant_id = %s {filtros_where}
@@ -192,8 +192,8 @@ def analytics_dashboard_view(request):
                     COUNT(*) FILTER (WHERE fecha_primera_captura >= DATE_TRUNC('month', CURRENT_DATE)) as leads_este_mes,
                     COALESCE(AVG(lead_score), 0)::INTEGER as score_medio,
                     COALESCE(AVG(
-                        CASE WHEN fecha_primer_contacto IS NOT NULL
-                        THEN EXTRACT(EPOCH FROM (fecha_primer_contacto - fecha_primera_captura)) / 86400
+                        CASE WHEN COALESCE(estado_fecha_contacto, fecha_primer_contacto) IS NOT NULL
+                        THEN EXTRACT(EPOCH FROM (COALESCE(estado_fecha_contacto, fecha_primer_contacto) - fecha_primera_captura)) / 86400
                         END
                     ), 0)::NUMERIC(5,1) as dias_medio_primer_contacto
                 FROM lead_con_estado
@@ -637,22 +637,22 @@ def scrape_history_view(request):
             cursor.execute("""
                 WITH scrape_sessions AS (
                     SELECT
-                        DATE(scraped_at) as fecha,
+                        DATE(scraping_timestamp) as fecha,
                         CASE
-                            WHEN EXTRACT(HOUR FROM scraped_at) < 15 THEN '12:00'
+                            WHEN EXTRACT(HOUR FROM scraping_timestamp) < 15 THEN '12:00'
                             ELSE '18:00'
                         END as franja,
                         raw_data->>'zona_geografica' as zona,
                         portal,
                         COUNT(*) as listings,
-                        MIN(scraped_at) as start_time,
-                        MAX(scraped_at) as end_time
+                        MIN(scraping_timestamp) as start_time,
+                        MAX(scraping_timestamp) as end_time
                     FROM raw.raw_listings
                     WHERE tenant_id = %s
-                      AND scraped_at >= CURRENT_DATE - INTERVAL '%s days'
+                      AND scraping_timestamp >= CURRENT_DATE - INTERVAL '%s days'
                       AND raw_data->>'zona_geografica' IS NOT NULL
-                    GROUP BY DATE(scraped_at),
-                             CASE WHEN EXTRACT(HOUR FROM scraped_at) < 15 THEN '12:00' ELSE '18:00' END,
+                    GROUP BY DATE(scraping_timestamp),
+                             CASE WHEN EXTRACT(HOUR FROM scraping_timestamp) < 15 THEN '12:00' ELSE '18:00' END,
                              raw_data->>'zona_geografica',
                              portal
                 )
@@ -703,7 +703,7 @@ def zones_grid_view(request):
                     SELECT
                         raw_data->>'zona_geografica' as zona,
                         portal,
-                        MAX(scraped_at) as ultimo,
+                        MAX(scraping_timestamp) as ultimo,
                         COUNT(*) as total_listings
                     FROM raw.raw_listings
                     WHERE tenant_id = %s
@@ -719,7 +719,7 @@ def zones_grid_view(request):
                         scrapear_fotocasa as fc,
                         scrapear_habitaclia as ha,
                         scrapear_idealista as id
-                    FROM core_zonageografica
+                    FROM zonas_geograficas
                     WHERE tenant_id = %s
                 )
                 SELECT
