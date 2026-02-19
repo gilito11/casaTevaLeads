@@ -243,7 +243,7 @@ final AS (
             OR LOWER(COALESCE(vendedor, '')) LIKE '%servicios inmobiliarios%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%consulting%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%costa dorada%'
-            OR vendedor = 'Profesional'
+            OR COALESCE(vendedor, '') = 'Profesional'
         )
         -- Filter out listings that reject agencies (looking for direct buyers only)
         AND NOT (
