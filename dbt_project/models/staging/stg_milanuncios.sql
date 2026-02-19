@@ -254,18 +254,7 @@ final AS (
             OR LOWER(COALESCE(vendedor, '')) LIKE '%realty%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%pisos.com%'
         )
-        -- Filter out agencies by nombre_contacto patterns too
-        AND NOT (
-            LOWER(COALESCE(nombre_contacto, '')) LIKE '%inmobiliaria%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%inmuebles%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%fincas%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%agencia%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '% s.l.%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '% s.a.%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%real estate%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%costa dorada%'
-            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%realty%'
-        )
+        -- Note: nombre_contacto = vendedor in this model, so vendor filter above covers both
         -- Filter out listings with empty descriptions (just "Ref: NNN")
         -- These are almost always professional listings where full description wasn't extracted
         AND LENGTH(TRIM(REGEXP_REPLACE(COALESCE(descripcion, ''), 'Descripci.n|Ref:?\s*[0-9]+', '', 'g'))) >= 10
