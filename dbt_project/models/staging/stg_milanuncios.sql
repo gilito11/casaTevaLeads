@@ -210,8 +210,8 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
-        -- Filter out listings marked as professional by scraper
-        AND es_particular = TRUE
+        -- Don't hard-filter on es_particular — scraper heuristic can be unreliable
+        -- Name-based vendor patterns below are more effective
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
