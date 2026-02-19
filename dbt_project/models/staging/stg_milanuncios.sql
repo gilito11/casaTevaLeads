@@ -99,13 +99,9 @@ normalized AS (
             AS INTEGER
         ) AS banos,
 
-        -- Use es_particular from scraper raw data (DOM-based detection)
-        -- If vendedor AND nombre are both empty, mark as professional (agency heuristic)
+        -- Use es_particular from scraper, with seller_type as fallback
         CASE
-            WHEN (raw_data->>'es_particular')::BOOLEAN = FALSE THEN FALSE
-            WHEN NULLIF(TRIM(COALESCE(raw_data->>'vendedor', '')), '') IS NULL
-                 AND NULLIF(TRIM(COALESCE(raw_data->>'nombre', '')), '') IS NULL
-            THEN FALSE
+            WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'professional' THEN FALSE
             ELSE COALESCE((raw_data->>'es_particular')::BOOLEAN, TRUE)
         END AS es_particular,
         TRUE AS permite_inmobiliarias

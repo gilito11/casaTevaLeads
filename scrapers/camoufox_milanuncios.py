@@ -404,13 +404,6 @@ class CamoufoxMilanuncios:
         skipped_pro = 0
         skipped_price = 0
 
-        # Check if JSON seller classification is broken (all marked professional)
-        seller_types = [ad.get('sellerType', '').lower() for ad in ads if ad.get('sellerType')]
-        all_same_type = len(set(seller_types)) <= 1 and len(seller_types) > 3
-        seller_filter_broken = all_same_type and seller_types and seller_types[0] == 'professional'
-        if seller_filter_broken:
-            logger.warning(f"JSON classifies ALL {len(ads)} ads as 'professional' - treating as broken, will verify on detail page")
-
         for ad in ads:
             try:
                 # Check seller type from multiple fields
@@ -424,8 +417,7 @@ class CamoufoxMilanuncios:
                     or user_type == 'professional'
                 )
 
-                # When seller filter is broken, don't skip here - verify on detail page
-                if self.only_particulares and is_professional and not seller_filter_broken:
+                if self.only_particulares and is_professional:
                     skipped_pro += 1
                     continue
 
@@ -483,6 +475,7 @@ class CamoufoxMilanuncios:
                     'zona_busqueda': zona_key,
                     'url_anuncio': url_anuncio,
                     'es_particular': not is_professional,
+                    'seller_type': seller_type,
                     'tipo_inmueble': 'piso',
                     'fotos': fotos,
                 }
@@ -838,6 +831,7 @@ class CamoufoxMilanuncios:
                 'url': listing.get('url_anuncio', ''),
                 'es_particular': listing.get('es_particular', True),
                 'vendedor': listing.get('vendedor', ''),
+                'seller_type': listing.get('seller_type', ''),
                 'scraper_type': 'camoufox',
             }
 
