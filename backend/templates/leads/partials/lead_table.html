@@ -192,9 +192,6 @@
                             <div>
                                 <p class="font-medium text-gray-900 dark:text-white flex items-center gap-1.5">
                                     {{ lead.nombre|default:"Sin nombre" }}
-                                    {% if lead.es_particular == False %}
-                                    <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">Agencia</span>
-                                    {% endif %}
                                 </p>
                                 <a href="tel:{{ lead.telefono_norm }}"
                                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline flex items-center">

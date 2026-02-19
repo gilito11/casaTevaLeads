@@ -38,8 +38,8 @@ def lead_list_view(request):
     """Vista de lista de leads con filtros y paginacion"""
     tenant_id = get_user_tenant(request)
 
-    # Base queryset
-    leads_qs = Lead.objects.all()
+    # Base queryset - exclude profesional/agency leads
+    leads_qs = Lead.objects.exclude(es_particular=False)
     if tenant_id:
         leads_qs = leads_qs.filter(tenant_id=tenant_id)
 
@@ -48,7 +48,6 @@ def lead_list_view(request):
     estado = request.GET.get('estado', '')
     portal = request.GET.get('portal', '')
     zona = request.GET.get('zona', '')
-    tipo = request.GET.get('tipo', '')
     asignado = request.GET.get('asignado', '')  # 'me' para mis leads, user_id, o '' para todos
 
     if q:
@@ -64,11 +63,6 @@ def lead_list_view(request):
 
     if zona:
         leads_qs = leads_qs.filter(zona_geografica=zona)
-
-    if tipo == 'particular':
-        leads_qs = leads_qs.filter(es_particular=True)
-    elif tipo == 'profesional':
-        leads_qs = leads_qs.filter(es_particular=False)
 
     # Ordenamiento
     orden = request.GET.get('orden', '')
