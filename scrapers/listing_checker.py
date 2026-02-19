@@ -2,7 +2,8 @@
 Listing availability checker.
 
 Verifies if listings in the database are still active on their portals.
-Uses simple HTTP requests (no ScrapingBee needed - cheaper).
+Uses simple HTTP requests — only works reliably for habitaclia and fotocasa.
+Milanuncios/idealista have anti-bot (GeeTest/DataDome) so HTTP checks may fail.
 """
 
 import logging
@@ -46,7 +47,15 @@ REMOVED_PATTERNS = {
     ],
 }
 
-# User agent to avoid basic bot detection
+# CRM states to exclude from checking — these are already managed by the user
+EXCLUDED_ESTADOS = (
+    'YA_VENDIDO', 'CLIENTE', 'NO_CONTACTAR', 'INTERESADO', 'EN_PROCESO',
+)
+
+# Portals safe to check via simple HTTP (no anti-bot)
+SAFE_PORTALS = ('habitaclia', 'fotocasa')
+
+# User agent
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -80,12 +89,27 @@ def get_postgres_config() -> Dict[str, str]:
     }
 
 
+def send_telegram(message: str):
+    """Send a Telegram notification."""
+    token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    if not token or not chat_id:
+        return
+    try:
+        requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            data={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'},
+            timeout=10,
+        )
+    except Exception as e:
+        logger.warning(f"Telegram send failed: {e}")
+
+
 class ListingChecker:
     """
     Checks if listings are still available on their source portals.
-
-    Uses simple HTTP HEAD/GET requests to verify URL status.
-    Does not use ScrapingBee to save credits.
+    Uses simple HTTP GET requests to verify URL status.
+    Only checks habitaclia/fotocasa by default (milanuncios/idealista have anti-bot).
     """
 
     REQUEST_DELAY = 2.0  # seconds between requests
@@ -129,6 +153,40 @@ class ListingChecker:
                 return portal
         return None
 
+    def _is_redirect_to_search(self, original_url: str, final_url: str, portal: Optional[str]) -> bool:
+        """
+        Detect if the request was redirected to a search results page.
+        This happens when a listing is removed — the portal redirects to
+        a generic search instead of showing a 404.
+        """
+        if original_url == final_url:
+            return False
+
+        original_parsed = urlparse(original_url.lower())
+        final_parsed = urlparse(final_url.lower())
+
+        # Different domain = definitely a redirect (shouldn't happen normally)
+        if original_parsed.hostname != final_parsed.hostname:
+            return True
+
+        if portal == 'habitaclia':
+            # Habitaclia: specific listing URLs contain '-i{ID}.htm'
+            # If the final URL doesn't contain the listing ID, it's a redirect
+            id_match = re.search(r'-i(\d{9,})\.htm', original_url)
+            if id_match and id_match.group(1) not in final_url:
+                return True
+            # Redirect to search: /comprar-* without specific listing ID
+            if '/comprar-' in final_parsed.path and '-i' not in final_parsed.path:
+                return True
+
+        elif portal == 'fotocasa':
+            # Fotocasa: listing URLs contain /d at the end with a numeric ID
+            id_match = re.search(r'/(\d{7,})/d', original_url)
+            if id_match and id_match.group(1) not in final_url:
+                return True
+
+        return False
+
     def check_url(self, url: str, portal: Optional[str] = None) -> Tuple[bool, str]:
         """
         Check if a listing URL is still active.
@@ -158,11 +216,21 @@ class ListingChecker:
             if response.status_code == 410:
                 return False, 'http_410'
 
-            # Check for redirect to homepage (common pattern)
-            final_url = response.url.lower()
-            parsed = urlparse(final_url)
+            # HTTP 403 = anti-bot blocked, can't determine status
+            if response.status_code == 403:
+                self.stats['errors'] += 1
+                return True, 'blocked_403'
+
+            final_url = response.url
+
+            # Check for redirect to homepage
+            parsed = urlparse(final_url.lower())
             if parsed.path in ('/', '', '/es/', '/ca/'):
                 return False, 'redirected_to_home'
+
+            # Check for redirect to search results page (key improvement)
+            if self._is_redirect_to_search(url, final_url, portal):
+                return False, 'redirected_to_search'
 
             # Check HTML content for removal patterns
             if response.status_code == 200 and portal and portal in REMOVED_PATTERNS:
@@ -176,36 +244,47 @@ class ListingChecker:
 
         except requests.exceptions.Timeout:
             return True, 'timeout'  # Assume active on timeout
-        except requests.exceptions.ConnectionError as e:
-            return True, f'connection_error'  # Assume active on connection error
+        except requests.exceptions.ConnectionError:
+            return True, 'connection_error'  # Assume active on connection error
         except Exception as e:
             logger.warning(f"Error checking {url[:50]}: {e}")
             return True, f'error:{str(e)[:30]}'
 
-    def get_leads_to_check(self, limit: int = 100, portal: Optional[str] = None) -> List[Dict]:
+    def get_leads_to_check(
+        self,
+        limit: int = 100,
+        portal: Optional[str] = None,
+        safe_only: bool = True,
+    ) -> List[Dict]:
         """
         Get leads from database that need checking.
-        Prioritizes older leads that haven't been checked recently.
+        Excludes leads already in active CRM states (INTERESADO, CLIENTE, etc).
+        Prioritizes older leads.
         """
         cursor = self.conn.cursor()
 
         query = """
             SELECT
-                lead_id,
-                listing_url,
-                source_portal,
-                fecha_primera_captura
-            FROM public_marts.dim_leads
-            WHERE listing_url IS NOT NULL
-              AND listing_url != ''
+                d.lead_id,
+                d.listing_url,
+                d.source_portal,
+                d.fecha_primera_captura
+            FROM public_marts.dim_leads d
+            LEFT JOIN leads_lead_estado e ON d.lead_id = e.lead_id
+            WHERE d.listing_url IS NOT NULL
+              AND d.listing_url != ''
+              AND (e.estado IS NULL OR e.estado NOT IN %s)
         """
-        params = []
+        params: list = [EXCLUDED_ESTADOS]
 
         if portal:
-            query += " AND source_portal = %s"
+            query += " AND d.source_portal = %s"
             params.append(portal)
+        elif safe_only:
+            query += " AND d.source_portal IN %s"
+            params.append(SAFE_PORTALS)
 
-        query += " ORDER BY fecha_primera_captura ASC LIMIT %s"
+        query += " ORDER BY d.fecha_primera_captura ASC LIMIT %s"
         params.append(limit)
 
         cursor.execute(query, params)
@@ -223,14 +302,10 @@ class ListingChecker:
         return leads
 
     def mark_as_removed(self, lead_id: str, reason: str) -> bool:
-        """
-        Mark a lead as removed in the database.
-        Updates the LeadEstado table with estado='ELIMINADO'.
-        """
+        """Mark a lead as YA_VENDIDO in the database."""
         try:
             cursor = self.conn.cursor()
 
-            # Get tenant_id and telefono_norm from dim_leads
             cursor.execute("""
                 SELECT tenant_id, telefono_norm
                 FROM public_marts.dim_leads
@@ -245,8 +320,6 @@ class ListingChecker:
 
             tenant_id, telefono_norm = row
 
-            # Update or create LeadEstado with estado='YA_VENDIDO' (closest to removed)
-            # We use YA_VENDIDO because it means the listing is no longer available
             cursor.execute("""
                 INSERT INTO leads_lead_estado (
                     lead_id, tenant_id, telefono_norm, estado,
@@ -278,6 +351,8 @@ class ListingChecker:
         limit: int = 100,
         portal: Optional[str] = None,
         mark_removed: bool = True,
+        safe_only: bool = True,
+        notify: bool = True,
     ) -> Dict:
         """
         Check multiple leads and optionally mark removed ones.
@@ -286,12 +361,11 @@ class ListingChecker:
             limit: Maximum number of leads to check
             portal: Filter by portal (optional)
             mark_removed: If True, update database for removed leads
-
-        Returns:
-            Statistics dictionary
+            safe_only: If True, only check habitaclia/fotocasa (no anti-bot)
+            notify: If True, send Telegram notification with summary
         """
-        leads = self.get_leads_to_check(limit=limit, portal=portal)
-        logger.info(f"Checking {len(leads)} leads...")
+        leads = self.get_leads_to_check(limit=limit, portal=portal, safe_only=safe_only)
+        logger.info(f"Checking {len(leads)} leads (safe_only={safe_only})...")
 
         removed_leads = []
 
@@ -310,15 +384,32 @@ class ListingChecker:
                     'portal': lead['portal'],
                     'reason': reason,
                 })
-                logger.info(f"Removed: {lead['lead_id']} - {reason}")
+                logger.info(f"Removed: {lead['lead_id']} ({lead['portal']}) - {reason}")
 
                 if mark_removed:
                     self.mark_as_removed(lead['lead_id'], reason)
 
-        return {
+        results = {
             'stats': self.stats,
             'removed_leads': removed_leads,
         }
+
+        # Send Telegram summary
+        if notify and self.stats['checked'] > 0:
+            msg = (
+                f"<b>Listing Check</b>\n"
+                f"Checked: {self.stats['checked']}\n"
+                f"Active: {self.stats['active']}\n"
+                f"Removed: {self.stats['removed']}"
+            )
+            if removed_leads:
+                portals = {}
+                for rl in removed_leads:
+                    portals[rl['portal']] = portals.get(rl['portal'], 0) + 1
+                msg += "\n\nBy portal: " + ", ".join(f"{p}: {c}" for p, c in portals.items())
+            send_telegram(msg)
+
+        return results
 
     def close(self):
         """Close database connection."""
@@ -333,16 +424,7 @@ class ListingChecker:
 
 
 def check_removed_listings(limit: int = 50, portal: Optional[str] = None) -> Dict:
-    """
-    Convenience function to check listings and mark removed ones.
-
-    Args:
-        limit: Maximum number of leads to check
-        portal: Filter by portal (optional)
-
-    Returns:
-        Results dictionary with stats and removed leads
-    """
+    """Convenience function to check listings and mark removed ones."""
     with ListingChecker() as checker:
         return checker.check_leads(limit=limit, portal=portal, mark_removed=True)
 
@@ -355,30 +437,29 @@ if __name__ == '__main__':
 
     import argparse
     parser = argparse.ArgumentParser(description='Check if listings are still active')
-    parser.add_argument('--limit', type=int, default=50, help='Max leads to check')
+    parser.add_argument('--limit', type=int, default=200, help='Max leads to check')
     parser.add_argument('--portal', type=str, help='Filter by portal')
+    parser.add_argument('--all-portals', action='store_true', help='Check all portals (including anti-bot)')
     parser.add_argument('--dry-run', action='store_true', help='Do not update database')
+    parser.add_argument('--no-notify', action='store_true', help='Skip Telegram notification')
     args = parser.parse_args()
 
-    results = check_removed_listings(
-        limit=args.limit,
-        portal=args.portal,
-    ) if not args.dry_run else None
-
-    if args.dry_run:
-        with ListingChecker() as checker:
-            results = checker.check_leads(
-                limit=args.limit,
-                portal=args.portal,
-                mark_removed=False,
-            )
+    with ListingChecker() as checker:
+        results = checker.check_leads(
+            limit=args.limit,
+            portal=args.portal,
+            mark_removed=not args.dry_run,
+            safe_only=not args.all_portals,
+            notify=not args.no_notify,
+        )
 
     print(f"\n=== Results ===")
     print(f"Checked: {results['stats']['checked']}")
     print(f"Active: {results['stats']['active']}")
     print(f"Removed: {results['stats']['removed']}")
+    print(f"Errors: {results['stats']['errors']}")
 
     if results['removed_leads']:
         print(f"\nRemoved listings:")
         for lead in results['removed_leads']:
-            print(f"  - {lead['lead_id']} ({lead['portal']}): {lead['reason']}")
+            print(f"  - {lead['lead_id'][:12]}... ({lead['portal']}): {lead['reason']}")

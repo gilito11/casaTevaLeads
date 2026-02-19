@@ -544,11 +544,11 @@ class CamoufoxIdealista:
             anuncio_id = id_match.group(1)
 
             # Check if professional (agency) - heuristic from listing HTML
-            # Note: This is not 100% accurate, final filtering done in dbt
+            # Only check for specific agency indicators (logo/branding elements)
+            # Avoid broad 'professional' text match — idealista HTML contains it in generic attrs
             item_html = item.inner_html()
             is_professional = (
                 'logo-branding' in item_html or
-                'professional' in item_html.lower() or
                 'item-not-clickable-logo' in item_html
             )
 

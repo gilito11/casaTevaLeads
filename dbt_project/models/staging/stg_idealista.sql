@@ -224,33 +224,34 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
-        -- Filter for particular (non-agency) listings only
-        -- Note: Use COALESCE to treat NULL as TRUE (assume particular if not specified)
-        -- The scraper already filters agencies, this is a backup
-        AND COALESCE(es_particular, TRUE) = TRUE
-        -- Filter out listings that reject agencies (they're looking for direct buyers)
+        -- Don't hard-filter on es_particular — the scraper heuristic is unreliable
+        -- because idealista changes HTML frequently. Instead, filter by vendor name patterns.
+        -- Filter out agency names in vendedor/anunciante field
+        AND NOT (
+            LOWER(COALESCE(vendedor, '')) LIKE '%inmobiliaria%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%inmuebles%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%agencia%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%agency%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%fincas%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%gestoria%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%grupo%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% s.l.%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% sl%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% s.a.%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%real estate%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%properties%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%servicios inmobiliarios%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%consulting%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%costa dorada%'
+            OR vendedor = 'Profesional'
+        )
+        -- Filter out listings that reject agencies (looking for direct buyers only)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%abstener%inmobiliaria%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no agencia%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no inmobiliaria%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%sin intermediario%'
-        )
-        -- Filter out agency listings disguised as particulars (they advertise "no agency fees")
-        AND NOT (
-            LOWER(COALESCE(descripcion, '')) LIKE '%sin comision%agencia%'
-            OR LOWER(COALESCE(descripcion, '')) LIKE '%sin comisiones de agencia%'
-            OR LOWER(COALESCE(descripcion, '')) LIKE '%0% comision%'
-            OR LOWER(COALESCE(descripcion, '')) LIKE '%cero comision%'
-        )
-        -- Filter out agency names in vendedor/anunciante field
-        AND NOT (
-            LOWER(COALESCE(vendedor, '')) LIKE '%inmobiliaria%'
-            OR LOWER(COALESCE(vendedor, '')) LIKE '%agencia%'
-            OR LOWER(COALESCE(vendedor, '')) LIKE '%agency%'
-            OR LOWER(COALESCE(vendedor, '')) LIKE '%fincas%'
-            OR LOWER(COALESCE(vendedor, '')) LIKE '%gestoria%'
-            OR vendedor = 'Profesional'
         )
 )
 

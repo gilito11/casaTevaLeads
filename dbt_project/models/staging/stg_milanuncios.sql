@@ -244,6 +244,27 @@ final AS (
             OR LOWER(COALESCE(vendedor, '')) LIKE '%real estate%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%properties%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%servicios inmobiliarios%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%consulting%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%costa dorada%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%gestoria%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%asesores%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%inversiones%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%patrimonio%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%soluciones%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%realty%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%pisos.com%'
+        )
+        -- Filter out agencies by nombre_contacto patterns too
+        AND NOT (
+            LOWER(COALESCE(nombre, '')) LIKE '%inmobiliaria%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '%inmuebles%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '%fincas%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '%agencia%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '% s.l.%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '% s.a.%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '%real estate%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '%costa dorada%'
+            OR LOWER(COALESCE(nombre, '')) LIKE '%realty%'
         )
         -- Filter out listings with empty descriptions (just "Ref: NNN")
         -- These are almost always professional listings where full description wasn't extracted
