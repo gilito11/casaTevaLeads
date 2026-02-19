@@ -132,4 +132,19 @@
         {% include 'leads/partials/lead_table.html' %}
     </div>
 </div>
+
+<script>
+// Restore filters and table when browser back/forward is pressed
+window.addEventListener('popstate', function() {
+    var params = new URLSearchParams(window.location.search);
+    var form = document.querySelector('form[hx-get]');
+    if (!form) return;
+    // Update form inputs to match URL params
+    form.querySelectorAll('input, select').forEach(function(el) {
+        if (el.name) el.value = params.get(el.name) || '';
+    });
+    // Re-fetch table with the restored URL params
+    htmx.ajax('GET', '{% url "leads:list" %}?' + params.toString(), '#leads-table-container');
+});
+</script>
 {% endblock %}
