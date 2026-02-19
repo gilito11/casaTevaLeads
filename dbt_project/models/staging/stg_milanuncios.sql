@@ -256,15 +256,15 @@ final AS (
         )
         -- Filter out agencies by nombre_contacto patterns too
         AND NOT (
-            LOWER(COALESCE(nombre, '')) LIKE '%inmobiliaria%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '%inmuebles%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '%fincas%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '%agencia%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '% s.l.%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '% s.a.%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '%real estate%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '%costa dorada%'
-            OR LOWER(COALESCE(nombre, '')) LIKE '%realty%'
+            LOWER(COALESCE(nombre_contacto, '')) LIKE '%inmobiliaria%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%inmuebles%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%fincas%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%agencia%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '% s.l.%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '% s.a.%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%real estate%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%costa dorada%'
+            OR LOWER(COALESCE(nombre_contacto, '')) LIKE '%realty%'
         )
         -- Filter out listings with empty descriptions (just "Ref: NNN")
         -- These are almost always professional listings where full description wasn't extracted
