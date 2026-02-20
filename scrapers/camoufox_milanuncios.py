@@ -597,6 +597,7 @@ class CamoufoxMilanuncios:
                 'zona_busqueda': zona_key,
                 'url_anuncio': f"{self.BASE_URL}{href}" if href.startswith('/') else href,
                 'es_particular': not is_professional,
+                'seller_type': 'professional' if is_professional else 'particular',
                 'tipo_inmueble': 'piso',
                 'fotos': [],
             }

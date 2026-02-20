@@ -132,7 +132,7 @@ jobs:
           EOF
           dbt deps --profiles-dir /tmp/dbt_profiles || true
           dbt run --select staging --profiles-dir /tmp/dbt_profiles
-          dbt run --select marts --profiles-dir /tmp/dbt_profiles
+          dbt run --select marts --full-refresh --profiles-dir /tmp/dbt_profiles
         env:
           DBT_PASSWORD: ${{ secrets.NEON_DB_PASSWORD }}
 
