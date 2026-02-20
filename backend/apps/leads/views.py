@@ -40,8 +40,6 @@ def lead_list_view(request):
 
     # Base queryset - exclude profesional/agency leads
     leads_qs = Lead.objects.exclude(es_particular=False)
-    # Exclude milanuncios until re-scraped with seller_type fix
-    leads_qs = leads_qs.exclude(portal='milanuncios')
     if tenant_id:
         leads_qs = leads_qs.filter(tenant_id=tenant_id)
 
