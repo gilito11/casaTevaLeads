@@ -42,7 +42,7 @@ extracted AS (
         raw_data->>'codigo_postal' AS codigo_postal,
         COALESCE(raw_data->>'telefono', raw_data->>'telefono_norm') AS telefono_raw,
         raw_data->>'email' AS email,
-        COALESCE(raw_data->>'vendedor', raw_data->>'nombre', 'Particular') AS vendedor,
+        COALESCE(NULLIF(TRIM(raw_data->>'vendedor'), ''), NULLIF(TRIM(raw_data->>'nombre'), '')) AS vendedor,
         COALESCE(raw_data->>'metros', (raw_data->'metros')::TEXT) AS metros_text,
         COALESCE(raw_data->>'habitaciones', (raw_data->'habitaciones')::TEXT) AS habitaciones_text,
         COALESCE(raw_data->>'banos', (raw_data->'banos')::TEXT) AS banos_text,
@@ -213,8 +213,8 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
-        -- Don't hard-filter on es_particular — scraper heuristic can be unreliable
-        -- Name-based vendor patterns below are more effective
+        -- Hard filter: only particular sellers (scraper + JSON detection improved in session 7)
+        AND es_particular = TRUE
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
@@ -234,28 +234,43 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%solo particulares%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%sólo particulares%'
         )
-        -- Filter out agencies by seller name patterns
+        -- Filter out agencies by seller name patterns (belt + suspenders with es_particular)
         AND NOT (
             LOWER(COALESCE(vendedor, '')) LIKE '%inmobiliaria%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%inmuebles%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%fincas%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%agencia%'
-            OR LOWER(COALESCE(vendedor, '')) LIKE '%grupo%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%grupo %'
             OR LOWER(COALESCE(vendedor, '')) LIKE '% s.l.%'
-            OR LOWER(COALESCE(vendedor, '')) LIKE '% sl%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% s.l%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% sl %'
             OR LOWER(COALESCE(vendedor, '')) LIKE '% s.a.%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%real estate%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%properties%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%servicios inmobiliarios%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%consulting%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%consultora%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%costa dorada%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%gestoria%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%gestión%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%gestion %'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%asesores%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%asesoría%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%inversiones%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%patrimonio%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%soluciones%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%realty%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%pisos.com%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%habitaclia%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%fotocasa%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%idealista%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%promotora%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%promociones%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%propiedad%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%homes%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%api %'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%administracion%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%administración%'
         )
         -- Note: nombre_contacto = vendedor in this model, so vendor filter above covers both
         -- Filter out listings with empty descriptions (just "Ref: NNN")

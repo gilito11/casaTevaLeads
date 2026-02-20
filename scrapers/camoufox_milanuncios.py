@@ -649,7 +649,54 @@ class CamoufoxMilanuncios:
             page.mouse.wheel(0, random.randint(200, 400))
             self._human_delay(1, 2)
 
-            # Verify seller type from detail page
+            # Verify seller type from detail page JSON first (most reliable)
+            try:
+                seller_info = page.evaluate("""
+                    () => {
+                        try {
+                            let ad = null;
+                            if (window.__INITIAL_PROPS__) {
+                                const p = window.__INITIAL_PROPS__;
+                                ad = p.adDetail || p.ad || p;
+                            }
+                            if (!ad && window.__NEXT_DATA__ && window.__NEXT_DATA__.props) {
+                                const pp = window.__NEXT_DATA__.props.pageProps;
+                                ad = pp && (pp.ad || pp.adDetail);
+                            }
+                            if (ad) {
+                                return {
+                                    sellerType: ad.sellerType || ad.seller_type || '',
+                                    userType: ad.userType || ad.user_type || '',
+                                    sellerBadge: ad.sellerBadge || ad.seller_badge || '',
+                                    sellerName: (ad.seller && ad.seller.name) || ad.sellerName || ad.advertiserName || '',
+                                    isPro: ad.isProfessional || ad.is_professional || false,
+                                };
+                            }
+                        } catch(e) {}
+                        return null;
+                    }
+                """)
+                if seller_info:
+                    st = str(seller_info.get('sellerType', '')).lower()
+                    ut = str(seller_info.get('userType', '')).lower()
+                    sb = str(seller_info.get('sellerBadge', '')).lower()
+                    sn = seller_info.get('sellerName', '')
+                    is_pro_json = seller_info.get('isPro', False)
+
+                    if st == 'professional' or ut == 'professional' or 'pro' in sb or is_pro_json:
+                        listing['es_particular'] = False
+                        listing['seller_type'] = 'professional'
+                        if sn:
+                            listing['vendedor'] = sn
+                        logger.info(f"Detail JSON: professional detected (type={st}, user={ut}, badge={sb}) - {listing.get('anuncio_id')}")
+                    elif sn:
+                        listing['vendedor'] = sn
+                        if not listing.get('seller_type'):
+                            listing['seller_type'] = st or 'particular'
+            except:
+                pass
+
+            # Verify seller type from DOM selectors (fallback)
             try:
                 seller_selectors = [
                     '[class*="SellerBadge"]', '[class*="seller-badge"]',
@@ -669,19 +716,36 @@ class CamoufoxMilanuncios:
                                 pro_keywords = [
                                     'profesional', 'professional', 'inmobiliaria',
                                     'agencia', 'real estate', 'properties',
-                                    ' s.l.', ' sl', ' s.a.',
+                                    ' s.l.', ' sl', ' s.a.', ' s.l',
+                                    'consulting', 'gestoria', 'asesores',
+                                    'inversiones', 'patrimonio', 'realty',
+                                    'soluciones', 'servicios', 'pisos.com',
+                                    'habitaclia', 'fotocasa', 'idealista',
                                 ]
                                 if any(w in seller_lower for w in pro_keywords):
                                     listing['es_particular'] = False
+                                    listing['seller_type'] = 'professional'
                                     listing['vendedor'] = seller_text
-                                    logger.info(f"Detail page: professional detected '{seller_text}' - {listing.get('anuncio_id')}")
+                                    logger.info(f"Detail DOM: professional detected '{seller_text}' - {listing.get('anuncio_id')}")
                                     break
                     except:
                         continue
-                if seller_name and listing.get('es_particular', True):
+                if seller_name and listing.get('es_particular', True) and not listing.get('vendedor'):
                     listing['vendedor'] = seller_name
             except:
                 pass
+
+            # Final check: regex scan page HTML for sellerType in any JSON blob
+            if listing.get('es_particular', True):
+                try:
+                    content = page.content()
+                    seller_match = re.search(r'"sellerType"\s*:\s*"(professional)"', content, re.IGNORECASE)
+                    if seller_match:
+                        listing['es_particular'] = False
+                        listing['seller_type'] = 'professional'
+                        logger.info(f"Detail regex: professional found in HTML - {listing.get('anuncio_id')}")
+                except:
+                    pass
 
             # Try to get phone via button click
             try:
