@@ -99,10 +99,15 @@ normalized AS (
             AS INTEGER
         ) AS banos,
 
-        -- Use es_particular from scraper, with seller_type as fallback
+        -- Use seller_type as primary signal, es_particular as secondary
+        -- Conservative: if seller_type is missing/empty, default to FALSE (professional)
+        -- Only trust es_particular=TRUE when seller_type explicitly confirms 'particular'
         CASE
             WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'professional' THEN FALSE
-            ELSE COALESCE((raw_data->>'es_particular')::BOOLEAN, TRUE)
+            WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'particular' THEN TRUE
+            WHEN (raw_data->>'es_particular')::BOOLEAN = FALSE THEN FALSE
+            -- seller_type unknown + es_particular not explicitly FALSE = suspect, default FALSE
+            ELSE FALSE
         END AS es_particular,
         TRUE AS permite_inmobiliarias
 

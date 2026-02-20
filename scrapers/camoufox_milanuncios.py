@@ -475,7 +475,7 @@ class CamoufoxMilanuncios:
                     'zona_busqueda': zona_key,
                     'url_anuncio': url_anuncio,
                     'es_particular': not is_professional,
-                    'seller_type': seller_type,
+                    'seller_type': seller_type or ('particular' if not is_professional else 'professional'),
                     'tipo_inmueble': 'piso',
                     'fotos': fotos,
                 }
