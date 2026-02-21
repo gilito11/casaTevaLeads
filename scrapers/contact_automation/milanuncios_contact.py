@@ -177,7 +177,7 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
     async def login(self, email: str = None, password: str = None) -> bool:
-        """Login to Milanuncios (two-step flow: email → Continuar → password → Iniciar sesion)."""
+        """Login to Milanuncios by clicking 'Acceder' on homepage, then email → password flow."""
         email = email or self.email
         password = password or self.password
 
@@ -186,24 +186,49 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
         try:
-            logger.info("Navigating to Milanuncios login page...")
-            await self.page.goto(self.LOGIN_URL, wait_until='domcontentloaded', timeout=30000)
+            # Go to homepage (is_logged_in already navigated here)
+            current_url = self.page.url
+            if 'milanuncios.com' not in current_url:
+                logger.info("Navigating to Milanuncios homepage...")
+                await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=30000)
+                await asyncio.sleep(5)
+                await self.accept_cookies()
+                await asyncio.sleep(2)
+
+            # Click "Acceder" / "Entrar" / login link on homepage
+            logger.info("Looking for login link on homepage...")
+            login_link = None
+            login_selectors = [
+                'a:has-text("Acceder")',
+                'a:has-text("Entrar")',
+                'a:has-text("Iniciar sesión")',
+                'button:has-text("Acceder")',
+                'button:has-text("Entrar")',
+                '[class*="login"] a',
+                '[class*="Login"] a',
+                '[data-testid*="login"]',
+                'a[href*="login"]',
+                'a[href*="acceder"]',
+            ]
+            for selector in login_selectors:
+                try:
+                    login_link = await self.page.wait_for_selector(selector, timeout=3000)
+                    if login_link:
+                        logger.info(f"Found login link: {selector}")
+                        break
+                except:
+                    continue
+
+            if not login_link:
+                logger.error("Could not find login link on homepage")
+                return False
+
+            await login_link.click()
+            logger.info(f"Clicked login link, waiting for login form...")
             await asyncio.sleep(5)
 
-            # Accept cookies (OneTrust)
-            await self.accept_cookies()
-            await asyncio.sleep(2)
-
-            page_content = await self.page.content()
-            logger.info(f"Login page loaded: {len(page_content)} bytes, URL: {self.page.url}")
-
-            # Wait for React to render the login form
-            if 'input' not in page_content.lower():
-                logger.info("Waiting for React SPA to render...")
-                await asyncio.sleep(8)
-                page_content = await self.page.content()
-                input_count = await self.page.evaluate("() => document.querySelectorAll('input').length")
-                logger.info(f"After wait: {len(page_content)} bytes, {input_count} inputs")
+            # Log current URL to understand the login flow
+            logger.info(f"After click URL: {self.page.url}")
 
             # --- STEP 1: Email ---
             logger.info("Step 1: Filling email...")
@@ -214,15 +239,12 @@ class MilanunciosContact(BaseContactAutomation):
                 '#email',
                 'input[placeholder*="mail"]',
                 'input[placeholder*="correo"]',
-                'input.sui-AtomInput-input',
-                'input[type="text"]',
                 'input[autocomplete="email"]',
                 'input[autocomplete="username"]',
-                'input',
             ]
             for selector in email_selectors:
                 try:
-                    email_input = await self.page.wait_for_selector(selector, timeout=3000)
+                    email_input = await self.page.wait_for_selector(selector, timeout=5000)
                     if email_input:
                         logger.info(f"Found email input: {selector}")
                         break
@@ -230,9 +252,16 @@ class MilanunciosContact(BaseContactAutomation):
                     continue
 
             if not email_input:
-                logger.error("Could not find email input field")
-                dom_count = await self.page.evaluate("() => document.querySelectorAll('*').length")
-                logger.error(f"DOM elements: {dom_count}, page size: {len(page_content)} bytes")
+                # Log what inputs exist for debugging
+                input_count = await self.page.evaluate("() => document.querySelectorAll('input').length")
+                logger.error(f"No email input found. Total inputs: {input_count}, URL: {self.page.url}")
+                if input_count > 0:
+                    input_info = await self.page.evaluate("""() => {
+                        return Array.from(document.querySelectorAll('input')).map(i => ({
+                            type: i.type, name: i.name, id: i.id, placeholder: i.placeholder
+                        }))
+                    }""")
+                    logger.info(f"Available inputs: {input_info}")
                 return False
 
             await email_input.fill(email)
@@ -242,7 +271,7 @@ class MilanunciosContact(BaseContactAutomation):
             logger.info("Clicking Continuar...")
             continue_btn = None
             for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
-                             'button:has-text("Siguiente")']:
+                             'button:has-text("Siguiente")', 'button:has-text("Next")']:
                 try:
                     continue_btn = await self.page.wait_for_selector(selector, timeout=5000)
                     if continue_btn:
@@ -256,6 +285,7 @@ class MilanunciosContact(BaseContactAutomation):
                 await email_input.press('Enter')
 
             await asyncio.sleep(3)
+            logger.info(f"After Continuar URL: {self.page.url}")
 
             # --- STEP 2: Password ---
             logger.info("Step 2: Filling password...")
@@ -269,7 +299,7 @@ class MilanunciosContact(BaseContactAutomation):
                     continue
 
             if not password_input:
-                logger.error("Could not find password input field (step 2)")
+                logger.error(f"Could not find password input. URL: {self.page.url}")
                 return False
 
             await password_input.fill(password)
@@ -279,7 +309,8 @@ class MilanunciosContact(BaseContactAutomation):
             logger.info("Submitting login...")
             submit_btn = None
             for selector in ['button:has-text("Iniciar")', 'button:has-text("Entrar")',
-                             'button:has-text("Acceder")', 'button[type="submit"]']:
+                             'button:has-text("Acceder")', 'button:has-text("Log in")',
+                             'button[type="submit"]']:
                 try:
                     submit_btn = await self.page.wait_for_selector(selector, timeout=5000)
                     if submit_btn:
@@ -293,6 +324,7 @@ class MilanunciosContact(BaseContactAutomation):
                 await password_input.press('Enter')
 
             await asyncio.sleep(5)
+            logger.info(f"After login URL: {self.page.url}")
 
             # Verify login
             if await self.is_logged_in():
