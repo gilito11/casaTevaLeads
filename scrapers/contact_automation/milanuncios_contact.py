@@ -178,8 +178,29 @@ class MilanunciosContact(BaseContactAutomation):
                 return True
             return False
 
+    async def _find_login_page(self) -> 'Page':
+        """Find the page containing the login form (could be popup, redirect, or current page)."""
+        # Check all open pages for login-related URLs or forms
+        for page in self.context.pages:
+            url = page.url.lower()
+            if any(x in url for x in ['login', 'schibsted', 'authn', 'auth', 'acceso', 'registro']):
+                logger.info(f"Found login page: {page.url[:80]}")
+                return page
+            # Check if page has email input (not search)
+            try:
+                has_login = await page.evaluate("""() => {
+                    const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[autocomplete="email"]');
+                    return inputs.length > 0;
+                }""")
+                if has_login:
+                    logger.info(f"Found page with email input: {page.url[:80]}")
+                    return page
+            except:
+                continue
+        return self.page
+
     async def login(self, email: str = None, password: str = None) -> bool:
-        """Login to Milanuncios by clicking login button, then email → password flow."""
+        """Login to Milanuncios via Schibsted OAuth (popup or redirect flow)."""
         email = email or self.email
         password = password or self.password
 
@@ -188,72 +209,146 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
         try:
-            # Navigate fresh to homepage
-            logger.info("Navigating to Milanuncios homepage...")
-            await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=45000)
+            # --- METHOD 1: Navigate to /mis-anuncios/ which forces auth redirect ---
+            logger.info("Method 1: Navigating to /mis-anuncios/ to trigger auth redirect...")
+            await self.page.goto(f"{self.BASE_URL}/mis-anuncios/", wait_until='domcontentloaded', timeout=45000)
             await asyncio.sleep(5)
-            await self.accept_cookies()
-            await asyncio.sleep(2)
 
-            # Count inputs BEFORE clicking login (to detect new ones after)
-            inputs_before = await self.page.evaluate("() => document.querySelectorAll('input').length")
-            logger.info(f"Inputs before login click: {inputs_before}")
+            current_url = self.page.url
+            logger.info(f"After /mis-anuncios/ URL: {current_url}")
 
-            # Listen for popup/new tab
-            self._popup_page = None
-            self.context.on("page", lambda page: setattr(self, '_popup_page', page))
+            # Check if we got redirected to a login page
+            target_page = await self._find_login_page()
+            has_email_input = False
+            try:
+                has_email_input = await target_page.evaluate("""() => {
+                    const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="password"]');
+                    return inputs.length > 0;
+                }""")
+            except:
+                pass
 
-            # Find login button via JS, then use Playwright element_handle.click()
-            # (JS .click() doesn't trigger React; mouse.click() may miss; locator can't find SUI buttons)
-            logger.info("Clicking login button...")
-            btn_handle = await self.page.evaluate_handle("""() => {
-                const buttons = document.querySelectorAll('button, a, [role="button"]');
-                for (const btn of buttons) {
-                    const text = (btn.textContent || '').trim();
-                    if (/iniciar sesi|acceder|^entrar$/i.test(text)) {
-                        return btn;
-                    }
-                }
-                return null;
-            }""")
-            btn_element = btn_handle.as_element()
-            if not btn_element:
-                logger.error("Could not find login button on homepage")
+            if not has_email_input:
+                # --- METHOD 2: Click login button and catch popup ---
+                logger.info("Method 2: Click login button + catch popup...")
+                await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=45000)
+                await asyncio.sleep(5)
+                await self.accept_cookies()
+                await asyncio.sleep(2)
+
+                # Log all navigation/popup activity
+                auth_urls = []
+
+                def on_request(request):
+                    url = request.url
+                    if any(x in url for x in ['login', 'schibsted', 'authn', 'oauth', 'authorize']):
+                        auth_urls.append(url)
+                        logger.info(f"Auth request detected: {url[:100]}")
+
+                self.page.on('request', on_request)
+
+                # Try to catch popup
+                login_popup = None
+                try:
+                    async with self.context.expect_page(timeout=10000) as popup_info:
+                        # Click the login button via JS (find + click with coordinates)
+                        btn_info = await self.page.evaluate("""() => {
+                            const buttons = document.querySelectorAll('button, a, [role="button"]');
+                            for (const btn of buttons) {
+                                const text = (btn.textContent || '').trim();
+                                if (/iniciar sesi|acceder|^entrar$/i.test(text)) {
+                                    return { text, x: btn.getBoundingClientRect().x + btn.getBoundingClientRect().width / 2,
+                                             y: btn.getBoundingClientRect().y + btn.getBoundingClientRect().height / 2 };
+                                }
+                            }
+                            return null;
+                        }""")
+
+                        if btn_info:
+                            logger.info(f"Clicking '{btn_info['text']}' at ({btn_info['x']:.0f}, {btn_info['y']:.0f})")
+                            await self.page.mouse.click(btn_info['x'], btn_info['y'])
+                        else:
+                            logger.error("Login button not found on homepage")
+                            return False
+
+                    login_popup = await popup_info.value
+                    logger.info(f"Popup opened: {login_popup.url[:100]}")
+                    await login_popup.wait_for_load_state('domcontentloaded')
+                    await asyncio.sleep(3)
+                    target_page = login_popup
+                except Exception as popup_err:
+                    logger.info(f"No popup detected ({popup_err}), checking redirect...")
+                    await asyncio.sleep(3)
+
+                    # Check if current page navigated
+                    logger.info(f"After click URL: {self.page.url}")
+
+                    # Check if any auth URLs were captured
+                    if auth_urls:
+                        logger.info(f"Captured auth URLs: {auth_urls}")
+                        # Navigate to the auth URL directly
+                        await self.page.goto(auth_urls[0], wait_until='domcontentloaded', timeout=30000)
+                        await asyncio.sleep(3)
+
+                    target_page = await self._find_login_page()
+
+                self.page.remove_listener('request', on_request)
+
+                # Final check: do we have a login form?
+                try:
+                    has_email_input = await target_page.evaluate("""() => {
+                        const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="password"]');
+                        return inputs.length > 0;
+                    }""")
+                except:
+                    has_email_input = False
+
+            if not has_email_input:
+                # --- METHOD 3: Try direct Schibsted login URL pattern ---
+                logger.info("Method 3: Trying direct Schibsted login URLs...")
+                schibsted_urls = [
+                    "https://www.milanuncios.com/registro",
+                    "https://login.schibsted.com/authn/identifier",
+                ]
+                for url in schibsted_urls:
+                    try:
+                        await self.page.goto(url, wait_until='domcontentloaded', timeout=15000)
+                        await asyncio.sleep(3)
+                        has_email_input = await self.page.evaluate("""() => {
+                            const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="text"]');
+                            return inputs.length > 0;
+                        }""")
+                        if has_email_input:
+                            target_page = self.page
+                            logger.info(f"Found login form at {url}")
+                            break
+                    except:
+                        continue
+
+            if not has_email_input:
+                # Debug: dump page info
+                page_info = await target_page.evaluate("""() => ({
+                    url: location.href,
+                    title: document.title,
+                    inputs: Array.from(document.querySelectorAll('input')).map(i => ({
+                        type: i.type, name: i.name, id: i.id,
+                        placeholder: i.placeholder,
+                    })),
+                    bodyLen: document.body.innerHTML.length,
+                    pages: 'N/A',
+                })""")
+                logger.error(f"No login form found after all methods. Page info: {json.dumps(page_info, indent=2)}")
                 return False
 
-            btn_text = await btn_element.text_content()
-            logger.info(f"Found login button: '{btn_text.strip()}'")
+            # --- FILL LOGIN FORM ---
+            logger.info(f"Login form found on: {target_page.url[:80]}")
+            await self.accept_cookies()
 
-            # Scroll button into view and force click (skip actionability checks)
-            await btn_element.scroll_into_view_if_needed()
-            await asyncio.sleep(1)
-            await btn_element.click(force=True, timeout=10000)
-            logger.info("Clicked login button via element handle")
-
-            # Wait for login form to appear
-            await asyncio.sleep(5)
-            logger.info(f"After login click URL: {self.page.url}")
-
-            # Check if a popup opened (Schibsted/Adevinta shared auth)
-            target_page = self.page
-            all_pages = self.context.pages
-            if len(all_pages) > 1:
-                target_page = all_pages[-1]
-                logger.info(f"Login opened in new page: {target_page.url[:80]}")
-                await asyncio.sleep(3)
-            elif self._popup_page:
-                target_page = self._popup_page
-                logger.info(f"Login popup: {target_page.url[:80]}")
-                await asyncio.sleep(3)
-
-            # --- STEP 1: Email ---
-            logger.info("Step 1: Looking for email input...")
-
-            # Wait for a new email input (not the search bar)
+            # Step 1: Email
+            logger.info("Step 1: Filling email...")
             email_input = None
-
-            # First try: wait for email-specific input to appear
-            for selector in ['input[type="email"]', 'input[name="email"]', 'input[autocomplete="email"]']:
+            for selector in ['input[type="email"]', 'input[name="email"]', 'input[autocomplete="email"]',
+                             'input[type="text"]:not([id*="search"]):not([id*="suggester"])']:
                 try:
                     email_input = await target_page.wait_for_selector(selector, timeout=5000)
                     if email_input:
@@ -263,63 +358,17 @@ class MilanunciosContact(BaseContactAutomation):
                     continue
 
             if not email_input:
-                # Check if new inputs appeared (login modal with text input)
-                inputs_after = await target_page.evaluate("() => document.querySelectorAll('input').length")
-                logger.info(f"Inputs after click: {inputs_after} (was {inputs_before})")
-
-                # Find the NEW input (not the search bars)
-                email_input_handle = await target_page.evaluate_handle("""() => {
-                    // Look for input inside a login-related container
-                    const loginContainers = [
-                        ...document.querySelectorAll('[class*="Login"], [class*="login"], [class*="Auth"], [class*="auth"]'),
-                        ...document.querySelectorAll('[class*="FormLogin"], [class*="FormEmail"]'),
-                    ];
-                    for (const container of loginContainers) {
-                        const input = container.querySelector('input');
-                        if (input) return input;
-                    }
-
-                    // Look for inputs that are NOT search bars
-                    const allInputs = document.querySelectorAll('input');
-                    for (const input of allInputs) {
-                        const id = input.id || '';
-                        const placeholder = (input.placeholder || '').toLowerCase();
-                        const name = input.name || '';
-                        // Skip search bars
-                        if (id.includes('search') || id.includes('suggester')
-                            || placeholder.includes('buscando') || placeholder.includes('buscar')
-                            || input.type === 'search') continue;
-                        // This might be the login input
-                        if (input.type === 'email' || input.type === 'text') return input;
-                    }
-                    return null;
-                }""")
-                if email_input_handle:
-                    email_input = email_input_handle.as_element()
-                    if email_input:
-                        logger.info("Found non-search input via JS")
-
-            if not email_input:
-                # Debug: dump all inputs
-                input_info = await target_page.evaluate("""() => {
-                    return Array.from(document.querySelectorAll('input')).map(i => ({
-                        type: i.type, name: i.name, id: i.id,
-                        placeholder: i.placeholder, class: i.className.substring(0, 50)
-                    }))
-                }""")
-                logger.error(f"No email input found. Inputs: {input_info}")
-                logger.error(f"URL: {target_page.url}")
+                logger.error("Email input not found on login page")
                 return False
 
             await email_input.fill(email)
             logger.info("Email filled")
             await asyncio.sleep(1)
 
-            # Click "Continuar"
-            logger.info("Clicking Continuar...")
+            # Click "Continuar" / submit
             continue_btn = None
             for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
-                             'button:has-text("Siguiente")']:
+                             'button:has-text("Siguiente")', 'button:has-text("Continue")']:
                 try:
                     continue_btn = await target_page.wait_for_selector(selector, timeout=5000)
                     if continue_btn:
@@ -333,21 +382,28 @@ class MilanunciosContact(BaseContactAutomation):
                 await email_input.press('Enter')
 
             await asyncio.sleep(3)
-            logger.info(f"After Continuar URL: {target_page.url}")
+            logger.info(f"After email submit URL: {target_page.url}")
 
-            # --- STEP 2: Password ---
+            # Step 2: Password (may appear on same page or new page)
             logger.info("Step 2: Filling password...")
             password_input = None
-            for selector in ['input[type="password"]', 'input[name="password"]', '#password']:
-                try:
-                    password_input = await target_page.wait_for_selector(selector, timeout=10000)
-                    if password_input:
-                        break
-                except:
-                    continue
+            # Check current page and any new pages
+            pages_to_check = [target_page] + [p for p in self.context.pages if p != target_page]
+            for p in pages_to_check:
+                for selector in ['input[type="password"]', 'input[name="password"]', '#password']:
+                    try:
+                        password_input = await p.wait_for_selector(selector, timeout=8000)
+                        if password_input:
+                            target_page = p
+                            logger.info(f"Found password input on {p.url[:60]}")
+                            break
+                    except:
+                        continue
+                if password_input:
+                    break
 
             if not password_input:
-                logger.error(f"Could not find password input. URL: {target_page.url}")
+                logger.error(f"Password input not found. URL: {target_page.url}")
                 return False
 
             await password_input.fill(password)
@@ -358,7 +414,7 @@ class MilanunciosContact(BaseContactAutomation):
             submit_btn = None
             for selector in ['button:has-text("Iniciar")', 'button:has-text("Entrar")',
                              'button:has-text("Acceder")', 'button:has-text("Log in")',
-                             'button[type="submit"]']:
+                             'button[type="submit"]', 'button:has-text("Continue")']:
                 try:
                     submit_btn = await target_page.wait_for_selector(selector, timeout=5000)
                     if submit_btn:
@@ -371,8 +427,13 @@ class MilanunciosContact(BaseContactAutomation):
             else:
                 await password_input.press('Enter')
 
-            await asyncio.sleep(5)
-            logger.info(f"After login URL: {self.page.url}")
+            # Wait for redirect back to milanuncios
+            await asyncio.sleep(8)
+            logger.info(f"After login submit URL: {self.page.url}")
+
+            # If login was in popup, it might close and redirect the main page
+            for p in self.context.pages:
+                logger.info(f"Open page: {p.url[:80]}")
 
             # Verify login
             if await self.is_logged_in():
@@ -385,6 +446,8 @@ class MilanunciosContact(BaseContactAutomation):
 
         except Exception as e:
             logger.error(f"Login error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
 
     async def extract_phone(self, listing_url: str) -> Optional[str]:
