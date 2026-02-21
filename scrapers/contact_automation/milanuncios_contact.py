@@ -354,20 +354,94 @@ class MilanunciosContact(BaseContactAutomation):
 
             # --- FILL LOGIN FORM ---
             logger.info(f"Login form found on: {target_page.url[:80]}")
+
+            # Debug: dump all inputs on the login page
+            all_inputs = await target_page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('input')).map(i => ({
+                    type: i.type, name: i.name, id: i.id,
+                    placeholder: i.placeholder,
+                    class: (i.className || '').substring(0, 60),
+                    visible: i.offsetParent !== null,
+                    autoComplete: i.autocomplete,
+                }))
+            }""")
+            logger.info(f"Inputs on login page: {json.dumps(all_inputs)}")
+
+            # If on /registro, look for "Ya tienes cuenta" / "Iniciar sesión" link
+            if '/registro' in target_page.url:
+                logger.info("On registration page, looking for login link...")
+                login_link = await target_page.evaluate("""() => {
+                    const links = document.querySelectorAll('a, button');
+                    for (const el of links) {
+                        const text = (el.textContent || '').trim().toLowerCase();
+                        if (text.includes('ya tienes') || text.includes('iniciar sesi')
+                            || text.includes('inicia sesi') || text.includes('acceder')
+                            || text.includes('log in') || text.includes('entrar')) {
+                            return { text: el.textContent.trim(), href: el.href || '', tag: el.tagName };
+                        }
+                    }
+                    return null;
+                }""")
+                if login_link:
+                    logger.info(f"Found login link on registration page: {login_link}")
+                    if login_link.get('href'):
+                        await target_page.goto(login_link['href'], wait_until='networkidle', timeout=30000)
+                        await asyncio.sleep(3)
+                    else:
+                        # Click the element
+                        await target_page.evaluate("""(text) => {
+                            const links = document.querySelectorAll('a, button');
+                            for (const el of links) {
+                                if (el.textContent.trim().toLowerCase().includes(text)) {
+                                    el.click();
+                                    break;
+                                }
+                            }
+                        }""", login_link['text'].lower()[:20])
+                        await asyncio.sleep(3)
+                    logger.info(f"After login link click URL: {target_page.url}")
+
             await self.accept_cookies()
 
             # Step 1: Email
             logger.info("Step 1: Filling email...")
             email_input = None
+            # Try email-specific selectors first, then generic text input
             for selector in ['input[type="email"]', 'input[name="email"]', 'input[autocomplete="email"]',
-                             'input[type="text"]:not([id*="search"]):not([id*="suggester"])']:
+                             'input.sui-AtomInput-input', 'input[type="text"]']:
                 try:
                     email_input = await target_page.wait_for_selector(selector, timeout=5000)
                     if email_input:
+                        # Verify it's not a search input
+                        is_search = await email_input.evaluate("""(el) => {
+                            const id = el.id || '';
+                            const ph = (el.placeholder || '').toLowerCase();
+                            return id.includes('search') || id.includes('suggester')
+                                || ph.includes('buscando') || ph.includes('buscar');
+                        }""")
+                        if is_search:
+                            logger.info(f"Skipping search input: {selector}")
+                            email_input = None
+                            continue
                         logger.info(f"Found email input: {selector}")
                         break
                 except:
                     continue
+
+            if not email_input:
+                # Last resort: find any visible input
+                email_input_h = await target_page.evaluate_handle("""() => {
+                    const inputs = document.querySelectorAll('input');
+                    for (const inp of inputs) {
+                        if (inp.offsetParent && inp.type !== 'hidden' && inp.type !== 'search') {
+                            return inp;
+                        }
+                    }
+                    return null;
+                }""")
+                email_input = email_input_h.as_element() if email_input_h else None
+                if email_input:
+                    logger.info("Found input via last-resort visible scan")
 
             if not email_input:
                 logger.error("Email input not found on login page")
