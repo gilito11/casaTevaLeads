@@ -273,43 +273,48 @@ class MilanunciosContact(BaseContactAutomation):
 
             # --- STEP 1: Email ---
             logger.info("Step 1: Filling email...")
-            # Search for email input in target page and all frames
+
+            # Find input inside the login modal (sui-MoleculeModal / ma-FormHome)
             email_input = None
-            email_selectors = [
+            modal_selectors = [
+                '.sui-MoleculeModal input[type="email"]',
+                '.sui-MoleculeModal input[type="text"]',
+                '.sui-MoleculeModal input.sui-AtomInput-input',
+                '.sui-MoleculeModal input',
+                '.ma-FormHome input',
                 'input[type="email"]',
                 'input[name="email"]',
                 '#email',
-                'input[placeholder*="mail"]',
-                'input[placeholder*="correo"]',
-                'input[autocomplete="email"]',
-                'input[autocomplete="username"]',
             ]
-
-            search_targets = [target_page] + list(target_page.frames[1:])  # page + iframes
-            for target in search_targets:
-                for selector in email_selectors:
-                    try:
-                        email_input = await target.wait_for_selector(selector, timeout=3000)
-                        if email_input:
-                            logger.info(f"Found email input: {selector} in {target.url[:50]}")
-                            target_page = target  # Use this frame for remaining steps
-                            break
-                    except:
-                        continue
-                if email_input:
-                    break
+            for selector in modal_selectors:
+                try:
+                    email_input = await target_page.wait_for_selector(selector, timeout=3000)
+                    if email_input:
+                        logger.info(f"Found email input: {selector}")
+                        break
+                except:
+                    continue
 
             if not email_input:
-                # Log what inputs exist for debugging
+                # Fallback: find input via JS inside any visible modal
+                email_input_handle = await target_page.evaluate_handle("""() => {
+                    const modals = document.querySelectorAll('.sui-MoleculeModal, [role="dialog"]');
+                    for (const modal of modals) {
+                        if (modal.offsetParent !== null || modal.style.display !== 'none') {
+                            const input = modal.querySelector('input');
+                            if (input) return input;
+                        }
+                    }
+                    return null;
+                }""")
+                if email_input_handle:
+                    email_input = email_input_handle.as_element()
+                    if email_input:
+                        logger.info("Found email input via JS modal search")
+
+            if not email_input:
                 input_count = await target_page.evaluate("() => document.querySelectorAll('input').length")
-                logger.error(f"No email input found. Total inputs: {input_count}, URL: {target_page.url}")
-                if input_count > 0:
-                    input_info = await target_page.evaluate("""() => {
-                        return Array.from(document.querySelectorAll('input')).map(i => ({
-                            type: i.type, name: i.name, id: i.id, placeholder: i.placeholder
-                        }))
-                    }""")
-                    logger.info(f"Available inputs: {input_info}")
+                logger.error(f"No email input found. Total inputs: {input_count}")
                 return False
 
             await email_input.fill(email)
