@@ -195,69 +195,26 @@ class MilanunciosContact(BaseContactAutomation):
                 await self.accept_cookies()
                 await asyncio.sleep(2)
 
-            # Click "Acceder" / "Entrar" / login link on homepage
-            logger.info("Looking for login link on homepage...")
-            login_link = None
-            login_selectors = [
-                'a:has-text("Acceder")',
-                'a:has-text("Entrar")',
-                'a:has-text("Iniciar sesión")',
-                'button:has-text("Acceder")',
-                'button:has-text("Entrar")',
-                '[class*="login"] a',
-                '[class*="Login"] a',
-                '[data-testid*="login"]',
-                'a[href*="login"]',
-                'a[href*="acceder"]',
-            ]
-            for selector in login_selectors:
-                try:
-                    login_link = await self.page.wait_for_selector(selector, timeout=3000)
-                    if login_link:
-                        logger.info(f"Found login link: {selector}")
-                        break
-                except:
-                    continue
-
-            if not login_link:
-                # Debug: find what login-related elements exist
-                login_info = await self.page.evaluate("""() => {
-                    const results = [];
-                    // Find all links/buttons with login-related text
-                    const allElements = document.querySelectorAll('a, button, [role="button"]');
-                    for (const el of allElements) {
-                        const text = (el.textContent || '').trim().toLowerCase();
-                        const href = el.getAttribute('href') || '';
-                        if (text.includes('acceder') || text.includes('entrar') || text.includes('login')
-                            || text.includes('iniciar') || text.includes('registr')
-                            || href.includes('login') || href.includes('acceder')) {
-                            results.push({
-                                tag: el.tagName,
-                                text: (el.textContent || '').trim().substring(0, 50),
-                                href: href.substring(0, 80),
-                                class: (el.className || '').substring(0, 80),
-                                visible: el.offsetParent !== null,
-                                id: el.id || ''
-                            });
-                        }
+            # Click login button via JS (most reliable for SPA with SUI components)
+            logger.info("Looking for login button on homepage...")
+            clicked = await self.page.evaluate("""() => {
+                const buttons = document.querySelectorAll('button, a, [role="button"]');
+                for (const btn of buttons) {
+                    const text = (btn.textContent || '').trim().toLowerCase();
+                    if (text.includes('iniciar sesi') || text.includes('acceder')
+                        || text.includes('entrar') || text === 'login') {
+                        btn.click();
+                        return btn.textContent.trim();
                     }
-                    return results;
-                }""")
-                logger.info(f"Login-related elements found: {login_info}")
+                }
+                return null;
+            }""")
 
-                # Try clicking by text directly (may work even if selector doesn't match)
-                for text in ['Acceder', 'Entrar', 'Iniciar sesión', 'Inicia sesión']:
-                    try:
-                        await self.page.click(f'text="{text}"', timeout=3000)
-                        logger.info(f"Clicked via text='{text}'")
-                        login_link = True
-                        break
-                    except:
-                        continue
-
-            if not login_link:
-                logger.error("Could not find or click any login element")
+            if not clicked:
+                logger.error("Could not find login button on homepage")
                 return False
+
+            logger.info(f"Clicked login button: '{clicked}'")
 
             await login_link.click()
             logger.info(f"Clicked login link, waiting for login form...")
