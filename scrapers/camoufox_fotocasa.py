@@ -74,6 +74,9 @@ class CamoufoxFotocasa:
         logger.info(f"PostgreSQL connected: {config['host']}")
 
     def _human_delay(self, min_s=1, max_s=3):
+        env_min = float(os.environ.get('SCRAPER_MIN_DELAY', '0'))
+        min_s = max(min_s, env_min)
+        max_s = max(max_s, min_s)
         time.sleep(random.uniform(min_s, max_s))
 
     @staticmethod

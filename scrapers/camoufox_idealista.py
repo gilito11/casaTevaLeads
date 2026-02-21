@@ -239,6 +239,9 @@ class CamoufoxIdealista:
 
     def _human_delay(self, min_sec: float = 1.0, max_sec: float = 3.0):
         """Random delay to simulate human behavior."""
+        env_min = float(os.environ.get('SCRAPER_MIN_DELAY', '0'))
+        min_sec = max(min_sec, env_min)
+        max_sec = max(max_sec, min_sec)
         time.sleep(random.uniform(min_sec, max_sec))
 
     def _warmup_navigation(self, page, max_attempts: int = 3):

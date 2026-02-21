@@ -265,6 +265,9 @@ class CamoufoxMilanuncios:
         return None
 
     def _human_delay(self, min_sec: float = 2.0, max_sec: float = 5.0):
+        env_min = float(os.environ.get('SCRAPER_MIN_DELAY', '0'))
+        min_sec = max(min_sec, env_min)
+        max_sec = max(max_sec, min_sec)
         time.sleep(random.uniform(min_sec, max_sec))
 
     def _warmup_navigation(self, page):

@@ -77,17 +77,47 @@ def check_model_available(model: str = "llama3.2-vision") -> bool:
 
 
 def download_image(url: str) -> Optional[bytes]:
-    """Download image from URL and return as bytes."""
+    """Download image from URL with portal-specific headers."""
+    import requests
+
     try:
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
         logger.info(f"Descargando imagen: {url[:80]}...")
-        req = Request(url, headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': url.split('/')[0] + '//' + url.split('/')[2] + '/',
-        })
-        with urlopen(req, timeout=30) as response:
-            return response.read()
+
+        # Portal-specific headers to bypass hotlink protection
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        }
+
+        if 'habimg.com' in url or 'habitaclia' in url:
+            headers['Referer'] = 'https://www.habitaclia.com/'
+            headers['Origin'] = 'https://www.habitaclia.com'
+        elif 'fotocasa' in url:
+            headers['Referer'] = 'https://www.fotocasa.es/'
+            headers['Origin'] = 'https://www.fotocasa.es'
+        elif 'milanuncios' in url or 'ma-media' in url:
+            headers['Referer'] = 'https://www.milanuncios.com/'
+            headers['Origin'] = 'https://www.milanuncios.com'
+        elif 'idealista' in url:
+            headers['Referer'] = 'https://www.idealista.com/'
+            headers['Origin'] = 'https://www.idealista.com'
+        else:
+            domain = url.split('/')[2] if len(url.split('/')) > 2 else ''
+            headers['Referer'] = f'https://{domain}/'
+
+        resp = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
+        resp.raise_for_status()
+
+        # Verify it's actually an image
+        content_type = resp.headers.get('Content-Type', '')
+        if resp.status_code == 200 and len(resp.content) > 1000:
+            return resp.content
+
+        logger.warning(f"Image response: {resp.status_code}, type={content_type}, size={len(resp.content)}")
+        return None
     except Exception as e:
         logger.error(f"Error descargando imagen: {e}")
         return None

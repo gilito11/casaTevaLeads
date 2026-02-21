@@ -81,8 +81,15 @@ def main():
         action='store_true',
         help='Save to PostgreSQL (always enabled)'
     )
+    parser.add_argument('--min-delay', type=float, default=None, help='Min delay between requests (seconds)')
+    parser.add_argument('--max-delay', type=float, default=None, help='Max delay between requests (seconds)')
 
     args = parser.parse_args()
+
+    if args.min_delay is not None:
+        os.environ['SCRAPER_MIN_DELAY'] = str(args.min_delay)
+    if args.max_delay is not None:
+        os.environ['SCRAPER_MAX_DELAY'] = str(args.max_delay)
 
     # Configure logging
     log_level = logging.DEBUG if args.debug else logging.INFO
