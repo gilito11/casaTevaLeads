@@ -28,7 +28,7 @@ class MilanunciosContact(BaseContactAutomation):
 
     # URLs
     BASE_URL = "https://www.milanuncios.com"
-    LOGIN_URL = "https://www.milanuncios.com/mis/"
+    LOGIN_URL = "https://www.milanuncios.com/login/"
 
     # Selectors
     SELECTORS = {
@@ -60,6 +60,7 @@ class MilanunciosContact(BaseContactAutomation):
         """Accept cookies dialog if present."""
         try:
             cookie_selectors = [
+                '#onetrust-accept-btn-handler',
                 'button:has-text("Aceptar")',
                 'button:has-text("Aceptar todo")',
                 'button:has-text("Aceptar y continuar")',
@@ -95,11 +96,13 @@ class MilanunciosContact(BaseContactAutomation):
 
             # Look for logged-in indicators
             logged_in_indicators = [
+                'ma-UserNav',
                 'Mi cuenta',
                 'Mis anuncios',
                 'Cerrar sesión',
                 'mis-favoritos',
                 'user-menu',
+                'UserNav',
             ]
 
             for indicator in logged_in_indicators:
@@ -126,7 +129,7 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
     async def login(self, email: str = None, password: str = None) -> bool:
-        """Login to Milanuncios."""
+        """Login to Milanuncios (two-step flow: email → Continuar → password → Iniciar sesion)."""
         email = email or self.email
         password = password or self.password
 
@@ -136,38 +139,18 @@ class MilanunciosContact(BaseContactAutomation):
 
         try:
             logger.info("Navigating to Milanuncios login page...")
-            await self.page.goto(self.LOGIN_URL, wait_until='networkidle')
+            await self.page.goto(self.LOGIN_URL, wait_until='domcontentloaded', timeout=20000)
             await asyncio.sleep(3)
 
-            # Accept cookies
+            # Accept cookies (OneTrust)
             await self.accept_cookies()
             await asyncio.sleep(1)
 
-            # Check if we're redirected to a login form
-            # Milanuncios may use different login URLs
-            current_url = self.page.url
-            if 'login' not in current_url.lower() and 'acceder' not in current_url.lower():
-                # Try to find and click login button
-                login_links = [
-                    'a:has-text("Acceder")',
-                    'a:has-text("Entrar")',
-                    'a:has-text("Iniciar sesión")',
-                    '[href*="login"]',
-                ]
-                for selector in login_links:
-                    try:
-                        link = await self.page.wait_for_selector(selector, timeout=3000)
-                        if link:
-                            await link.click()
-                            await asyncio.sleep(3)
-                            break
-                    except:
-                        continue
-
-            # Fill email
-            logger.info("Filling email...")
+            # --- STEP 1: Email ---
+            logger.info("Step 1: Filling email...")
             email_input = None
-            for selector in ['input[type="email"]', 'input[name="email"]', '#email', 'input[placeholder*="mail"]']:
+            for selector in ['input[type="email"]', 'input[name="email"]', '#email',
+                             'input[placeholder*="mail"]', 'input.sui-AtomInput-input']:
                 try:
                     email_input = await self.page.wait_for_selector(selector, timeout=5000)
                     if email_input:
@@ -179,35 +162,60 @@ class MilanunciosContact(BaseContactAutomation):
                 logger.error("Could not find email input field")
                 try:
                     await self.page.screenshot(path='debug_milanuncios_login.png')
+                    logger.info(f"Current URL: {self.page.url}")
                 except:
                     pass
                 return False
 
             await email_input.fill(email)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
 
-            # Fill password
-            logger.info("Filling password...")
+            # Click "Continuar" to go to password screen
+            logger.info("Clicking Continuar...")
+            continue_btn = None
+            for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
+                             'button:has-text("Siguiente")']:
+                try:
+                    continue_btn = await self.page.wait_for_selector(selector, timeout=5000)
+                    if continue_btn:
+                        break
+                except:
+                    continue
+
+            if continue_btn:
+                await continue_btn.click()
+            else:
+                await email_input.press('Enter')
+
+            await asyncio.sleep(3)
+
+            # --- STEP 2: Password ---
+            logger.info("Step 2: Filling password...")
             password_input = None
             for selector in ['input[type="password"]', 'input[name="password"]', '#password']:
                 try:
-                    password_input = await self.page.wait_for_selector(selector, timeout=5000)
+                    password_input = await self.page.wait_for_selector(selector, timeout=10000)
                     if password_input:
                         break
                 except:
                     continue
 
             if not password_input:
-                logger.error("Could not find password input field")
+                logger.error("Could not find password input field (step 2)")
+                try:
+                    await self.page.screenshot(path='debug_milanuncios_password.png')
+                except:
+                    pass
                 return False
 
             await password_input.fill(password)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
 
-            # Submit
+            # Click "Iniciar sesion" or submit
             logger.info("Submitting login...")
             submit_btn = None
-            for selector in ['button[type="submit"]', 'button:has-text("Entrar")', 'button:has-text("Acceder")', '[class*="submit"]']:
+            for selector in ['button:has-text("Iniciar")', 'button:has-text("Entrar")',
+                             'button:has-text("Acceder")', 'button[type="submit"]']:
                 try:
                     submit_btn = await self.page.wait_for_selector(selector, timeout=5000)
                     if submit_btn:
@@ -218,7 +226,6 @@ class MilanunciosContact(BaseContactAutomation):
             if submit_btn:
                 await submit_btn.click()
             else:
-                # Try pressing Enter
                 await password_input.press('Enter')
 
             await asyncio.sleep(5)
