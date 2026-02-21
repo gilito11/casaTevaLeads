@@ -139,30 +139,63 @@ class MilanunciosContact(BaseContactAutomation):
 
         try:
             logger.info("Navigating to Milanuncios login page...")
-            await self.page.goto(self.LOGIN_URL, wait_until='domcontentloaded', timeout=20000)
-            await asyncio.sleep(3)
+            await self.page.goto(self.LOGIN_URL, wait_until='networkidle', timeout=30000)
+            await asyncio.sleep(5)
 
             # Accept cookies (OneTrust)
             await self.accept_cookies()
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
+
+            # Log page state for debugging
+            page_content = await self.page.content()
+            logger.info(f"Login page loaded: {len(page_content)} bytes, URL: {self.page.url}")
+            has_input = 'input' in page_content.lower()
+            has_email = 'email' in page_content.lower()
+            logger.info(f"Page has input: {has_input}, has email: {has_email}")
 
             # --- STEP 1: Email ---
             logger.info("Step 1: Filling email...")
             email_input = None
-            for selector in ['input[type="email"]', 'input[name="email"]', '#email',
-                             'input[placeholder*="mail"]', 'input.sui-AtomInput-input']:
+            email_selectors = [
+                'input[type="email"]',
+                'input[name="email"]',
+                '#email',
+                'input[placeholder*="mail"]',
+                'input[placeholder*="correo"]',
+                'input.sui-AtomInput-input',
+                'input[type="text"]',  # Some sites use text type for email
+                'input[autocomplete="email"]',
+                'input[autocomplete="username"]',
+            ]
+            for selector in email_selectors:
                 try:
-                    email_input = await self.page.wait_for_selector(selector, timeout=5000)
+                    email_input = await self.page.wait_for_selector(selector, timeout=3000)
                     if email_input:
+                        logger.info(f"Found email input with selector: {selector}")
                         break
                 except:
                     continue
 
             if not email_input:
-                logger.error("Could not find email input field")
+                # Last resort: try any visible input
+                try:
+                    all_inputs = await self.page.query_selector_all('input:visible')
+                    logger.info(f"Found {len(all_inputs)} visible inputs on page")
+                    for inp in all_inputs:
+                        inp_type = await inp.get_attribute('type') or 'text'
+                        inp_name = await inp.get_attribute('name') or ''
+                        logger.info(f"  Input: type={inp_type}, name={inp_name}")
+                        if inp_type in ('email', 'text') and inp_type != 'hidden':
+                            email_input = inp
+                            logger.info(f"Using fallback input: type={inp_type}, name={inp_name}")
+                            break
+                except Exception as e:
+                    logger.error(f"Error scanning inputs: {e}")
+
+            if not email_input:
+                logger.error("Could not find email input field after all attempts")
                 try:
                     await self.page.screenshot(path='debug_milanuncios_login.png')
-                    logger.info(f"Current URL: {self.page.url}")
                 except:
                     pass
                 return False
