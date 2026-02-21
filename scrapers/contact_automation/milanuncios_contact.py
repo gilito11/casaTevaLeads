@@ -133,7 +133,7 @@ class MilanunciosContact(BaseContactAutomation):
     async def is_logged_in(self) -> bool:
         """Check if session is active."""
         try:
-            await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=15000)
+            await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=30000)
             await asyncio.sleep(3)
 
             # Accept cookies first
@@ -186,14 +186,12 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
         try:
-            # Go to homepage (is_logged_in already navigated here)
-            current_url = self.page.url
-            if 'milanuncios.com' not in current_url:
-                logger.info("Navigating to Milanuncios homepage...")
-                await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=30000)
-                await asyncio.sleep(5)
-                await self.accept_cookies()
-                await asyncio.sleep(2)
+            # Always navigate fresh to homepage for login
+            logger.info("Navigating to Milanuncios homepage...")
+            await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=45000)
+            await asyncio.sleep(5)
+            await self.accept_cookies()
+            await asyncio.sleep(2)
 
             # Find login button via JS, then use Playwright click (triggers React events)
             logger.info("Looking for login button on homepage...")
