@@ -215,13 +215,8 @@ class MilanunciosContact(BaseContactAutomation):
                 return False
 
             logger.info(f"Clicked login button: '{clicked}'")
-
-            await login_link.click()
-            logger.info(f"Clicked login link, waiting for login form...")
             await asyncio.sleep(5)
-
-            # Log current URL to understand the login flow
-            logger.info(f"After click URL: {self.page.url}")
+            logger.info(f"After login click URL: {self.page.url}")
 
             # --- STEP 1: Email ---
             logger.info("Step 1: Filling email...")
