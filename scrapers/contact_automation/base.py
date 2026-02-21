@@ -100,9 +100,9 @@ class BaseContactAutomation(ABC):
 
         self.playwright = await async_playwright().start()
 
-        # Use Firefox for Milanuncios (GeeTest), Chromium for others
-        # Note: Idealista uses Chromium because cookies were captured with Chromium
-        use_firefox = self.PORTAL_NAME in ('milanuncios',)
+        # Use Chromium for all portals (contact automation doesn't need GeeTest bypass)
+        # Note: GeeTest bypass is only needed for scraping, not for login/contact
+        use_firefox = False
 
         if use_firefox:
             self.browser = await self.playwright.firefox.launch(
