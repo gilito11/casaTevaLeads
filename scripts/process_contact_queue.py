@@ -300,12 +300,17 @@ async def process_idealista(contact: dict) -> dict:
 
 def main():
     """Main function."""
+    import argparse
+    parser = argparse.ArgumentParser(description='Process contact queue')
+    parser.add_argument('--max-contacts', type=int, default=5, help='Max contacts to process')
+    args = parser.parse_args()
+
     logger.info("=" * 50)
     logger.info("Contact Queue Processor")
     logger.info("=" * 50)
 
     # Get pending contacts
-    pending = get_pending_contacts(limit=5)
+    pending = get_pending_contacts(limit=args.max_contacts)
 
     if not pending:
         logger.info("No pending contacts")
