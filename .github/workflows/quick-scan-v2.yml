@@ -132,11 +132,6 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Force-queue milanuncios test lead
-        if: contains(github.event.inputs.portals || '', 'milanuncios')
-        continue-on-error: true
-        run: python scripts/test_milanuncios_login.py
-
       - name: Process contact queue
         if: ${{ github.event.inputs.max_contacts != '0' }}
         continue-on-error: true
