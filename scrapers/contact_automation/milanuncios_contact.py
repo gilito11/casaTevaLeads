@@ -463,8 +463,12 @@ class MilanunciosContact(BaseContactAutomation):
                 logger.error(f"No email input found. All inputs: {json.dumps(all_inputs)}")
                 return False
 
-            await email_input.fill(email)
-            logger.info("Email filled")
+            # Use click + type (NOT fill) to trigger React state updates
+            await email_input.click()
+            await asyncio.sleep(0.3)
+            await email_input.press('Control+a')
+            await target_page.keyboard.type(email, delay=50)
+            logger.info("Email typed (keyboard)")
             await asyncio.sleep(1)
 
             # Click "Continuar" / submit - prefer buttons inside modal
@@ -553,8 +557,27 @@ class MilanunciosContact(BaseContactAutomation):
                 logger.error(f"Password input not found. State: {json.dumps(page_state)}")
                 return False
 
-            await password_input.fill(password)
+            # Use click + type (NOT fill) to trigger React state updates
+            await password_input.click()
+            await asyncio.sleep(0.3)
+            await password_input.press('Control+a')
+            await target_page.keyboard.type(password, delay=50)
             await asyncio.sleep(1)
+
+            # Verify fields have values before submitting
+            field_values = await target_page.evaluate("""() => {
+                const modal = document.querySelector('#modal-react-portal');
+                const container = modal || document;
+                const emailEl = container.querySelector('input[type="email"], input#email, input[type="text"]');
+                const passEl = container.querySelector('input[type="password"]');
+                return {
+                    email: emailEl ? emailEl.value : null,
+                    emailLen: emailEl ? emailEl.value.length : 0,
+                    passLen: passEl ? passEl.value.length : 0,
+                };
+            }""")
+            logger.info(f"Pre-submit field check - email: {field_values.get('email', '?')}, "
+                        f"emailLen: {field_values.get('emailLen')}, passLen: {field_values.get('passLen')}")
 
             # Submit login via Enter on password field (most reliable for modal forms)
             logger.info("Submitting login via Enter key on password field...")
