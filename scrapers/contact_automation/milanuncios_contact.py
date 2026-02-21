@@ -195,26 +195,32 @@ class MilanunciosContact(BaseContactAutomation):
                 await self.accept_cookies()
                 await asyncio.sleep(2)
 
-            # Click login button via JS (most reliable for SPA with SUI components)
+            # Find login button via JS, then use Playwright click (triggers React events)
             logger.info("Looking for login button on homepage...")
-            clicked = await self.page.evaluate("""() => {
+            btn_box = await self.page.evaluate("""() => {
                 const buttons = document.querySelectorAll('button, a, [role="button"]');
                 for (const btn of buttons) {
                     const text = (btn.textContent || '').trim().toLowerCase();
                     if (text.includes('iniciar sesi') || text.includes('acceder')
                         || text.includes('entrar') || text === 'login') {
-                        btn.click();
-                        return btn.textContent.trim();
+                        const rect = btn.getBoundingClientRect();
+                        return {
+                            text: btn.textContent.trim(),
+                            x: rect.x + rect.width / 2,
+                            y: rect.y + rect.height / 2
+                        };
                     }
                 }
                 return null;
             }""")
 
-            if not clicked:
+            if not btn_box:
                 logger.error("Could not find login button on homepage")
                 return False
 
-            logger.info(f"Clicked login button: '{clicked}'")
+            logger.info(f"Found login button: '{btn_box['text']}' at ({btn_box['x']:.0f}, {btn_box['y']:.0f})")
+            await self.page.mouse.click(btn_box['x'], btn_box['y'])
+            logger.info("Clicked login button via mouse, waiting for login form...")
             await asyncio.sleep(5)
             logger.info(f"After login click URL: {self.page.url}")
 
