@@ -146,9 +146,39 @@ class MilanunciosContact(BaseContactAutomation):
             await self.accept_cookies()
             await asyncio.sleep(2)
 
-            # Check for iframes (Adevinta shared auth uses iframe)
+            # Debug: check what the page actually contains
             page_content = await self.page.content()
             logger.info(f"Login page loaded: {len(page_content)} bytes, URL: {self.page.url}")
+
+            # Dump a snippet of the HTML for debugging
+            # Look for key indicators
+            if 'input' not in page_content.lower():
+                logger.warning("No input elements in page HTML!")
+                # Check if page has a root div (React mount point)
+                has_root = 'id="root"' in page_content or 'id="app"' in page_content
+                logger.info(f"Has React root: {has_root}")
+                # Check for JS errors via page console
+                snippet = page_content[500:2000] if len(page_content) > 2000 else page_content[500:]
+                logger.info(f"Page snippet: {snippet[:500]}")
+
+                # Wait longer for JS to render
+                logger.info("Waiting 10s more for JS render...")
+                await asyncio.sleep(10)
+                page_content = await self.page.content()
+                logger.info(f"After extra wait: {len(page_content)} bytes, has input: {'input' in page_content.lower()}")
+
+                # Check via JS if there's a shadow DOM
+                try:
+                    shadow_count = await self.page.evaluate("""
+                        () => document.querySelectorAll('*').length
+                    """)
+                    logger.info(f"Total DOM elements: {shadow_count}")
+                    input_count = await self.page.evaluate("""
+                        () => document.querySelectorAll('input').length
+                    """)
+                    logger.info(f"Input elements via JS: {input_count}")
+                except Exception as e:
+                    logger.error(f"JS eval error: {e}")
 
             frames = self.page.frames
             logger.info(f"Page has {len(frames)} frames")
