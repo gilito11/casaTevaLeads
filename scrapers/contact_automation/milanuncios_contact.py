@@ -86,8 +86,10 @@ class MilanunciosContact(BaseContactAutomation):
         self._camoufox_cm = AsyncCamoufox(**camoufox_opts)
         self.browser = await self._camoufox_cm.__aenter__()
 
-        # Create context and page
-        self.context = await self.browser.new_context()
+        # Create context with explicit viewport (Camoufox virtual display may be wider)
+        self.context = await self.browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+        )
 
         # Load saved cookies
         if self.cookies_file.exists():
@@ -304,25 +306,35 @@ class MilanunciosContact(BaseContactAutomation):
                     has_email_input = False
 
             if not has_email_input:
-                # --- METHOD 3: Try direct Schibsted login URL pattern ---
-                logger.info("Method 3: Trying direct Schibsted login URLs...")
-                schibsted_urls = [
+                # --- METHOD 3: Try direct Schibsted/milanuncios login URLs ---
+                logger.info("Method 3: Trying direct login URLs...")
+                login_urls = [
                     "https://www.milanuncios.com/registro",
                     "https://login.schibsted.com/authn/identifier",
                 ]
-                for url in schibsted_urls:
+                for url in login_urls:
                     try:
-                        await self.page.goto(url, wait_until='domcontentloaded', timeout=15000)
-                        await asyncio.sleep(3)
-                        has_email_input = await self.page.evaluate("""() => {
-                            const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="text"]');
-                            return inputs.length > 0;
-                        }""")
+                        logger.info(f"Trying {url}...")
+                        await self.page.goto(url, wait_until='networkidle', timeout=30000)
+                        # Wait longer for SPA JS to render the form
+                        for wait in [3, 5, 5]:
+                            has_email_input = await self.page.evaluate("""() => {
+                                const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="text"], input[type="password"]');
+                                return inputs.length > 0;
+                            }""")
+                            if has_email_input:
+                                break
+                            logger.info(f"No inputs yet, waiting {wait}s for SPA to render...")
+                            await asyncio.sleep(wait)
                         if has_email_input:
                             target_page = self.page
-                            logger.info(f"Found login form at {url}")
+                            logger.info(f"Found login form at {self.page.url}")
                             break
-                    except:
+                        else:
+                            body_len = await self.page.evaluate("() => document.body.innerHTML.length")
+                            logger.info(f"No form at {self.page.url[:60]} (body: {body_len} bytes)")
+                    except Exception as e:
+                        logger.info(f"Failed loading {url}: {e}")
                         continue
 
             if not has_email_input:
