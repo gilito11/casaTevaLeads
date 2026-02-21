@@ -197,6 +197,10 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no agencia%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no inmobiliaria%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%sin intermediario%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%no intermediarios%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%no se atienden%agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%no se atienden%intermediario%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%exclusivamente%particular%'
         )
         -- Filter out agency listings disguised as particulars (they advertise "no agency fees")
         AND NOT (
