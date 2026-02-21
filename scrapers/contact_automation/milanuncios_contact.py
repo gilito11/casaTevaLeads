@@ -223,7 +223,11 @@ class MilanunciosContact(BaseContactAutomation):
 
             btn_text = await btn_element.text_content()
             logger.info(f"Found login button: '{btn_text.strip()}'")
-            await btn_element.click()
+
+            # Scroll button into view and force click (skip actionability checks)
+            await btn_element.scroll_into_view_if_needed()
+            await asyncio.sleep(1)
+            await btn_element.click(force=True, timeout=10000)
             logger.info("Clicked login button via element handle")
 
             # Wait for login form to appear
