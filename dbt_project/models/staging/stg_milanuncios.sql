@@ -99,13 +99,14 @@ normalized AS (
             AS INTEGER
         ) AS banos,
 
-        -- Use seller_type as primary signal, es_particular as secondary
-        -- Default TRUE (like idealista) — rely on vendedor name patterns for agency filtering
+        -- Use seller_type as primary signal from scraper
+        -- Conservative: default FALSE if unknown (filter in dbt, not Django)
         CASE
             WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'professional' THEN FALSE
+            WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'profesional' THEN FALSE
             WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'particular' THEN TRUE
             WHEN (raw_data->>'es_particular')::BOOLEAN = FALSE THEN FALSE
-            ELSE TRUE
+            ELSE FALSE
         END AS es_particular,
         TRUE AS permite_inmobiliarias
 
@@ -216,8 +217,8 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
-        -- No hard es_particular filter — rely on vendedor name patterns (like idealista)
-        -- es_particular field kept for lead scoring (+10pts bonus)
+        -- Hard filter: only particular sellers (seller_type from scraper)
+        AND es_particular = TRUE
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'

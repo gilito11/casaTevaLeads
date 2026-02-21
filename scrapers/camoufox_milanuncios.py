@@ -412,9 +412,9 @@ class CamoufoxMilanuncios:
                 user_type = str(ad.get('userType', '')).lower()
 
                 is_professional = (
-                    seller_type == 'professional'
+                    seller_type in ('professional', 'profesional')
                     or 'pro' in seller_badge
-                    or user_type == 'professional'
+                    or user_type in ('professional', 'profesional')
                 )
 
                 if self.only_particulares and is_professional:
@@ -684,7 +684,7 @@ class CamoufoxMilanuncios:
                     sn = seller_info.get('sellerName', '')
                     is_pro_json = seller_info.get('isPro', False)
 
-                    if st == 'professional' or ut == 'professional' or 'pro' in sb or is_pro_json:
+                    if st in ('professional', 'profesional') or ut in ('professional', 'profesional') or 'pro' in sb or is_pro_json:
                         listing['es_particular'] = False
                         listing['seller_type'] = 'professional'
                         if sn:
@@ -908,7 +908,9 @@ class CamoufoxMilanuncios:
                 )
                 ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
                 WHERE raw_data->>'anuncio_id' IS NOT NULL
-                DO NOTHING
+                DO UPDATE SET
+                    raw_data = EXCLUDED.raw_data,
+                    scraping_timestamp = EXCLUDED.scraping_timestamp
             """
 
             now = datetime.now()
