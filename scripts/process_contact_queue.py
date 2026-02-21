@@ -211,7 +211,9 @@ async def process_milanuncios(contact: dict) -> dict:
         result['error'] = 'MILANUNCIOS credentials not configured'
         return result
 
-    automation = MilanunciosContact(headless=True, email=email, password=password)
+    # Camoufox needs virtual display in CI (not plain headless)
+    headless = "virtual" if os.environ.get('CI') else True
+    automation = MilanunciosContact(headless=headless, email=email, password=password)
 
     try:
         await automation.setup_browser()

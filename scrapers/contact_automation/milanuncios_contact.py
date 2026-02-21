@@ -11,6 +11,7 @@ Usage:
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class MilanunciosContact(BaseContactAutomation):
-    """Contact automation for Milanuncios.com"""
+    """Contact automation for Milanuncios.com using Camoufox anti-detect browser."""
 
     PORTAL_NAME = "milanuncios"
 
@@ -51,10 +52,57 @@ class MilanunciosContact(BaseContactAutomation):
         'phone_number': '[class*="phone-number"], a[href^="tel:"]',
     }
 
-    def __init__(self, headless: bool = False, email: str = None, password: str = None):
-        super().__init__(headless=headless)
+    def __init__(self, headless: bool = False, email: str = None, password: str = None, proxy: str = None):
+        super().__init__(headless=headless, proxy=proxy)
         self.email = email or os.getenv('MILANUNCIOS_EMAIL')
         self.password = password or os.getenv('MILANUNCIOS_PASSWORD')
+        if not self.proxy:
+            self.proxy = os.getenv('DATADOME_PROXY')
+        self._camoufox_cm = None
+
+    async def setup_browser(self):
+        """Initialize Camoufox anti-detect browser (bypasses GeeTest/bot detection)."""
+        from camoufox.async_api import AsyncCamoufox
+        from scrapers.camoufox_idealista import parse_proxy
+
+        camoufox_opts = {
+            "humanize": 2.5,
+            "headless": self.headless,
+            "geoip": True,
+            "os": "windows",
+            "block_webrtc": True,
+            "locale": ["es-ES", "es"],
+        }
+
+        proxy_config = parse_proxy(self.proxy)
+        if proxy_config:
+            camoufox_opts["proxy"] = proxy_config
+            logger.info(f"Camoufox proxy configured: {proxy_config['server']}")
+
+        logger.info("Launching Camoufox browser for Milanuncios contact automation")
+
+        self._camoufox_cm = AsyncCamoufox(**camoufox_opts)
+        self.browser = await self._camoufox_cm.__aenter__()
+
+        # Create context and page
+        self.context = await self.browser.new_context()
+
+        # Load saved cookies
+        if self.cookies_file.exists():
+            cookies = json.loads(self.cookies_file.read_text())
+            await self.context.add_cookies(cookies)
+            logger.info(f"Loaded {len(cookies)} cookies from {self.cookies_file}")
+
+        self.page = await self.context.new_page()
+
+    async def close(self):
+        """Clean up Camoufox browser resources."""
+        if self.context:
+            await self.save_cookies()
+        if self._camoufox_cm:
+            await self._camoufox_cm.__aexit__(None, None, None)
+        elif self.browser:
+            await self.browser.close()
 
     async def accept_cookies(self):
         """Accept cookies dialog if present."""
@@ -139,61 +187,23 @@ class MilanunciosContact(BaseContactAutomation):
 
         try:
             logger.info("Navigating to Milanuncios login page...")
-            await self.page.goto(self.LOGIN_URL, wait_until='networkidle', timeout=30000)
+            await self.page.goto(self.LOGIN_URL, wait_until='domcontentloaded', timeout=30000)
             await asyncio.sleep(5)
 
             # Accept cookies (OneTrust)
             await self.accept_cookies()
             await asyncio.sleep(2)
 
-            # Debug: check what the page actually contains
             page_content = await self.page.content()
             logger.info(f"Login page loaded: {len(page_content)} bytes, URL: {self.page.url}")
 
-            # Dump a snippet of the HTML for debugging
-            # Look for key indicators
+            # Wait for React to render the login form
             if 'input' not in page_content.lower():
-                logger.warning("No input elements in page HTML!")
-                # Check if page has a root div (React mount point)
-                has_root = 'id="root"' in page_content or 'id="app"' in page_content
-                logger.info(f"Has React root: {has_root}")
-                # Check for JS errors via page console
-                snippet = page_content[500:2000] if len(page_content) > 2000 else page_content[500:]
-                logger.info(f"Page snippet: {snippet[:500]}")
-
-                # Wait longer for JS to render
-                logger.info("Waiting 10s more for JS render...")
-                await asyncio.sleep(10)
+                logger.info("Waiting for React SPA to render...")
+                await asyncio.sleep(8)
                 page_content = await self.page.content()
-                logger.info(f"After extra wait: {len(page_content)} bytes, has input: {'input' in page_content.lower()}")
-
-                # Check via JS if there's a shadow DOM
-                try:
-                    shadow_count = await self.page.evaluate("""
-                        () => document.querySelectorAll('*').length
-                    """)
-                    logger.info(f"Total DOM elements: {shadow_count}")
-                    input_count = await self.page.evaluate("""
-                        () => document.querySelectorAll('input').length
-                    """)
-                    logger.info(f"Input elements via JS: {input_count}")
-                except Exception as e:
-                    logger.error(f"JS eval error: {e}")
-
-            frames = self.page.frames
-            logger.info(f"Page has {len(frames)} frames")
-            for i, frame in enumerate(frames):
-                logger.info(f"  Frame {i}: {frame.url[:100]}")
-
-            # Try to find the login form - might be in an iframe
-            target_frame = self.page
-            if len(frames) > 1:
-                for frame in frames:
-                    frame_content = await frame.content()
-                    if 'input' in frame_content.lower() and ('email' in frame_content.lower() or 'correo' in frame_content.lower()):
-                        logger.info(f"Found login form in frame: {frame.url[:80]}")
-                        target_frame = frame
-                        break
+                input_count = await self.page.evaluate("() => document.querySelectorAll('input').length")
+                logger.info(f"After wait: {len(page_content)} bytes, {input_count} inputs")
 
             # --- STEP 1: Email ---
             logger.info("Step 1: Filling email...")
@@ -208,44 +218,21 @@ class MilanunciosContact(BaseContactAutomation):
                 'input[type="text"]',
                 'input[autocomplete="email"]',
                 'input[autocomplete="username"]',
-                'input',  # Last resort: any input
+                'input',
             ]
             for selector in email_selectors:
                 try:
-                    email_input = await target_frame.wait_for_selector(selector, timeout=3000)
+                    email_input = await self.page.wait_for_selector(selector, timeout=3000)
                     if email_input:
-                        logger.info(f"Found email input with selector: {selector}")
+                        logger.info(f"Found email input: {selector}")
                         break
                 except:
                     continue
 
             if not email_input:
-                # Scan all frames for inputs
-                for i, frame in enumerate(frames):
-                    try:
-                        all_inputs = await frame.query_selector_all('input')
-                        if all_inputs:
-                            logger.info(f"Frame {i} ({frame.url[:50]}) has {len(all_inputs)} inputs")
-                            for inp in all_inputs:
-                                inp_type = await inp.get_attribute('type') or 'text'
-                                inp_name = await inp.get_attribute('name') or ''
-                                logger.info(f"  Input: type={inp_type}, name={inp_name}")
-                                if inp_type in ('email', 'text'):
-                                    email_input = inp
-                                    target_frame = frame
-                                    logger.info(f"Using input from frame {i}")
-                                    break
-                        if email_input:
-                            break
-                    except:
-                        continue
-
-            if not email_input:
-                logger.error("Could not find email input in any frame")
-                try:
-                    await self.page.screenshot(path='debug_milanuncios_login.png')
-                except:
-                    pass
+                logger.error("Could not find email input field")
+                dom_count = await self.page.evaluate("() => document.querySelectorAll('*').length")
+                logger.error(f"DOM elements: {dom_count}, page size: {len(page_content)} bytes")
                 return False
 
             await email_input.fill(email)
@@ -257,7 +244,7 @@ class MilanunciosContact(BaseContactAutomation):
             for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
                              'button:has-text("Siguiente")']:
                 try:
-                    continue_btn = await target_frame.wait_for_selector(selector, timeout=5000)
+                    continue_btn = await self.page.wait_for_selector(selector, timeout=5000)
                     if continue_btn:
                         break
                 except:
@@ -275,7 +262,7 @@ class MilanunciosContact(BaseContactAutomation):
             password_input = None
             for selector in ['input[type="password"]', 'input[name="password"]', '#password']:
                 try:
-                    password_input = await target_frame.wait_for_selector(selector, timeout=10000)
+                    password_input = await self.page.wait_for_selector(selector, timeout=10000)
                     if password_input:
                         break
                 except:
@@ -283,10 +270,6 @@ class MilanunciosContact(BaseContactAutomation):
 
             if not password_input:
                 logger.error("Could not find password input field (step 2)")
-                try:
-                    await self.page.screenshot(path='debug_milanuncios_password.png')
-                except:
-                    pass
                 return False
 
             await password_input.fill(password)
@@ -298,7 +281,7 @@ class MilanunciosContact(BaseContactAutomation):
             for selector in ['button:has-text("Iniciar")', 'button:has-text("Entrar")',
                              'button:has-text("Acceder")', 'button[type="submit"]']:
                 try:
-                    submit_btn = await target_frame.wait_for_selector(selector, timeout=5000)
+                    submit_btn = await self.page.wait_for_selector(selector, timeout=5000)
                     if submit_btn:
                         break
                 except:
