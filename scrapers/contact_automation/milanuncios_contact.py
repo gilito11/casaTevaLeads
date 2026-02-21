@@ -6,6 +6,8 @@ Automates:
 2. Extract phone from listing (if visible)
 3. Send contact message via internal chat system
 
+Uses Camoufox anti-detect browser to bypass GeeTest/bot detection.
+
 Usage:
     python -m scrapers.contact_automation.milanuncios_contact --url <listing_url>
 """
@@ -177,7 +179,7 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
     async def login(self, email: str = None, password: str = None) -> bool:
-        """Login to Milanuncios by clicking 'Acceder' on homepage, then email → password flow."""
+        """Login to Milanuncios by clicking login button, then email → password flow."""
         email = email or self.email
         password = password or self.password
 
@@ -186,109 +188,78 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
         try:
-            # Always navigate fresh to homepage for login
+            # Navigate fresh to homepage
             logger.info("Navigating to Milanuncios homepage...")
             await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=45000)
             await asyncio.sleep(5)
             await self.accept_cookies()
             await asyncio.sleep(2)
 
-            # Find login button via JS, then use Playwright click (triggers React events)
-            logger.info("Looking for login button on homepage...")
-            btn_box = await self.page.evaluate("""() => {
-                const buttons = document.querySelectorAll('button, a, [role="button"]');
-                for (const btn of buttons) {
-                    const text = (btn.textContent || '').trim().toLowerCase();
-                    if (text.includes('iniciar sesi') || text.includes('acceder')
-                        || text.includes('entrar') || text === 'login') {
-                        const rect = btn.getBoundingClientRect();
-                        return {
-                            text: btn.textContent.trim(),
-                            x: rect.x + rect.width / 2,
-                            y: rect.y + rect.height / 2
-                        };
-                    }
-                }
-                return null;
-            }""")
+            # Count inputs BEFORE clicking login (to detect new ones after)
+            inputs_before = await self.page.evaluate("() => document.querySelectorAll('input').length")
+            logger.info(f"Inputs before login click: {inputs_before}")
 
-            if not btn_box:
-                logger.error("Could not find login button on homepage")
+            # Listen for popup/new tab
+            self._popup_page = None
+            self.context.on("page", lambda page: setattr(self, '_popup_page', page))
+
+            # Click login button using Playwright locator (handles React events properly)
+            logger.info("Clicking login button...")
+            clicked = False
+            for text in ['Iniciar sesión', 'Acceder', 'Entrar']:
+                try:
+                    locator = self.page.get_by_role("button", name=text)
+                    if await locator.count() > 0:
+                        await locator.first.click(timeout=5000)
+                        logger.info(f"Clicked login button: '{text}'")
+                        clicked = True
+                        break
+                except Exception as e:
+                    logger.debug(f"Button '{text}' not clickable: {e}")
+
+            if not clicked:
+                # Fallback: try link elements
+                for text in ['Iniciar sesión', 'Acceder', 'Entrar']:
+                    try:
+                        locator = self.page.get_by_role("link", name=text)
+                        if await locator.count() > 0:
+                            await locator.first.click(timeout=5000)
+                            logger.info(f"Clicked login link: '{text}'")
+                            clicked = True
+                            break
+                    except:
+                        continue
+
+            if not clicked:
+                logger.error("Could not click any login button/link")
                 return False
 
-            logger.info(f"Found login button: '{btn_box['text']}' at ({btn_box['x']:.0f}, {btn_box['y']:.0f})")
-
-            # Listen for popup windows before clicking
-            popup_page = None
-            self.context.on("page", lambda page: setattr(self, '_popup_page', page))
-            self._popup_page = None
-
-            await self.page.mouse.click(btn_box['x'], btn_box['y'])
-            logger.info("Clicked login button, waiting for login form...")
+            # Wait for login form to appear
             await asyncio.sleep(5)
+            logger.info(f"After login click URL: {self.page.url}")
 
-            # Check what happened after click
-            logger.info(f"After click URL: {self.page.url}")
-
-            # Check for popup window
-            all_pages = self.context.pages
-            logger.info(f"Open pages: {len(all_pages)}")
-            for i, p in enumerate(all_pages):
-                logger.info(f"  Page {i}: {p.url[:80]}")
-
-            # Determine which page has the login form
+            # Check if a popup opened (Schibsted/Adevinta shared auth)
             target_page = self.page
-            if self._popup_page:
-                logger.info(f"Popup detected: {self._popup_page.url[:80]}")
-                target_page = self._popup_page
-                await asyncio.sleep(3)
-            elif len(all_pages) > 1:
-                # Use the newest page (likely the login popup)
+            all_pages = self.context.pages
+            if len(all_pages) > 1:
                 target_page = all_pages[-1]
-                logger.info(f"Using newest page: {target_page.url[:80]}")
+                logger.info(f"Login opened in new page: {target_page.url[:80]}")
                 await asyncio.sleep(3)
-
-            # Check for iframes (login might be in an iframe modal)
-            frames = target_page.frames
-            logger.info(f"Target page has {len(frames)} frames")
-            for i, f in enumerate(frames):
-                logger.info(f"  Frame {i}: {f.url[:80]}")
-
-            # Check for modal dialog
-            modal_info = await target_page.evaluate("""() => {
-                // Check for dialog elements
-                const dialogs = document.querySelectorAll('dialog, [role="dialog"], [class*="modal"], [class*="Modal"], [class*="overlay"], [class*="Overlay"]');
-                const results = [];
-                for (const d of dialogs) {
-                    results.push({
-                        tag: d.tagName,
-                        class: (d.className || '').substring(0, 80),
-                        visible: d.offsetParent !== null || d.style.display !== 'none',
-                        inputs: d.querySelectorAll('input').length
-                    });
-                }
-                return results;
-            }""")
-            logger.info(f"Modal/dialog elements: {modal_info}")
+            elif self._popup_page:
+                target_page = self._popup_page
+                logger.info(f"Login popup: {target_page.url[:80]}")
+                await asyncio.sleep(3)
 
             # --- STEP 1: Email ---
-            logger.info("Step 1: Filling email...")
+            logger.info("Step 1: Looking for email input...")
 
-            # Find input inside the login modal (sui-MoleculeModal / ma-FormHome)
+            # Wait for a new email input (not the search bar)
             email_input = None
-            modal_selectors = [
-                '.sui-MoleculeModal input[type="email"]',
-                '.sui-MoleculeModal input[type="text"]',
-                '.sui-MoleculeModal input.sui-AtomInput-input',
-                '.sui-MoleculeModal input',
-                '.ma-FormHome input',
-                'input[type="email"]',
-                'input[name="email"]',
-                '#email',
-            ]
-            for selector in modal_selectors:
+
+            # First try: wait for email-specific input to appear
+            for selector in ['input[type="email"]', 'input[name="email"]', 'input[autocomplete="email"]']:
                 try:
-                    email_input = await target_page.wait_for_selector(selector, timeout=3000)
+                    email_input = await target_page.wait_for_selector(selector, timeout=5000)
                     if email_input:
                         logger.info(f"Found email input: {selector}")
                         break
@@ -296,35 +267,63 @@ class MilanunciosContact(BaseContactAutomation):
                     continue
 
             if not email_input:
-                # Fallback: find input via JS inside any visible modal
+                # Check if new inputs appeared (login modal with text input)
+                inputs_after = await target_page.evaluate("() => document.querySelectorAll('input').length")
+                logger.info(f"Inputs after click: {inputs_after} (was {inputs_before})")
+
+                # Find the NEW input (not the search bars)
                 email_input_handle = await target_page.evaluate_handle("""() => {
-                    const modals = document.querySelectorAll('.sui-MoleculeModal, [role="dialog"]');
-                    for (const modal of modals) {
-                        if (modal.offsetParent !== null || modal.style.display !== 'none') {
-                            const input = modal.querySelector('input');
-                            if (input) return input;
-                        }
+                    // Look for input inside a login-related container
+                    const loginContainers = [
+                        ...document.querySelectorAll('[class*="Login"], [class*="login"], [class*="Auth"], [class*="auth"]'),
+                        ...document.querySelectorAll('[class*="FormLogin"], [class*="FormEmail"]'),
+                    ];
+                    for (const container of loginContainers) {
+                        const input = container.querySelector('input');
+                        if (input) return input;
+                    }
+
+                    // Look for inputs that are NOT search bars
+                    const allInputs = document.querySelectorAll('input');
+                    for (const input of allInputs) {
+                        const id = input.id || '';
+                        const placeholder = (input.placeholder || '').toLowerCase();
+                        const name = input.name || '';
+                        // Skip search bars
+                        if (id.includes('search') || id.includes('suggester')
+                            || placeholder.includes('buscando') || placeholder.includes('buscar')
+                            || input.type === 'search') continue;
+                        // This might be the login input
+                        if (input.type === 'email' || input.type === 'text') return input;
                     }
                     return null;
                 }""")
                 if email_input_handle:
                     email_input = email_input_handle.as_element()
                     if email_input:
-                        logger.info("Found email input via JS modal search")
+                        logger.info("Found non-search input via JS")
 
             if not email_input:
-                input_count = await target_page.evaluate("() => document.querySelectorAll('input').length")
-                logger.error(f"No email input found. Total inputs: {input_count}")
+                # Debug: dump all inputs
+                input_info = await target_page.evaluate("""() => {
+                    return Array.from(document.querySelectorAll('input')).map(i => ({
+                        type: i.type, name: i.name, id: i.id,
+                        placeholder: i.placeholder, class: i.className.substring(0, 50)
+                    }))
+                }""")
+                logger.error(f"No email input found. Inputs: {input_info}")
+                logger.error(f"URL: {target_page.url}")
                 return False
 
             await email_input.fill(email)
+            logger.info("Email filled")
             await asyncio.sleep(1)
 
-            # Click "Continuar" to go to password screen
+            # Click "Continuar"
             logger.info("Clicking Continuar...")
             continue_btn = None
             for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
-                             'button:has-text("Siguiente")', 'button:has-text("Next")']:
+                             'button:has-text("Siguiente")']:
                 try:
                     continue_btn = await target_page.wait_for_selector(selector, timeout=5000)
                     if continue_btn:
@@ -358,7 +357,7 @@ class MilanunciosContact(BaseContactAutomation):
             await password_input.fill(password)
             await asyncio.sleep(1)
 
-            # Click "Iniciar sesion" or submit
+            # Submit login
             logger.info("Submitting login...")
             submit_btn = None
             for selector in ['button:has-text("Iniciar")', 'button:has-text("Entrar")',
@@ -531,10 +530,6 @@ class MilanunciosContact(BaseContactAutomation):
 
             if not message_field:
                 logger.error("Message field not found")
-                try:
-                    await self.page.screenshot(path='debug_milanuncios_contact.png')
-                except:
-                    pass
                 return False
 
             # Clear and fill message with human-like typing
