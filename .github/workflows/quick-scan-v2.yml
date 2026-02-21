@@ -134,6 +134,7 @@ jobs:
 
       - name: Force-queue milanuncios test lead
         if: contains(github.event.inputs.portals || '', 'milanuncios')
+        continue-on-error: true
         run: python scripts/test_milanuncios_login.py
 
       - name: Process contact queue
