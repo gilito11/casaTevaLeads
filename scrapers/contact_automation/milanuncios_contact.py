@@ -203,36 +203,28 @@ class MilanunciosContact(BaseContactAutomation):
             self._popup_page = None
             self.context.on("page", lambda page: setattr(self, '_popup_page', page))
 
-            # Click login button using Playwright locator (handles React events properly)
+            # Find login button via JS, then use Playwright element_handle.click()
+            # (JS .click() doesn't trigger React; mouse.click() may miss; locator can't find SUI buttons)
             logger.info("Clicking login button...")
-            clicked = False
-            for text in ['Iniciar sesión', 'Acceder', 'Entrar']:
-                try:
-                    locator = self.page.get_by_role("button", name=text)
-                    if await locator.count() > 0:
-                        await locator.first.click(timeout=5000)
-                        logger.info(f"Clicked login button: '{text}'")
-                        clicked = True
-                        break
-                except Exception as e:
-                    logger.debug(f"Button '{text}' not clickable: {e}")
-
-            if not clicked:
-                # Fallback: try link elements
-                for text in ['Iniciar sesión', 'Acceder', 'Entrar']:
-                    try:
-                        locator = self.page.get_by_role("link", name=text)
-                        if await locator.count() > 0:
-                            await locator.first.click(timeout=5000)
-                            logger.info(f"Clicked login link: '{text}'")
-                            clicked = True
-                            break
-                    except:
-                        continue
-
-            if not clicked:
-                logger.error("Could not click any login button/link")
+            btn_handle = await self.page.evaluate_handle("""() => {
+                const buttons = document.querySelectorAll('button, a, [role="button"]');
+                for (const btn of buttons) {
+                    const text = (btn.textContent || '').trim();
+                    if (/iniciar sesi|acceder|^entrar$/i.test(text)) {
+                        return btn;
+                    }
+                }
+                return null;
+            }""")
+            btn_element = btn_handle.as_element()
+            if not btn_element:
+                logger.error("Could not find login button on homepage")
                 return False
+
+            btn_text = await btn_element.text_content()
+            logger.info(f"Found login button: '{btn_text.strip()}'")
+            await btn_element.click()
+            logger.info("Clicked login button via element handle")
 
             # Wait for login form to appear
             await asyncio.sleep(5)
