@@ -100,14 +100,12 @@ normalized AS (
         ) AS banos,
 
         -- Use seller_type as primary signal, es_particular as secondary
-        -- Conservative: if seller_type is missing/empty, default to FALSE (professional)
-        -- Only trust es_particular=TRUE when seller_type explicitly confirms 'particular'
+        -- Default TRUE (like idealista) — rely on vendedor name patterns for agency filtering
         CASE
             WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'professional' THEN FALSE
             WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'particular' THEN TRUE
             WHEN (raw_data->>'es_particular')::BOOLEAN = FALSE THEN FALSE
-            -- seller_type unknown + es_particular not explicitly FALSE = suspect, default FALSE
-            ELSE FALSE
+            ELSE TRUE
         END AS es_particular,
         TRUE AS permite_inmobiliarias
 
@@ -218,8 +216,8 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
-        -- Hard filter: only particular sellers (scraper + JSON detection improved in session 7)
-        AND es_particular = TRUE
+        -- No hard es_particular filter — rely on vendedor name patterns (like idealista)
+        -- es_particular field kept for lead scoring (+10pts bonus)
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
