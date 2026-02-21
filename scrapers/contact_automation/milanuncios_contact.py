@@ -146,12 +146,24 @@ class MilanunciosContact(BaseContactAutomation):
             await self.accept_cookies()
             await asyncio.sleep(2)
 
-            # Log page state for debugging
+            # Check for iframes (Adevinta shared auth uses iframe)
             page_content = await self.page.content()
             logger.info(f"Login page loaded: {len(page_content)} bytes, URL: {self.page.url}")
-            has_input = 'input' in page_content.lower()
-            has_email = 'email' in page_content.lower()
-            logger.info(f"Page has input: {has_input}, has email: {has_email}")
+
+            frames = self.page.frames
+            logger.info(f"Page has {len(frames)} frames")
+            for i, frame in enumerate(frames):
+                logger.info(f"  Frame {i}: {frame.url[:100]}")
+
+            # Try to find the login form - might be in an iframe
+            target_frame = self.page
+            if len(frames) > 1:
+                for frame in frames:
+                    frame_content = await frame.content()
+                    if 'input' in frame_content.lower() and ('email' in frame_content.lower() or 'correo' in frame_content.lower()):
+                        logger.info(f"Found login form in frame: {frame.url[:80]}")
+                        target_frame = frame
+                        break
 
             # --- STEP 1: Email ---
             logger.info("Step 1: Filling email...")
@@ -163,13 +175,14 @@ class MilanunciosContact(BaseContactAutomation):
                 'input[placeholder*="mail"]',
                 'input[placeholder*="correo"]',
                 'input.sui-AtomInput-input',
-                'input[type="text"]',  # Some sites use text type for email
+                'input[type="text"]',
                 'input[autocomplete="email"]',
                 'input[autocomplete="username"]',
+                'input',  # Last resort: any input
             ]
             for selector in email_selectors:
                 try:
-                    email_input = await self.page.wait_for_selector(selector, timeout=3000)
+                    email_input = await target_frame.wait_for_selector(selector, timeout=3000)
                     if email_input:
                         logger.info(f"Found email input with selector: {selector}")
                         break
@@ -177,23 +190,28 @@ class MilanunciosContact(BaseContactAutomation):
                     continue
 
             if not email_input:
-                # Last resort: try any visible input
-                try:
-                    all_inputs = await self.page.query_selector_all('input:visible')
-                    logger.info(f"Found {len(all_inputs)} visible inputs on page")
-                    for inp in all_inputs:
-                        inp_type = await inp.get_attribute('type') or 'text'
-                        inp_name = await inp.get_attribute('name') or ''
-                        logger.info(f"  Input: type={inp_type}, name={inp_name}")
-                        if inp_type in ('email', 'text') and inp_type != 'hidden':
-                            email_input = inp
-                            logger.info(f"Using fallback input: type={inp_type}, name={inp_name}")
+                # Scan all frames for inputs
+                for i, frame in enumerate(frames):
+                    try:
+                        all_inputs = await frame.query_selector_all('input')
+                        if all_inputs:
+                            logger.info(f"Frame {i} ({frame.url[:50]}) has {len(all_inputs)} inputs")
+                            for inp in all_inputs:
+                                inp_type = await inp.get_attribute('type') or 'text'
+                                inp_name = await inp.get_attribute('name') or ''
+                                logger.info(f"  Input: type={inp_type}, name={inp_name}")
+                                if inp_type in ('email', 'text'):
+                                    email_input = inp
+                                    target_frame = frame
+                                    logger.info(f"Using input from frame {i}")
+                                    break
+                        if email_input:
                             break
-                except Exception as e:
-                    logger.error(f"Error scanning inputs: {e}")
+                    except:
+                        continue
 
             if not email_input:
-                logger.error("Could not find email input field after all attempts")
+                logger.error("Could not find email input in any frame")
                 try:
                     await self.page.screenshot(path='debug_milanuncios_login.png')
                 except:
@@ -209,7 +227,7 @@ class MilanunciosContact(BaseContactAutomation):
             for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
                              'button:has-text("Siguiente")']:
                 try:
-                    continue_btn = await self.page.wait_for_selector(selector, timeout=5000)
+                    continue_btn = await target_frame.wait_for_selector(selector, timeout=5000)
                     if continue_btn:
                         break
                 except:
@@ -227,7 +245,7 @@ class MilanunciosContact(BaseContactAutomation):
             password_input = None
             for selector in ['input[type="password"]', 'input[name="password"]', '#password']:
                 try:
-                    password_input = await self.page.wait_for_selector(selector, timeout=10000)
+                    password_input = await target_frame.wait_for_selector(selector, timeout=10000)
                     if password_input:
                         break
                 except:
@@ -250,7 +268,7 @@ class MilanunciosContact(BaseContactAutomation):
             for selector in ['button:has-text("Iniciar")', 'button:has-text("Entrar")',
                              'button:has-text("Acceder")', 'button[type="submit"]']:
                 try:
-                    submit_btn = await self.page.wait_for_selector(selector, timeout=5000)
+                    submit_btn = await target_frame.wait_for_selector(selector, timeout=5000)
                     if submit_btn:
                         break
                 except:
