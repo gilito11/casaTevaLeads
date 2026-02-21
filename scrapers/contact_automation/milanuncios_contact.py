@@ -556,40 +556,78 @@ class MilanunciosContact(BaseContactAutomation):
             await password_input.fill(password)
             await asyncio.sleep(1)
 
-            # Submit login - prefer modal buttons via JS
-            logger.info("Submitting login...")
-            submit_clicked = await target_page.evaluate("""() => {
+            # Submit login via Enter on password field (most reliable for modal forms)
+            logger.info("Submitting login via Enter key on password field...")
+            await password_input.press('Enter')
+            await asyncio.sleep(5)
+
+            # Check for errors in modal (wrong password, etc.)
+            error_info = await target_page.evaluate("""() => {
                 const modal = document.querySelector('#modal-react-portal');
-                const containers = modal ? [modal, document] : [document];
-                for (const container of containers) {
-                    const buttons = container.querySelectorAll('button');
+                if (!modal) return null;
+                // Look for error messages
+                const errorEls = modal.querySelectorAll('[class*="error"], [class*="Error"], [role="alert"]');
+                const errors = Array.from(errorEls).map(e => e.textContent.trim()).filter(t => t.length > 0);
+                // Check if modal is still open (login didn't succeed)
+                const stillOpen = !!modal.querySelector('.sui-MoleculeModal.is-MoleculeModal-open');
+                // Check all buttons still visible
+                const buttons = Array.from(modal.querySelectorAll('button')).map(b => b.textContent.trim()).filter(t => t.length > 0);
+                return { errors, stillOpen, buttons };
+            }""")
+            logger.info(f"After submit - modal state: {json.dumps(error_info)}")
+
+            # If modal still open and no errors, try clicking submit button inside modal
+            if error_info and error_info.get('stillOpen') and not error_info.get('errors'):
+                logger.info("Modal still open after Enter, trying button click...")
+                submit_clicked = await target_page.evaluate("""() => {
+                    const modal = document.querySelector('#modal-react-portal .sui-MoleculeModal');
+                    if (!modal) return null;
+                    // Find submit-like button inside modal (not the X close button)
+                    const buttons = modal.querySelectorAll('button:not(.sui-MoleculeModal-close)');
                     for (const btn of buttons) {
                         const text = (btn.textContent || '').trim().toLowerCase();
-                        if (text.includes('iniciar') || text.includes('entrar')
-                            || text.includes('acceder') || text.includes('log in')) {
+                        // Look specifically for login submit buttons
+                        if (text === 'iniciar sesión' || text === 'entrar'
+                            || text === 'acceder' || text === 'log in' || text === 'submit') {
                             btn.click();
                             return text;
                         }
                     }
-                    const submit = container.querySelector('button[type="submit"]');
-                    if (submit) { submit.click(); return 'submit'; }
-                }
-                return null;
-            }""")
+                    // Try type=submit inside modal
+                    const submitBtn = modal.querySelector('button[type="submit"]');
+                    if (submitBtn) { submitBtn.click(); return 'submit-type'; }
+                    // Try the primary action button (last non-link button)
+                    const primaryBtns = modal.querySelectorAll('.sui-AtomButton--primary:not(.sui-AtomButton--link)');
+                    if (primaryBtns.length > 0) {
+                        const last = primaryBtns[primaryBtns.length - 1];
+                        last.click();
+                        return 'primary: ' + last.textContent.trim();
+                    }
+                    return null;
+                }""")
+                if submit_clicked:
+                    logger.info(f"Clicked modal submit button: '{submit_clicked}'")
+                    await asyncio.sleep(5)
 
-            if submit_clicked:
-                logger.info(f"Clicked login submit: '{submit_clicked}'")
-            else:
-                await password_input.press('Enter')
-                logger.info("Pressed Enter on password")
+            # Wait for redirect / session to establish
+            await asyncio.sleep(5)
 
-            # Wait for redirect back to milanuncios
-            await asyncio.sleep(8)
-            logger.info(f"After login submit URL: {self.page.url}")
+            current_url = self.page.url
+            logger.info(f"After login submit URL: {current_url}")
 
-            # If login was in popup, it might close and redirect the main page
+            # If URL changed from /registro, login might have worked
             for p in self.context.pages:
                 logger.info(f"Open page: {p.url[:80]}")
+
+            # Check for login errors
+            final_error = await target_page.evaluate("""() => {
+                const modal = document.querySelector('#modal-react-portal');
+                if (!modal) return null;
+                const errorEls = modal.querySelectorAll('[class*="error"], [class*="Error"], [role="alert"], [class*="warning"]');
+                return Array.from(errorEls).map(e => e.textContent.trim()).filter(t => t.length > 0);
+            }""")
+            if final_error:
+                logger.error(f"Login errors detected: {final_error}")
 
             # Verify login
             if await self.is_logged_in():
