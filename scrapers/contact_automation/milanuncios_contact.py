@@ -58,7 +58,8 @@ class MilanunciosContact(BaseContactAutomation):
         super().__init__(headless=headless, proxy=proxy)
         self.email = email or os.getenv('MILANUNCIOS_EMAIL')
         self.password = password or os.getenv('MILANUNCIOS_PASSWORD')
-        # NOTE: milanuncios does NOT need proxy (no DataDome), don't use DATADOME_PROXY
+        if not self.proxy:
+            self.proxy = os.getenv('DATADOME_PROXY')
         self._camoufox_cm = None
 
     async def setup_browser(self):
