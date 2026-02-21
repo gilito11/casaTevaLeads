@@ -217,13 +217,63 @@ class MilanunciosContact(BaseContactAutomation):
                 return False
 
             logger.info(f"Found login button: '{btn_box['text']}' at ({btn_box['x']:.0f}, {btn_box['y']:.0f})")
+
+            # Listen for popup windows before clicking
+            popup_page = None
+            self.context.on("page", lambda page: setattr(self, '_popup_page', page))
+            self._popup_page = None
+
             await self.page.mouse.click(btn_box['x'], btn_box['y'])
-            logger.info("Clicked login button via mouse, waiting for login form...")
+            logger.info("Clicked login button, waiting for login form...")
             await asyncio.sleep(5)
-            logger.info(f"After login click URL: {self.page.url}")
+
+            # Check what happened after click
+            logger.info(f"After click URL: {self.page.url}")
+
+            # Check for popup window
+            all_pages = self.context.pages
+            logger.info(f"Open pages: {len(all_pages)}")
+            for i, p in enumerate(all_pages):
+                logger.info(f"  Page {i}: {p.url[:80]}")
+
+            # Determine which page has the login form
+            target_page = self.page
+            if self._popup_page:
+                logger.info(f"Popup detected: {self._popup_page.url[:80]}")
+                target_page = self._popup_page
+                await asyncio.sleep(3)
+            elif len(all_pages) > 1:
+                # Use the newest page (likely the login popup)
+                target_page = all_pages[-1]
+                logger.info(f"Using newest page: {target_page.url[:80]}")
+                await asyncio.sleep(3)
+
+            # Check for iframes (login might be in an iframe modal)
+            frames = target_page.frames
+            logger.info(f"Target page has {len(frames)} frames")
+            for i, f in enumerate(frames):
+                logger.info(f"  Frame {i}: {f.url[:80]}")
+
+            # Check for modal dialog
+            modal_info = await target_page.evaluate("""() => {
+                // Check for dialog elements
+                const dialogs = document.querySelectorAll('dialog, [role="dialog"], [class*="modal"], [class*="Modal"], [class*="overlay"], [class*="Overlay"]');
+                const results = [];
+                for (const d of dialogs) {
+                    results.push({
+                        tag: d.tagName,
+                        class: (d.className || '').substring(0, 80),
+                        visible: d.offsetParent !== null || d.style.display !== 'none',
+                        inputs: d.querySelectorAll('input').length
+                    });
+                }
+                return results;
+            }""")
+            logger.info(f"Modal/dialog elements: {modal_info}")
 
             # --- STEP 1: Email ---
             logger.info("Step 1: Filling email...")
+            # Search for email input in target page and all frames
             email_input = None
             email_selectors = [
                 'input[type="email"]',
@@ -234,21 +284,27 @@ class MilanunciosContact(BaseContactAutomation):
                 'input[autocomplete="email"]',
                 'input[autocomplete="username"]',
             ]
-            for selector in email_selectors:
-                try:
-                    email_input = await self.page.wait_for_selector(selector, timeout=5000)
-                    if email_input:
-                        logger.info(f"Found email input: {selector}")
-                        break
-                except:
-                    continue
+
+            search_targets = [target_page] + list(target_page.frames[1:])  # page + iframes
+            for target in search_targets:
+                for selector in email_selectors:
+                    try:
+                        email_input = await target.wait_for_selector(selector, timeout=3000)
+                        if email_input:
+                            logger.info(f"Found email input: {selector} in {target.url[:50]}")
+                            target_page = target  # Use this frame for remaining steps
+                            break
+                    except:
+                        continue
+                if email_input:
+                    break
 
             if not email_input:
                 # Log what inputs exist for debugging
-                input_count = await self.page.evaluate("() => document.querySelectorAll('input').length")
-                logger.error(f"No email input found. Total inputs: {input_count}, URL: {self.page.url}")
+                input_count = await target_page.evaluate("() => document.querySelectorAll('input').length")
+                logger.error(f"No email input found. Total inputs: {input_count}, URL: {target_page.url}")
                 if input_count > 0:
-                    input_info = await self.page.evaluate("""() => {
+                    input_info = await target_page.evaluate("""() => {
                         return Array.from(document.querySelectorAll('input')).map(i => ({
                             type: i.type, name: i.name, id: i.id, placeholder: i.placeholder
                         }))
@@ -265,7 +321,7 @@ class MilanunciosContact(BaseContactAutomation):
             for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
                              'button:has-text("Siguiente")', 'button:has-text("Next")']:
                 try:
-                    continue_btn = await self.page.wait_for_selector(selector, timeout=5000)
+                    continue_btn = await target_page.wait_for_selector(selector, timeout=5000)
                     if continue_btn:
                         break
                 except:
@@ -277,21 +333,21 @@ class MilanunciosContact(BaseContactAutomation):
                 await email_input.press('Enter')
 
             await asyncio.sleep(3)
-            logger.info(f"After Continuar URL: {self.page.url}")
+            logger.info(f"After Continuar URL: {target_page.url}")
 
             # --- STEP 2: Password ---
             logger.info("Step 2: Filling password...")
             password_input = None
             for selector in ['input[type="password"]', 'input[name="password"]', '#password']:
                 try:
-                    password_input = await self.page.wait_for_selector(selector, timeout=10000)
+                    password_input = await target_page.wait_for_selector(selector, timeout=10000)
                     if password_input:
                         break
                 except:
                     continue
 
             if not password_input:
-                logger.error(f"Could not find password input. URL: {self.page.url}")
+                logger.error(f"Could not find password input. URL: {target_page.url}")
                 return False
 
             await password_input.fill(password)
@@ -304,7 +360,7 @@ class MilanunciosContact(BaseContactAutomation):
                              'button:has-text("Acceder")', 'button:has-text("Log in")',
                              'button[type="submit"]']:
                 try:
-                    submit_btn = await self.page.wait_for_selector(selector, timeout=5000)
+                    submit_btn = await target_page.wait_for_selector(selector, timeout=5000)
                     if submit_btn:
                         break
                 except:
