@@ -355,163 +355,233 @@ class MilanunciosContact(BaseContactAutomation):
             # --- FILL LOGIN FORM ---
             logger.info(f"Login form found on: {target_page.url[:80]}")
 
-            # Debug: dump all inputs on the login page
-            all_inputs = await target_page.evaluate("""() => {
-                return Array.from(document.querySelectorAll('input')).map(i => ({
-                    type: i.type, name: i.name, id: i.id,
-                    placeholder: i.placeholder,
-                    class: (i.className || '').substring(0, 60),
-                    visible: i.offsetParent !== null,
-                    autoComplete: i.autocomplete,
-                }))
-            }""")
-            logger.info(f"Inputs on login page: {json.dumps(all_inputs)}")
-
-            # If on /registro, look for "Ya tienes cuenta" / "Iniciar sesión" link
+            # If on /registro, click "Iniciar sesión" to switch to login mode
             if '/registro' in target_page.url:
-                logger.info("On registration page, looking for login link...")
-                login_link = await target_page.evaluate("""() => {
-                    const links = document.querySelectorAll('a, button');
-                    for (const el of links) {
+                logger.info("On registration page, clicking 'Iniciar sesión' to switch to login...")
+                await target_page.evaluate("""() => {
+                    const els = document.querySelectorAll('a, button');
+                    for (const el of els) {
                         const text = (el.textContent || '').trim().toLowerCase();
-                        if (text.includes('ya tienes') || text.includes('iniciar sesi')
-                            || text.includes('inicia sesi') || text.includes('acceder')
-                            || text.includes('log in') || text.includes('entrar')) {
-                            return { text: el.textContent.trim(), href: el.href || '', tag: el.tagName };
+                        if (text.includes('iniciar sesi') || text.includes('inicia sesi')) {
+                            el.click();
+                            return;
                         }
                     }
-                    return null;
                 }""")
-                if login_link:
-                    logger.info(f"Found login link on registration page: {login_link}")
-                    if login_link.get('href'):
-                        await target_page.goto(login_link['href'], wait_until='networkidle', timeout=30000)
-                        await asyncio.sleep(3)
-                    else:
-                        # Click the element
-                        await target_page.evaluate("""(text) => {
-                            const links = document.querySelectorAll('a, button');
-                            for (const el of links) {
-                                if (el.textContent.trim().toLowerCase().includes(text)) {
-                                    el.click();
-                                    break;
-                                }
+                await asyncio.sleep(3)
+
+                # Check if a modal appeared (ModalAuthenticationOnboarding)
+                modal_info = await target_page.evaluate("""() => {
+                    const modal = document.querySelector('#modal-react-portal .sui-MoleculeModal');
+                    if (!modal) return null;
+                    const inputs = modal.querySelectorAll('input');
+                    const buttons = Array.from(modal.querySelectorAll('button, a')).map(b => ({
+                        text: b.textContent.trim().substring(0, 50),
+                        tag: b.tagName,
+                        class: (b.className || '').substring(0, 60),
+                    }));
+                    return {
+                        hasModal: true,
+                        inputCount: inputs.length,
+                        buttons: buttons,
+                        text: modal.textContent.substring(0, 200),
+                    };
+                }""")
+
+                if modal_info:
+                    logger.info(f"Auth modal detected: {json.dumps(modal_info)}")
+
+                    # Look for "Continuar con email" or "Email" button in modal
+                    email_btn_clicked = await target_page.evaluate("""() => {
+                        const modal = document.querySelector('#modal-react-portal .sui-MoleculeModal');
+                        if (!modal) return false;
+                        const buttons = modal.querySelectorAll('button, a');
+                        for (const btn of buttons) {
+                            const text = (btn.textContent || '').trim().toLowerCase();
+                            if (text.includes('email') || text.includes('correo')
+                                || text.includes('continuar con e')) {
+                                btn.click();
+                                return true;
                             }
-                        }""", login_link['text'].lower()[:20])
+                        }
+                        return false;
+                    }""")
+                    if email_btn_clicked:
+                        logger.info("Clicked 'email' button in modal")
                         await asyncio.sleep(3)
-                    logger.info(f"After login link click URL: {target_page.url}")
+
+                    # Check if modal has an email input now
+                    modal_email = await target_page.evaluate("""() => {
+                        const modal = document.querySelector('#modal-react-portal');
+                        if (!modal) return null;
+                        const input = modal.querySelector('input[type="email"], input#email, input[type="text"]');
+                        return input ? { type: input.type, id: input.id } : null;
+                    }""")
+                    if modal_email:
+                        logger.info(f"Found email input inside modal: {modal_email}")
 
             await self.accept_cookies()
 
-            # Step 1: Email
+            # Step 1: Email - look for input in modal first, then in page
             logger.info("Step 1: Filling email...")
             email_input = None
-            # Try email-specific selectors first, then generic text input
-            for selector in ['input[type="email"]', 'input[name="email"]', 'input[autocomplete="email"]',
-                             'input.sui-AtomInput-input', 'input[type="text"]']:
-                try:
-                    email_input = await target_page.wait_for_selector(selector, timeout=5000)
-                    if email_input:
-                        # Verify it's not a search input
-                        is_search = await email_input.evaluate("""(el) => {
-                            const id = el.id || '';
-                            const ph = (el.placeholder || '').toLowerCase();
-                            return id.includes('search') || id.includes('suggester')
-                                || ph.includes('buscando') || ph.includes('buscar');
-                        }""")
-                        if is_search:
-                            logger.info(f"Skipping search input: {selector}")
-                            email_input = None
-                            continue
-                        logger.info(f"Found email input: {selector}")
-                        break
-                except:
-                    continue
 
-            if not email_input:
-                # Last resort: find any visible input
-                email_input_h = await target_page.evaluate_handle("""() => {
-                    const inputs = document.querySelectorAll('input');
-                    for (const inp of inputs) {
-                        if (inp.offsetParent && inp.type !== 'hidden' && inp.type !== 'search') {
-                            return inp;
-                        }
-                    }
-                    return null;
-                }""")
-                email_input = email_input_h.as_element() if email_input_h else None
+            # Priority 1: input inside modal portal
+            email_input_h = await target_page.evaluate_handle("""() => {
+                const modal = document.querySelector('#modal-react-portal');
+                if (modal) {
+                    const inp = modal.querySelector('input[type="email"], input#email, input[type="text"]');
+                    if (inp) return inp;
+                }
+                return null;
+            }""")
+            if email_input_h:
+                email_input = email_input_h.as_element()
                 if email_input:
-                    logger.info("Found input via last-resort visible scan")
+                    logger.info("Using email input from modal")
+
+            # Priority 2: page-level email input (for direct login pages)
+            if not email_input:
+                for selector in ['input[type="email"]', 'input[name="email"]', 'input#email']:
+                    try:
+                        email_input = await target_page.wait_for_selector(selector, timeout=5000)
+                        if email_input:
+                            logger.info(f"Found email input: {selector}")
+                            break
+                    except:
+                        continue
 
             if not email_input:
-                logger.error("Email input not found on login page")
+                # Debug dump
+                all_inputs = await target_page.evaluate("""() => {
+                    return Array.from(document.querySelectorAll('input')).map(i => ({
+                        type: i.type, id: i.id, name: i.name,
+                        inModal: !!i.closest('#modal-react-portal'),
+                        visible: i.offsetParent !== null,
+                    }))
+                }""")
+                logger.error(f"No email input found. All inputs: {json.dumps(all_inputs)}")
                 return False
 
             await email_input.fill(email)
             logger.info("Email filled")
             await asyncio.sleep(1)
 
-            # Click "Continuar" / submit
-            continue_btn = None
-            for selector in ['button:has-text("Continuar")', 'button[type="submit"]',
-                             'button:has-text("Siguiente")', 'button:has-text("Continue")']:
-                try:
-                    continue_btn = await target_page.wait_for_selector(selector, timeout=5000)
-                    if continue_btn:
-                        break
-                except:
-                    continue
+            # Click "Continuar" / submit - prefer buttons inside modal
+            continue_clicked = await target_page.evaluate("""() => {
+                // Try modal buttons first
+                const modal = document.querySelector('#modal-react-portal');
+                const containers = modal ? [modal, document] : [document];
+                for (const container of containers) {
+                    const buttons = container.querySelectorAll('button');
+                    for (const btn of buttons) {
+                        const text = (btn.textContent || '').trim().toLowerCase();
+                        if (text === 'continuar' || text === 'siguiente' || text === 'continue') {
+                            btn.click();
+                            return true;
+                        }
+                    }
+                    // Try submit buttons
+                    const submit = container.querySelector('button[type="submit"]');
+                    if (submit) { submit.click(); return true; }
+                }
+                return false;
+            }""")
 
-            if continue_btn:
-                await continue_btn.click()
+            if continue_clicked:
+                logger.info("Clicked Continuar via JS")
             else:
                 await email_input.press('Enter')
+                logger.info("Pressed Enter on email input")
 
             await asyncio.sleep(3)
             logger.info(f"After email submit URL: {target_page.url}")
 
-            # Step 2: Password (may appear on same page or new page)
+            # Step 2: Password (may appear in modal, same page, or new page)
             logger.info("Step 2: Filling password...")
             password_input = None
-            # Check current page and any new pages
-            pages_to_check = [target_page] + [p for p in self.context.pages if p != target_page]
-            for p in pages_to_check:
-                for selector in ['input[type="password"]', 'input[name="password"]', '#password']:
+
+            # Check modal first, then page-level
+            password_input_h = await target_page.evaluate_handle("""() => {
+                // Check inside modal first
+                const modal = document.querySelector('#modal-react-portal');
+                if (modal) {
+                    const inp = modal.querySelector('input[type="password"]');
+                    if (inp) return inp;
+                }
+                // Then check page
+                return document.querySelector('input[type="password"]');
+            }""")
+            if password_input_h:
+                password_input = password_input_h.as_element()
+                if password_input:
+                    logger.info("Found password input")
+
+            if not password_input:
+                # Wait for it to appear (might need time after email submit)
+                for selector in ['input[type="password"]', 'input#password']:
                     try:
-                        password_input = await p.wait_for_selector(selector, timeout=8000)
+                        password_input = await target_page.wait_for_selector(selector, timeout=10000)
                         if password_input:
-                            target_page = p
-                            logger.info(f"Found password input on {p.url[:60]}")
                             break
                     except:
                         continue
-                if password_input:
-                    break
+
+            # Check other pages (popup scenario)
+            if not password_input:
+                for p in self.context.pages:
+                    if p == target_page:
+                        continue
+                    try:
+                        password_input = await p.wait_for_selector('input[type="password"]', timeout=5000)
+                        if password_input:
+                            target_page = p
+                            logger.info(f"Found password on other page: {p.url[:60]}")
+                            break
+                    except:
+                        continue
 
             if not password_input:
-                logger.error(f"Password input not found. URL: {target_page.url}")
+                # Debug: check what's on the page now
+                page_state = await target_page.evaluate("""() => ({
+                    url: location.href,
+                    inputs: Array.from(document.querySelectorAll('input')).map(i => ({
+                        type: i.type, id: i.id, inModal: !!i.closest('#modal-react-portal'),
+                    })),
+                    modalPresent: !!document.querySelector('#modal-react-portal .sui-MoleculeModal'),
+                })""")
+                logger.error(f"Password input not found. State: {json.dumps(page_state)}")
                 return False
 
             await password_input.fill(password)
             await asyncio.sleep(1)
 
-            # Submit login
+            # Submit login - prefer modal buttons via JS
             logger.info("Submitting login...")
-            submit_btn = None
-            for selector in ['button:has-text("Iniciar")', 'button:has-text("Entrar")',
-                             'button:has-text("Acceder")', 'button:has-text("Log in")',
-                             'button[type="submit"]', 'button:has-text("Continue")']:
-                try:
-                    submit_btn = await target_page.wait_for_selector(selector, timeout=5000)
-                    if submit_btn:
-                        break
-                except:
-                    continue
+            submit_clicked = await target_page.evaluate("""() => {
+                const modal = document.querySelector('#modal-react-portal');
+                const containers = modal ? [modal, document] : [document];
+                for (const container of containers) {
+                    const buttons = container.querySelectorAll('button');
+                    for (const btn of buttons) {
+                        const text = (btn.textContent || '').trim().toLowerCase();
+                        if (text.includes('iniciar') || text.includes('entrar')
+                            || text.includes('acceder') || text.includes('log in')) {
+                            btn.click();
+                            return text;
+                        }
+                    }
+                    const submit = container.querySelector('button[type="submit"]');
+                    if (submit) { submit.click(); return 'submit'; }
+                }
+                return null;
+            }""")
 
-            if submit_btn:
-                await submit_btn.click()
+            if submit_clicked:
+                logger.info(f"Clicked login submit: '{submit_clicked}'")
             else:
                 await password_input.press('Enter')
+                logger.info("Pressed Enter on password")
 
             # Wait for redirect back to milanuncios
             await asyncio.sleep(8)
