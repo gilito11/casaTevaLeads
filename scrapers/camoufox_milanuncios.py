@@ -334,15 +334,19 @@ class CamoufoxMilanuncios:
             """)
 
             if json_data:
-                listings = self._parse_json_listings(json_data, zona_key)
+                listings, json_had_ads = self._parse_json_listings(json_data, zona_key)
                 if listings:
                     logger.info(f"Extracted {len(listings)} listings from JSON")
                     return listings
+                if json_had_ads:
+                    # JSON found ads but all filtered as professional/low price - trust it
+                    logger.info("JSON found ads but all filtered (professional/low price) - skipping DOM fallback")
+                    return []
 
         except Exception as e:
             logger.warning(f"JSON extraction failed: {e}")
 
-        # Method 2: DOM fallback
+        # Method 2: DOM fallback (only when JSON extraction completely failed)
         selectors = [
             'article[data-testid="ad-card"]',
             'article[class*="AdCard"]',
@@ -378,8 +382,9 @@ class CamoufoxMilanuncios:
 
         return listings
 
-    def _parse_json_listings(self, json_data: Dict, zona_key: str) -> List[Dict[str, Any]]:
-        """Parse listings from Milanuncios JSON structure."""
+    def _parse_json_listings(self, json_data: Dict, zona_key: str) -> tuple:
+        """Parse listings from Milanuncios JSON structure.
+        Returns (listings, json_had_ads) tuple."""
         listings = []
 
         ads = None
@@ -400,7 +405,7 @@ class CamoufoxMilanuncios:
 
         if not ads:
             logger.warning(f"No ads found in JSON. Keys: {list(json_data.keys()) if isinstance(json_data, dict) else type(json_data)}")
-            return []
+            return [], False
 
         logger.info(f"Found {len(ads)} ads in JSON")
         zona_info = ZONAS_GEOGRAFICAS.get(zona_key, {})
@@ -494,7 +499,7 @@ class CamoufoxMilanuncios:
                 logger.debug(f"Error parsing JSON ad: {e}")
 
         logger.info(f"JSON filter: {len(listings)} kept, {skipped_pro} professional, {skipped_price} low price (of {len(ads)} total)")
-        return listings
+        return listings, True
 
     def _parse_listing_card(self, item, zona_key: str) -> Optional[Dict[str, Any]]:
         """Parse a single listing card from DOM (fallback)."""
