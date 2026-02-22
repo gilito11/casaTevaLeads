@@ -410,7 +410,12 @@ class CamoufoxMilanuncios:
         for ad in ads:
             try:
                 # Check seller type from multiple fields
-                seller_type = ad.get('sellerType', '').lower()
+                # sellerType can be string OR object {"value": "professional", "isPrivate": false}
+                raw_seller_type = ad.get('sellerType', '')
+                if isinstance(raw_seller_type, dict):
+                    seller_type = str(raw_seller_type.get('value', '')).lower()
+                else:
+                    seller_type = str(raw_seller_type).lower()
                 seller_badge = str(ad.get('sellerBadge', '')).lower()
                 user_type = str(ad.get('userType', '')).lower()
 
