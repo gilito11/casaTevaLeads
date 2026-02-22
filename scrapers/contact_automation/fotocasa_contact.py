@@ -267,26 +267,41 @@ class FotocasaContact(BaseContactAutomation):
                         logger.info(f"Phone found via tel: pattern: {phone}")
                         return phone
 
-                # Spanish mobile pattern (6xx, 7xx) - most common for particulares
-                mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
-                matches = re.findall(mobile_pattern, page_content)
-                if matches:
-                    phone = re.sub(r'[\s.-]', '', matches[0])
-                    logger.info(f"Phone found via mobile pattern: {phone}")
-                    return phone
+                # Search for phone ONLY in description/contact section (NOT full page HTML)
+                try:
+                    desc_element = await self.page.query_selector(
+                        '[class*="description"], [class*="Description"], [class*="comment"]'
+                    )
+                    if desc_element:
+                        desc_text = await desc_element.inner_text()
+                        mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
+                        matches = re.findall(mobile_pattern, desc_text)
+                        if matches:
+                            phone = re.sub(r'[\s.-]', '', matches[0])
+                            logger.info(f"Phone found in description: {phone}")
+                            return phone
+                except:
+                    pass
 
                 logger.warning("Phone button clicked but number not found in page")
                 return None
             else:
                 logger.info("'Ver teléfono' button not found - may need login or already visible")
 
-                # Try to find phone directly in page (some listings show it)
-                page_text = await self.page.inner_text('body')
-                for pattern in [r'[6789]\d{8}', r'[6789]\d{2}\s?\d{3}\s?\d{3}']:
-                    matches = re.findall(pattern, page_text)
-                    if matches:
-                        phone = re.sub(r'\s', '', matches[0])
-                        return phone
+                # Search for phone ONLY in description element (NOT full page)
+                try:
+                    desc_element = await self.page.query_selector(
+                        '[class*="description"], [class*="Description"], [class*="comment"]'
+                    )
+                    if desc_element:
+                        desc_text = await desc_element.inner_text()
+                        mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
+                        matches = re.findall(mobile_pattern, desc_text)
+                        if matches:
+                            phone = re.sub(r'[\s.-]', '', matches[0])
+                            return phone
+                except:
+                    pass
 
                 return None
 

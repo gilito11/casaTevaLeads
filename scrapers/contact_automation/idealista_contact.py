@@ -567,13 +567,21 @@ class IdealistaContact(BaseContactAutomation):
                     logger.info(f"Phone found: {phone}")
                     return phone
 
-            # Spanish mobile pattern
-            mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
-            matches = re.findall(mobile_pattern, content)
-            if matches:
-                phone = re.sub(r'[\s.-]', '', matches[0])
-                logger.info(f"Phone found via pattern: {phone}")
-                return phone
+            # Search for phone ONLY in listing description (NOT full page HTML)
+            try:
+                desc_element = await self.page.query_selector(
+                    '.comment, .adCommentsLanguage, [class*="description"], [class*="comment"]'
+                )
+                if desc_element:
+                    desc_text = await desc_element.inner_text()
+                    mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
+                    matches = re.findall(mobile_pattern, desc_text)
+                    if matches:
+                        phone = re.sub(r'[\s.-]', '', matches[0])
+                        logger.info(f"Phone found in description: {phone}")
+                        return phone
+            except:
+                pass
 
             logger.info("No phone number found")
             return None

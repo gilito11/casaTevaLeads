@@ -686,7 +686,12 @@ class CamoufoxMilanuncios:
                     }
                 """)
                 if seller_info:
-                    st = str(seller_info.get('sellerType', '')).lower()
+                    # sellerType can be string OR object {"value": "professional", "isPrivate": false}
+                    raw_st = seller_info.get('sellerType', '')
+                    if isinstance(raw_st, dict):
+                        st = str(raw_st.get('value', '')).lower()
+                    else:
+                        st = str(raw_st).lower()
                     ut = str(seller_info.get('userType', '')).lower()
                     sb = str(seller_info.get('sellerBadge', '')).lower()
                     sn = seller_info.get('sellerName', '')

@@ -279,17 +279,21 @@ class HabitacliaContact(BaseContactAutomation):
                 if phone[0] in '6789':
                     return phone
 
-            # Spanish mobile pattern
-            mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
-            matches = re.findall(mobile_pattern, content)
-            if matches:
-                return re.sub(r'[\s.-]', '', matches[0])
-
-            # Try body text
-            body_text = await self.page.inner_text('body')
-            matches = re.findall(r'[6789]\d{8}', body_text)
-            if matches:
-                return matches[0]
+            # Search for phone ONLY in listing description (NOT full page HTML)
+            try:
+                desc_element = await self.page.query_selector(
+                    '.detail-description, [class*="description"], [id*="description"]'
+                )
+                if desc_element:
+                    desc_text = await desc_element.inner_text()
+                    mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
+                    matches = re.findall(mobile_pattern, desc_text)
+                    if matches:
+                        phone = re.sub(r'[\s.-]', '', matches[0])
+                        logger.info(f"Phone found in description: {phone}")
+                        return phone
+            except:
+                pass
 
             return None
 
