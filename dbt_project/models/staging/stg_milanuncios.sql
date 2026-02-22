@@ -281,9 +281,23 @@ final AS (
             OR LOWER(COALESCE(vendedor, '')) LIKE '%administración%'
         )
         -- Note: nombre_contacto = vendedor in this model, so vendor filter above covers both
-        -- Filter out listings with empty descriptions (just "Ref: NNN")
-        -- These are almost always professional listings where full description wasn't extracted
-        AND LENGTH(TRIM(REGEXP_REPLACE(COALESCE(descripcion, ''), 'Descripci.n|Ref:?\s*[0-9]+', '', 'g'))) >= 10
+        -- Filter out agency descriptions starting with reference codes (Ref:, Ref.)
+        -- Nearly all milanuncios listings with "Ref:" at the start are professional agencies
+        AND NOT TRIM(COALESCE(descripcion, '')) ~ '^Ref[:.]\s*'
+        -- Filter out known agency names/patterns in description
+        AND NOT (
+            LOWER(COALESCE(descripcion, '')) LIKE '%oportunalia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%100%% hipoteca%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%inmueble okupado%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%inmueble ocupado%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%piso ocupado%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%vivienda ocupada%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%fortuny serveis%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%clikalia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%entidad especializada%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%ejecuci_n hipotecaria%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%activos bancarios%'
+        )
 )
 
 SELECT * FROM final
