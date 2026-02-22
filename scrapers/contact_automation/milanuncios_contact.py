@@ -211,131 +211,40 @@ class MilanunciosContact(BaseContactAutomation):
             return False
 
         try:
-            # --- METHOD 1: Navigate to /mis-anuncios/ which forces auth redirect ---
-            logger.info("Method 1: Navigating to /mis-anuncios/ to trigger auth redirect...")
-            await self.page.goto(f"{self.BASE_URL}/mis-anuncios/", wait_until='domcontentloaded', timeout=45000)
-            await asyncio.sleep(5)
-
-            current_url = self.page.url
-            logger.info(f"After /mis-anuncios/ URL: {current_url}")
-
-            # Check if we got redirected to a login page
-            target_page = await self._find_login_page()
+            # Go directly to /registro (proven working method)
+            logger.info("Navigating to /registro...")
+            target_page = self.page
             has_email_input = False
-            try:
-                has_email_input = await target_page.evaluate("""() => {
-                    const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="password"]');
-                    return inputs.length > 0;
-                }""")
-            except:
-                pass
 
-            if not has_email_input:
-                # --- METHOD 2: Click login button and catch popup ---
-                logger.info("Method 2: Click login button + catch popup...")
-                await self.page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=45000)
-                await asyncio.sleep(5)
-                await self.accept_cookies()
-                await asyncio.sleep(2)
-
-                # Log all navigation/popup activity
-                auth_urls = []
-
-                def on_request(request):
-                    url = request.url
-                    if any(x in url for x in ['login', 'schibsted', 'authn', 'oauth', 'authorize']):
-                        auth_urls.append(url)
-                        logger.info(f"Auth request detected: {url[:100]}")
-
-                self.page.on('request', on_request)
-
-                # Try to catch popup
-                login_popup = None
+            login_urls = [
+                "https://www.milanuncios.com/registro",
+                "https://login.schibsted.com/authn/identifier",
+            ]
+            for url in login_urls:
                 try:
-                    async with self.context.expect_page(timeout=10000) as popup_info:
-                        # Click the login button via JS (find + click with coordinates)
-                        btn_info = await self.page.evaluate("""() => {
-                            const buttons = document.querySelectorAll('button, a, [role="button"]');
-                            for (const btn of buttons) {
-                                const text = (btn.textContent || '').trim();
-                                if (/iniciar sesi|acceder|^entrar$/i.test(text)) {
-                                    return { text, x: btn.getBoundingClientRect().x + btn.getBoundingClientRect().width / 2,
-                                             y: btn.getBoundingClientRect().y + btn.getBoundingClientRect().height / 2 };
-                                }
-                            }
-                            return null;
+                    logger.info(f"Trying {url}...")
+                    await self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                    await self.accept_cookies()
+                    # Wait for SPA JS to render the form
+                    for wait in [3, 5, 5]:
+                        has_email_input = await self.page.evaluate("""() => {
+                            const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="text"], input[type="password"]');
+                            return inputs.length > 0;
                         }""")
-
-                        if btn_info:
-                            logger.info(f"Clicking '{btn_info['text']}' at ({btn_info['x']:.0f}, {btn_info['y']:.0f})")
-                            await self.page.mouse.click(btn_info['x'], btn_info['y'])
-                        else:
-                            logger.error("Login button not found on homepage")
-                            return False
-
-                    login_popup = await popup_info.value
-                    logger.info(f"Popup opened: {login_popup.url[:100]}")
-                    await login_popup.wait_for_load_state('domcontentloaded')
-                    await asyncio.sleep(3)
-                    target_page = login_popup
-                except Exception as popup_err:
-                    logger.info(f"No popup detected ({popup_err}), checking redirect...")
-                    await asyncio.sleep(3)
-
-                    # Check if current page navigated
-                    logger.info(f"After click URL: {self.page.url}")
-
-                    # Check if any auth URLs were captured
-                    if auth_urls:
-                        logger.info(f"Captured auth URLs: {auth_urls}")
-                        # Navigate to the auth URL directly
-                        await self.page.goto(auth_urls[0], wait_until='domcontentloaded', timeout=30000)
-                        await asyncio.sleep(3)
-
-                    target_page = await self._find_login_page()
-
-                self.page.remove_listener('request', on_request)
-
-                # Final check: do we have a login form?
-                try:
-                    has_email_input = await target_page.evaluate("""() => {
-                        const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="password"]');
-                        return inputs.length > 0;
-                    }""")
-                except:
-                    has_email_input = False
-
-            if not has_email_input:
-                # --- METHOD 3: Try direct Schibsted/milanuncios login URLs ---
-                logger.info("Method 3: Trying direct login URLs...")
-                login_urls = [
-                    "https://www.milanuncios.com/registro",
-                    "https://login.schibsted.com/authn/identifier",
-                ]
-                for url in login_urls:
-                    try:
-                        logger.info(f"Trying {url}...")
-                        await self.page.goto(url, wait_until='networkidle', timeout=30000)
-                        # Wait longer for SPA JS to render the form
-                        for wait in [3, 5, 5]:
-                            has_email_input = await self.page.evaluate("""() => {
-                                const inputs = document.querySelectorAll('input[type="email"], input[name="email"], input[type="text"], input[type="password"]');
-                                return inputs.length > 0;
-                            }""")
-                            if has_email_input:
-                                break
-                            logger.info(f"No inputs yet, waiting {wait}s for SPA to render...")
-                            await asyncio.sleep(wait)
                         if has_email_input:
-                            target_page = self.page
-                            logger.info(f"Found login form at {self.page.url}")
                             break
-                        else:
-                            body_len = await self.page.evaluate("() => document.body.innerHTML.length")
-                            logger.info(f"No form at {self.page.url[:60]} (body: {body_len} bytes)")
-                    except Exception as e:
-                        logger.info(f"Failed loading {url}: {e}")
-                        continue
+                        logger.info(f"No inputs yet, waiting {wait}s for SPA to render...")
+                        await asyncio.sleep(wait)
+                    if has_email_input:
+                        target_page = self.page
+                        logger.info(f"Found login form at {self.page.url}")
+                        break
+                    else:
+                        body_len = await self.page.evaluate("() => document.body.innerHTML.length")
+                        logger.info(f"No form at {self.page.url[:60]} (body: {body_len} bytes)")
+                except Exception as e:
+                    logger.info(f"Failed loading {url}: {e}")
+                    continue
 
             if not has_email_input:
                 # Debug: dump page info
