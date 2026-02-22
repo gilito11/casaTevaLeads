@@ -137,6 +137,8 @@ jobs:
         continue-on-error: true
         run: python scripts/test_milanuncios_login.py
 
+      # TODO: Remove force-queue step once milanuncios contact is confirmed working
+
       - name: Process contact queue
         if: ${{ github.event.inputs.max_contacts != '0' }}
         continue-on-error: true

@@ -652,9 +652,15 @@ class MilanunciosContact(BaseContactAutomation):
             if final_error:
                 logger.error(f"Login errors detected: {final_error}")
 
-            # Verify login
+            # If modal closed without errors, login succeeded (Schibsted behavior)
+            if error_info and not error_info.get('stillOpen') and not error_info.get('errors'):
+                logger.info("Login successful! (modal closed without errors)")
+                await self.save_cookies()
+                return True
+
+            # Fallback: verify via homepage check
             if await self.is_logged_in():
-                logger.info("Login successful!")
+                logger.info("Login successful! (verified via homepage)")
                 await self.save_cookies()
                 return True
             else:
