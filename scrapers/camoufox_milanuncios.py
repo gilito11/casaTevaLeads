@@ -478,7 +478,7 @@ class CamoufoxMilanuncios:
                     'zona_busqueda': zona_key,
                     'url_anuncio': url_anuncio,
                     'es_particular': not is_professional,
-                    'seller_type': seller_type or ('particular' if not is_professional else 'professional'),
+                    'seller_type': seller_type or ('professional' if is_professional else ''),
                     'tipo_inmueble': 'piso',
                     'fotos': fotos,
                 }
@@ -600,7 +600,7 @@ class CamoufoxMilanuncios:
                 'zona_busqueda': zona_key,
                 'url_anuncio': f"{self.BASE_URL}{href}" if href.startswith('/') else href,
                 'es_particular': not is_professional,
-                'seller_type': 'professional' if is_professional else 'particular',
+                'seller_type': 'professional' if is_professional else '',
                 'tipo_inmueble': 'piso',
                 'fotos': [],
             }
@@ -695,8 +695,8 @@ class CamoufoxMilanuncios:
                         logger.info(f"Detail JSON: professional detected (type={st}, user={ut}, badge={sb}) - {listing.get('anuncio_id')}")
                     elif sn:
                         listing['vendedor'] = sn
-                        if not listing.get('seller_type'):
-                            listing['seller_type'] = st or 'particular'
+                        if not listing.get('seller_type') and st:
+                            listing['seller_type'] = st
             except:
                 pass
 

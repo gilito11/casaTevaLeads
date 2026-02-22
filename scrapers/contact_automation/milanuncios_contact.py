@@ -632,17 +632,10 @@ class MilanunciosContact(BaseContactAutomation):
                     logger.info(f"Phone found via tel: pattern: {phone}")
                     return phone
 
-            # Spanish mobile pattern
+            # Only search for phone in the listing description text (NOT full page HTML)
             mobile_pattern = r'(?<!\d)([67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})(?!\d)'
-            matches = re.findall(mobile_pattern, page_content)
-            if matches:
-                phone = re.sub(r'[\s.-]', '', matches[0])
-                logger.info(f"Phone found via mobile pattern: {phone}")
-                return phone
-
-            # Also check description text
             try:
-                desc_element = await self.page.query_selector('[class*="description"], [class*="Description"]')
+                desc_element = await self.page.query_selector('[class*="description"], [class*="Description"], [class*="detail-body"]')
                 if desc_element:
                     desc_text = await desc_element.inner_text()
                     matches = re.findall(mobile_pattern, desc_text)
