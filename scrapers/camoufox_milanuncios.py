@@ -417,15 +417,20 @@ class CamoufoxMilanuncios:
                 # Check seller type from multiple fields
                 # sellerType can be string OR object {"value": "professional", "isPrivate": false}
                 raw_seller_type = ad.get('sellerType', '')
+                is_private = None
                 if isinstance(raw_seller_type, dict):
                     seller_type = str(raw_seller_type.get('value', '')).lower()
+                    is_private = raw_seller_type.get('isPrivate')
                 else:
                     seller_type = str(raw_seller_type).lower()
                 seller_badge = str(ad.get('sellerBadge', '')).lower()
                 user_type = str(ad.get('userType', '')).lower()
+                has_shop = bool(ad.get('shop'))
 
                 is_professional = (
                     seller_type in ('professional', 'profesional')
+                    or is_private is False
+                    or has_shop
                     or 'pro' in seller_badge
                     or user_type in ('professional', 'profesional')
                 )
@@ -684,6 +689,8 @@ class CamoufoxMilanuncios:
                                     sellerBadge: ad.sellerBadge || ad.seller_badge || '',
                                     sellerName: (ad.seller && ad.seller.name) || ad.sellerName || ad.advertiserName || '',
                                     isPro: ad.isProfessional || ad.is_professional || false,
+                                    hasShop: !!(ad.shop),
+                                    shopName: (ad.shop && ad.shop.name) || '',
                                 };
                             }
                         } catch(e) {}
@@ -693,21 +700,29 @@ class CamoufoxMilanuncios:
                 if seller_info:
                     # sellerType can be string OR object {"value": "professional", "isPrivate": false}
                     raw_st = seller_info.get('sellerType', '')
+                    is_private_detail = None
                     if isinstance(raw_st, dict):
                         st = str(raw_st.get('value', '')).lower()
+                        is_private_detail = raw_st.get('isPrivate')
                     else:
                         st = str(raw_st).lower()
                     ut = str(seller_info.get('userType', '')).lower()
                     sb = str(seller_info.get('sellerBadge', '')).lower()
                     sn = seller_info.get('sellerName', '')
                     is_pro_json = seller_info.get('isPro', False)
+                    has_shop = seller_info.get('hasShop', False)
+                    shop_name = seller_info.get('shopName', '')
 
-                    if st in ('professional', 'profesional') or ut in ('professional', 'profesional') or 'pro' in sb or is_pro_json:
+                    if (st in ('professional', 'profesional')
+                            or is_private_detail is False
+                            or has_shop
+                            or ut in ('professional', 'profesional')
+                            or 'pro' in sb
+                            or is_pro_json):
                         listing['es_particular'] = False
                         listing['seller_type'] = 'professional'
-                        if sn:
-                            listing['vendedor'] = sn
-                        logger.info(f"Detail JSON: professional detected (type={st}, user={ut}, badge={sb}) - {listing.get('anuncio_id')}")
+                        listing['vendedor'] = shop_name or sn or listing.get('vendedor', '')
+                        logger.info(f"Detail JSON: professional (type={st}, isPrivate={is_private_detail}, shop={has_shop}, name={shop_name or sn}) - {listing.get('anuncio_id')}")
                     elif sn:
                         listing['vendedor'] = sn
                         if not listing.get('seller_type') and st:
@@ -715,42 +730,46 @@ class CamoufoxMilanuncios:
             except:
                 pass
 
-            # Verify seller type from DOM selectors (fallback)
+            # Verify seller type from DOM - look for visible "Profesional" badge
             try:
-                seller_selectors = [
-                    '[class*="SellerBadge"]', '[class*="seller-badge"]',
-                    '[class*="Seller"]', '[class*="seller"]',
-                    '[class*="advertiser"]', '[class*="Advertiser"]',
-                    '[data-testid*="seller"]', '[data-testid*="Seller"]',
-                ]
-                seller_name = None
-                for sel in seller_selectors:
-                    try:
-                        elem = page.query_selector(sel)
-                        if elem:
-                            seller_text = elem.inner_text().strip()
-                            if seller_text:
-                                seller_name = seller_text
-                                seller_lower = seller_text.lower()
-                                pro_keywords = [
-                                    'profesional', 'professional', 'inmobiliaria',
-                                    'agencia', 'real estate', 'properties',
-                                    ' s.l.', ' sl', ' s.a.', ' s.l',
-                                    'consulting', 'gestoria', 'asesores',
-                                    'inversiones', 'patrimonio', 'realty',
-                                    'soluciones', 'servicios', 'pisos.com',
-                                    'habitaclia', 'fotocasa', 'idealista',
-                                ]
-                                if any(w in seller_lower for w in pro_keywords):
-                                    listing['es_particular'] = False
-                                    listing['seller_type'] = 'professional'
+                # Direct check: the "Profesional" badge text visible on the page
+                pro_badge = page.evaluate("""
+                    () => {
+                        const all = document.querySelectorAll('*');
+                        for (const el of all) {
+                            if (el.children.length === 0 || el.tagName === 'SPAN' || el.tagName === 'P') {
+                                const txt = (el.textContent || '').trim();
+                                if (txt === 'Profesional' || txt === 'Professional') {
+                                    return txt;
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                """)
+                if pro_badge:
+                    listing['es_particular'] = False
+                    listing['seller_type'] = 'professional'
+                    logger.info(f"Detail DOM: '{pro_badge}' badge found - {listing.get('anuncio_id')}")
+
+                # Also try to get seller name from DOM if not yet set
+                if not listing.get('vendedor'):
+                    seller_selectors = [
+                        '[class*="SellerBadge"]', '[class*="seller-badge"]',
+                        '[class*="Seller"]', '[class*="seller"]',
+                        '[class*="advertiser"]', '[class*="Advertiser"]',
+                        '[data-testid*="seller"]', '[data-testid*="Seller"]',
+                    ]
+                    for sel in seller_selectors:
+                        try:
+                            elem = page.query_selector(sel)
+                            if elem:
+                                seller_text = elem.inner_text().strip()
+                                if seller_text and len(seller_text) < 100:
                                     listing['vendedor'] = seller_text
-                                    logger.info(f"Detail DOM: professional detected '{seller_text}' - {listing.get('anuncio_id')}")
                                     break
-                    except:
-                        continue
-                if seller_name and listing.get('es_particular', True) and not listing.get('vendedor'):
-                    listing['vendedor'] = seller_name
+                        except:
+                            continue
             except:
                 pass
 
