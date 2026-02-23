@@ -301,6 +301,19 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%ejecuci_n hipotecaria%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%activos bancarios%'
         )
+        -- Filter agencies posing as particulars (agency name/legal entity in description)
+        AND NOT (
+            COALESCE(descripcion, '') ~ '(?i)\b\w+\s+s\.?l\.?\b'
+            OR COALESCE(descripcion, '') ~ '(?i)\b\w+\s+s\.?a\.?\b'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%nuestra agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%nuestra inmobiliaria%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%nuestro despacho%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%licencia turística%con%agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%contacte con nosotros%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%llámenos%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%visitenos%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%visítenos%'
+        )
 )
 
 SELECT * FROM final
