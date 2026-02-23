@@ -104,7 +104,8 @@ normalized AS (
         CASE
             WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'professional' THEN FALSE
             WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'profesional' THEN FALSE
-            WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) = 'particular' THEN TRUE
+            WHEN LOWER(COALESCE(raw_data->>'seller_type', '')) IN ('particular', 'private') THEN TRUE
+            WHEN (raw_data->>'es_particular')::BOOLEAN = TRUE THEN TRUE
             WHEN (raw_data->>'es_particular')::BOOLEAN = FALSE THEN FALSE
             ELSE FALSE
         END AS es_particular,
