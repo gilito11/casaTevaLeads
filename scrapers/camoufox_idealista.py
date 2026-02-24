@@ -44,6 +44,14 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Balaguer',
         'url_path': 'balaguer-lleida',
     },
+    'mollerussa': {
+        'nombre': 'Mollerussa',
+        'url_path': 'mollerussa-lleida',
+    },
+    'les_borges_blanques': {
+        'nombre': 'Les Borges Blanques',
+        'url_path': 'les-borges-blanques-lleida',
+    },
     # Cities - Tarragona
     'tarragona': {
         'nombre': 'Tarragona',

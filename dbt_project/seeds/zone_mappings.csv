@@ -1,0 +1,26 @@
+pattern,zone_name,region,priority
+lleida,Lleida Ciudad,Lleida,10
+lerida,Lleida Ciudad,Lleida,10
+balaguer,Lleida - Balaguer,Lleida,20
+mollerussa,Lleida - Mollerussa,Lleida,20
+borges blanques,Lleida - Les Borges Blanques,Lleida,20
+les borges blanques,Lleida - Les Borges Blanques,Lleida,21
+salou,Costa Dorada - Salou,Costa Dorada,10
+cambrils,Costa Dorada - Cambrils,Costa Dorada,10
+tarragona,Tarragona Ciudad,Tarragona,10
+reus,Tarragona - Reus,Tarragona,20
+vila-seca,Costa Dorada - Vila-seca,Costa Dorada,20
+vilaseca,Costa Dorada - Vila-seca,Costa Dorada,21
+torredembarra,Costa Dorada - Torredembarra,Costa Dorada,20
+vendrell,Costa Dorada - Vendrell,Costa Dorada,20
+calafell,Costa Dorada - Calafell,Costa Dorada,20
+tortosa,Terres Ebre - Tortosa,Terres Ebre,10
+amposta,Terres Ebre - Amposta,Terres Ebre,20
+valls,Tarragona - Valls,Tarragona,20
+mont-roig,Costa Dorada - Mont-roig,Costa Dorada,20
+montroig,Costa Dorada - Mont-roig,Costa Dorada,21
+miami playa,Costa Dorada - Miami Platja,Costa Dorada,20
+miami platja,Costa Dorada - Miami Platja,Costa Dorada,21
+la pineda,Costa Dorada - La Pineda,Costa Dorada,20
+altafulla,Costa Dorada - Altafulla,Costa Dorada,20
+coma-ruga,Costa Dorada - Coma-ruga,Costa Dorada,20

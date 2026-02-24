@@ -43,6 +43,10 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Mollerussa',
         'url_path': 'pisos-en-mollerussa-lleida/',
     },
+    'les_borges_blanques': {
+        'nombre': 'Les Borges Blanques',
+        'url_path': 'pisos-en-les-borges-blanques-lleida/',
+    },
     'tremp': {
         'nombre': 'Tremp',
         'url_path': 'pisos-en-tremp-lleida/',

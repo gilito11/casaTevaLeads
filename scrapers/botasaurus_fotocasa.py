@@ -98,6 +98,7 @@ ZONAS_GEOGRAFICAS = {
     'lleida': {'nombre': 'Lleida', 'url_path': 'lleida-capital/todas-las-zonas'},
     'balaguer': {'nombre': 'Balaguer', 'url_path': 'balaguer/todas-las-zonas'},
     'mollerussa': {'nombre': 'Mollerussa', 'url_path': 'mollerussa/todas-las-zonas'},
+    'les_borges_blanques': {'nombre': 'Les Borges Blanques', 'url_path': 'les-borges-blanques/todas-las-zonas'},
     'tremp': {'nombre': 'Tremp', 'url_path': 'tremp/todas-las-zonas'},
     'tarrega': {'nombre': 'Tàrrega', 'url_path': 'tarrega/todas-las-zonas'},
     'alpicat': {'nombre': 'Alpicat', 'url_path': 'alpicat/todas-las-zonas'},
