@@ -12,7 +12,7 @@ from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Case, When, IntegerField
 from django.db import connection, models, IntegrityError
 from django.views.decorators.http import require_POST
 
@@ -1168,6 +1168,10 @@ def cancel_queued_contact_view(request, queue_id):
     if item.estado == 'PENDIENTE':
         item.estado = 'CANCELADO'
         item.save()
+
+        if request.headers.get('HX-Request'):
+            html = render_to_string('leads/partials/contact_queue_row.html', {'item': item}, request=request)
+            return HttpResponse(html)
         return JsonResponse({'status': 'cancelled'})
     else:
         return JsonResponse({
@@ -1190,10 +1194,8 @@ def retry_queued_contact_view(request, queue_id):
         item.save()
 
         if request.headers.get('HX-Request'):
-            # Trigger HTMX page refresh
-            response = HttpResponse(status=200)
-            response['HX-Refresh'] = 'true'
-            return response
+            html = render_to_string('leads/partials/contact_queue_row.html', {'item': item}, request=request)
+            return HttpResponse(html)
         return JsonResponse({'status': 'requeued', 'id': item.id})
     else:
         return JsonResponse({
@@ -1222,9 +1224,8 @@ def mark_contact_responded_view(request, queue_id):
             )
 
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=200)
-            response['HX-Refresh'] = 'true'
-            return response
+            html = render_to_string('leads/partials/contact_queue_row.html', {'item': item}, request=request)
+            return HttpResponse(html)
         return JsonResponse({'status': 'marked_responded', 'id': item.id})
     else:
         return JsonResponse({
@@ -1280,7 +1281,15 @@ def task_list_view(request):
     if filtro_tipo:
         tasks_qs = tasks_qs.filter(tipo=filtro_tipo)
 
-    tasks_qs = tasks_qs.order_by('completada', 'fecha_vencimiento', '-prioridad')
+    priority_order = Case(
+        When(prioridad='urgente', then=0),
+        When(prioridad='alta', then=1),
+        When(prioridad='media', then=2),
+        When(prioridad='baja', then=3),
+        default=4,
+        output_field=IntegerField(),
+    )
+    tasks_qs = tasks_qs.annotate(priority_order=priority_order).order_by('completada', 'fecha_vencimiento', 'priority_order')
 
     # Estadísticas
     stats = {

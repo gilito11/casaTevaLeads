@@ -216,15 +216,23 @@ class CamoufoxHabitaclia:
             title_match = re.search(r'<h1[^>]*>([^<]+)</h1>', html)
             listing['titulo'] = title_match.group(1).strip() if title_match else None
 
-            # Price
+            # Price - try multiple patterns
+            # Pattern 1: From feature-container (uses <div> tags, not <ul>)
             feature_container = re.search(
-                r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</ul>',
+                r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</(?:ul|div)>',
                 html, re.DOTALL | re.IGNORECASE
             )
             if feature_container:
-                price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*€', feature_container.group(1))
+                # Only match plain price (€), not price-per-m2 (€/m)
+                price_match = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*€(?!/)', feature_container.group(1))
                 if price_match:
                     listing['precio'] = float(price_match.group(1).replace('.', ''))
+            # Pattern 2: From main price heading (class="price")
+            if 'precio' not in listing:
+                price_heading = re.search(r'class="[^"]*price[^"]*"[^>]*>[\s]*(\d{1,3}(?:\.\d{3})*)\s*€', html, re.IGNORECASE)
+                if price_heading:
+                    listing['precio'] = float(price_heading.group(1).replace('.', ''))
+            # Pattern 3: From title/meta (e.g., "Piso por 145.600 €")
             if 'precio' not in listing:
                 title_price = re.search(r'por\s+(\d{1,3}(?:\.\d{3})*)\s*€', html, re.IGNORECASE)
                 if title_price:

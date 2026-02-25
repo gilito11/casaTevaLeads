@@ -745,9 +745,8 @@ def zones_grid_view(request):
                     z.ma, z.fc, z.ha, z.id
                 FROM zonas_config z
                 LEFT JOIN ultimo_scrape u ON (
-                    u.zona ILIKE '%%' || z.nombre || '%%'
-                    OR u.zona ILIKE '%%' || z.slug || '%%'
-                    OR z.nombre ILIKE '%%' || u.zona || '%%'
+                    LOWER(u.zona) = LOWER(z.nombre)
+                    OR LOWER(u.zona) = LOWER(z.slug)
                 )
                 GROUP BY z.nombre, z.slug, z.activa, z.ma, z.fc, z.ha, z.id
                 ORDER BY z.activa DESC, z.nombre

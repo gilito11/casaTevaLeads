@@ -185,7 +185,10 @@ def validate_listing(row, portal):
         scraped_price = raw.get('precio')
         if scraped_price:
             try:
-                scraped_price = int(str(scraped_price).replace('.', '').replace(',', '').replace('€', '').strip())
+                # Convert to float first to handle "690000.0" correctly,
+                # then to int. Previous code did str().replace('.','') which
+                # turned 690000.0 into 6900000 (x10 bug).
+                scraped_price = int(float(scraped_price))
             except (ValueError, TypeError):
                 scraped_price = None
 
