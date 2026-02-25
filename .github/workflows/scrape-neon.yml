@@ -113,6 +113,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      - name: Check portal health
+        if: always()
+        continue-on-error: true
+        run: python scripts/check_portal_health.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Run dbt transformations
         run: |
           cd dbt_project

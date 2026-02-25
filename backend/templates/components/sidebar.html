@@ -168,6 +168,23 @@
                 </a>
             </li>
 
+            <!-- ACM - Valoracion -->
+            <li>
+                <a href="{% url 'analytics:acm' %}"
+                   class="flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors
+                   {% if 'valoracion' in request.path %}
+                   bg-primary-50 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400
+                   {% else %}
+                   text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+                   {% endif %}">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 7h6m0 10v-3m-3 3v-6m-3 6v-1M3 3v18h18"/>
+                    </svg>
+                    <span x-show="open" x-transition class="font-medium">Valoracion ACM</span>
+                </a>
+            </li>
+
             <!-- Real-Time Contact -->
             <li>
                 <a href="{% url 'analytics:realtime_dashboard' %}"
@@ -306,6 +323,7 @@
                     <li><a href="{% url 'leads:contact_queue' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Cola Contactos</a></li>
                     <li><a href="{% url 'scrapers' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Scrapers</a></li>
                     <li><a href="{% url 'analytics:dashboard' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Analytics</a></li>
+                    <li><a href="{% url 'analytics:acm' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Valoracion ACM</a></li>
                     <li><a href="{% url 'profile' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Mi Perfil</a></li>
                     <li><a href="{% url 'alert_settings' %}" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Alertas</a></li>
                 </ul>

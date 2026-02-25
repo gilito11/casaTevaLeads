@@ -388,14 +388,17 @@ def delete_lead_view(request, lead_id):
     with connection.cursor() as cursor:
         cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
 
-    # Delete from raw_listings (source of truth) - dbt view will update on next run
+    # Eliminar de contact queue
     with connection.cursor() as cursor:
-        cursor.execute("""
-            DELETE FROM raw.raw_listings
-            WHERE (raw_data->>'anuncio_id') IN (
-                SELECT source_listing_id FROM public_marts.dim_leads WHERE lead_id = %s
+        cursor.execute("DELETE FROM leads_contact_queue WHERE lead_id = %s", [lead_id])
+
+    # Eliminar de raw.raw_listings (source table; dim_leads is a view)
+    if lead.anuncio_id and lead.portal:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM raw.raw_listings WHERE tenant_id = %s AND portal = %s AND (raw_data->>'anuncio_id') = %s",
+                [tenant_id, lead.portal, lead.anuncio_id]
             )
-        """, [lead_id])
 
     # Devolver respuesta vacía para que HTMX elimine la fila
     return HttpResponse("")
