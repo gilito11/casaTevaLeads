@@ -75,39 +75,41 @@ def lead_list_view(request):
     if estado:
         # Obtener lead_ids que tienen el estado especificado en LeadEstado
         lead_ids_with_estado = LeadEstado.objects.filter(
-            estado=estado
+            tenant_id=tenant_id, estado=estado
         ).values_list('lead_id', flat=True)
 
         if estado == 'NUEVO':
             # Para estado NUEVO: leads que no tienen LeadEstado O tienen estado NUEVO
             leads_qs = leads_qs.filter(
-                Q(lead_id__in=[lid for lid in lead_ids_with_estado]) |
-                ~Q(lead_id__in=LeadEstado.objects.values_list('lead_id', flat=True))
+                Q(lead_id__in=lead_ids_with_estado) |
+                ~Q(lead_id__in=LeadEstado.objects.filter(tenant_id=tenant_id).values_list('lead_id', flat=True))
             )
         else:
             # Para otros estados: solo los que tienen ese estado en LeadEstado
-            leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_with_estado])
+            leads_qs = leads_qs.filter(lead_id__in=lead_ids_with_estado)
 
     # Filtrar por asignacion
     if asignado:
         if asignado == 'me':
             # Mis leads (asignados al usuario actual)
             lead_ids_asignados = LeadEstado.objects.filter(
-                asignado_a=request.user
+                tenant_id=tenant_id, asignado_a=request.user
             ).values_list('lead_id', flat=True)
-            leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_asignados])
+            leads_qs = leads_qs.filter(lead_id__in=lead_ids_asignados)
         elif asignado == 'unassigned':
             # Leads sin asignar
-            lead_ids_asignados = LeadEstado.objects.exclude(
+            lead_ids_asignados = LeadEstado.objects.filter(
+                tenant_id=tenant_id
+            ).exclude(
                 asignado_a__isnull=True
             ).values_list('lead_id', flat=True)
-            leads_qs = leads_qs.exclude(lead_id__in=[lid for lid in lead_ids_asignados])
+            leads_qs = leads_qs.exclude(lead_id__in=lead_ids_asignados)
         else:
             # Leads asignados a un usuario especifico
             lead_ids_asignados = LeadEstado.objects.filter(
-                asignado_a_id=asignado
+                tenant_id=tenant_id, asignado_a_id=asignado
             ).values_list('lead_id', flat=True)
-            leads_qs = leads_qs.filter(lead_id__in=[lid for lid in lead_ids_asignados])
+            leads_qs = leads_qs.filter(lead_id__in=lead_ids_asignados)
 
     # Ordenar por defecto si no hay orden especificado
     if not orden:
@@ -153,6 +155,7 @@ def lead_list_view(request):
 
     # Zonas para filtro - obtener zonas únicas no vacías
     zonas = (Lead.objects
+             .filter(tenant_id=tenant_id)
              .exclude(zona_geografica__isnull=True)
              .exclude(zona_geografica='')
              .values_list('zona_geografica', flat=True)
@@ -521,12 +524,17 @@ def bulk_delete_view(request):
                 with connection.cursor() as cursor:
                     cursor.execute("DELETE FROM leads_nota WHERE lead_id = %s", [lead_id])
 
-                # Eliminar de public_marts.dim_leads
+                # Eliminar de contact queue
                 with connection.cursor() as cursor:
-                    cursor.execute("""
-                        DELETE FROM public_marts.dim_leads
-                        WHERE lead_id = %s
-                    """, [lead_id])
+                    cursor.execute("DELETE FROM leads_contact_queue WHERE lead_id = %s", [lead_id])
+
+                # Eliminar de raw.raw_listings (source table; dim_leads is a view)
+                if lead.anuncio_id and lead.portal:
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            "DELETE FROM raw.raw_listings WHERE tenant_id = %s AND portal = %s AND (raw_data->>'anuncio_id') = %s",
+                            [tenant_id, lead.portal, lead.anuncio_id]
+                        )
 
                 deleted_count += 1
 
@@ -1434,11 +1442,11 @@ def export_csv_view(request):
     Respeta los mismos filtros que lead_list_view (q, estado, portal, zona).
     """
     tenant_id = get_user_tenant(request)
+    if not tenant_id:
+        return HttpResponse('Forbidden: no tenant assigned', status=403)
 
     # Base queryset
-    leads_qs = Lead.objects.all()
-    if tenant_id:
-        leads_qs = leads_qs.filter(tenant_id=tenant_id)
+    leads_qs = Lead.objects.filter(tenant_id=tenant_id)
 
     # Filtros (misma logica que lead_list_view)
     q = request.GET.get('q', '').strip()
@@ -1606,6 +1614,7 @@ def price_history_view(request, lead_id):
         })
 
 
+@login_required
 def image_proxy_view(request):
     """
     Proxy para servir imágenes de portales inmobiliarios.
@@ -1698,7 +1707,8 @@ def analyze_lead_images_view(request, lead_id):
     if PROJECT_ROOT not in sys.path:
         sys.path.insert(0, PROJECT_ROOT)
 
-    lead = get_object_or_404(Lead, lead_id=lead_id)
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id, tenant_id=tenant_id)
 
     fotos = lead.fotos_list
     if not fotos:

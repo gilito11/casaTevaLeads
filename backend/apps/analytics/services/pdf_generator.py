@@ -37,7 +37,7 @@ COLOR_DARK = colors.HexColor('#1e293b')  # Gris oscuro
 def generar_pdf_valoracion(
     acm: ACMResult,
     nombre_cliente: Optional[str] = None,
-    nombre_inmobiliaria: str = "Casa Teva",
+    nombre_inmobiliaria: str = "FincaRadar",
     direccion_inmueble: Optional[str] = None,
 ) -> io.BytesIO:
     """
@@ -325,7 +325,7 @@ def generar_pdf_valoracion(
 def generar_pdf_lead(
     tenant_id: int,
     lead_id: str,
-    nombre_inmobiliaria: str = "Casa Teva"
+    nombre_inmobiliaria: str = "FincaRadar"
 ) -> Optional[io.BytesIO]:
     """
     Genera PDF de valoración para un lead específico.

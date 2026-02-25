@@ -955,7 +955,7 @@ def pdf_valoracion_view(request):
             tenant = Tenant.objects.get(id=tenant_id)
             nombre_inmobiliaria = tenant.nombre
         except Tenant.DoesNotExist:
-            nombre_inmobiliaria = "Casa Teva"
+            nombre_inmobiliaria = "FincaRadar"
 
         pdf_buffer = generar_pdf_valoracion(
             acm=acm,
@@ -987,7 +987,7 @@ def pdf_lead_view(request, lead_id):
             tenant = Tenant.objects.get(id=tenant_id)
             nombre_inmobiliaria = tenant.nombre
         except Tenant.DoesNotExist:
-            nombre_inmobiliaria = "Casa Teva"
+            nombre_inmobiliaria = "FincaRadar"
 
         pdf_buffer = generar_pdf_lead(
             tenant_id=tenant_id,

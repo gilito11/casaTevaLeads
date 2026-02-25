@@ -118,9 +118,9 @@ def system_status(request):
 
             # Contact queue status
             cursor.execute("""
-                SELECT status, COUNT(*)
+                SELECT estado, COUNT(*)
                 FROM leads_contact_queue
-                GROUP BY status
+                GROUP BY estado
             """)
             status['contact_queue'] = {row[0]: row[1] for row in cursor.fetchall()}
 
@@ -232,9 +232,9 @@ def scraper_health(request):
             contact_queue = {}
             try:
                 cursor.execute("""
-                    SELECT status, COUNT(*)
+                    SELECT estado, COUNT(*)
                     FROM leads_contact_queue
-                    GROUP BY status
+                    GROUP BY estado
                 """)
                 contact_queue = {row[0]: row[1] for row in cursor.fetchall()}
             except:

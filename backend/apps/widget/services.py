@@ -212,7 +212,6 @@ def guardar_lead_widget(
                 %s, 'widget', %s, %s, NOW()
             )
             ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
-            WHERE raw_data->>'anuncio_id' IS NOT NULL
             DO UPDATE SET raw_data = EXCLUDED.raw_data, scraping_timestamp = NOW()
         """, [
             tenant_id,
