@@ -260,6 +260,21 @@ def main():
     # Telegram summary
     send_telegram_summary(total_queued, by_portal)
 
+    # In-app notification
+    if total_queued > 0:
+        try:
+            from notifications.utils import create_notification_raw
+            portal_summary = ', '.join(f'{p}: {c}' for p, c in sorted(by_portal.items()))
+            create_notification_raw(
+                conn, tenant_id,
+                tipo='nueva_lead',
+                titulo=f'{total_queued} leads encolados',
+                mensaje=portal_summary,
+                url='/leads/contact-queue/',
+            )
+        except Exception as e:
+            logger.debug(f"In-app notification skipped: {e}")
+
     conn.close()
     logger.info(f"Total queued: {total_queued}")
     return 0

@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-from .models import PushSubscription, AlertPreferences
+from .models import PushSubscription, AlertPreferences, Notification
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,55 @@ def unsubscribe_push(request):
     return JsonResponse({
         'success': True,
         'deleted': deleted > 0
+    })
+
+
+@login_required
+def notification_dropdown_view(request):
+    """Return HTMX partial with latest unread notifications."""
+    tenant_id = request.session.get('tenant_id')
+    notifications = Notification.objects.unread_for_user(request.user, tenant_id)[:10]
+    return render(request, 'notifications/partials/dropdown.html', {
+        'notifications': notifications,
+    })
+
+
+@login_required
+def notification_count_view(request):
+    """Return just the badge count for HTMX polling."""
+    tenant_id = request.session.get('tenant_id')
+    count = Notification.objects.unread_for_user(request.user, tenant_id).count()
+    return render(request, 'notifications/partials/badge_count.html', {
+        'notifications_count': count,
+    })
+
+
+@login_required
+@require_POST
+def notification_mark_read_view(request, pk):
+    """Mark a single notification as read."""
+    try:
+        notif = Notification.objects.get(pk=pk)
+        if notif.user is None or notif.user == request.user:
+            notif.mark_read()
+    except Notification.DoesNotExist:
+        pass
+    # Return updated dropdown
+    tenant_id = request.session.get('tenant_id')
+    notifications = Notification.objects.unread_for_user(request.user, tenant_id)[:10]
+    return render(request, 'notifications/partials/dropdown.html', {
+        'notifications': notifications,
+    })
+
+
+@login_required
+@require_POST
+def notification_mark_all_read_view(request):
+    """Mark all notifications as read for current user."""
+    tenant_id = request.session.get('tenant_id')
+    Notification.objects.unread_for_user(request.user, tenant_id).update(is_read=True)
+    return render(request, 'notifications/partials/dropdown.html', {
+        'notifications': [],
     })
 
 

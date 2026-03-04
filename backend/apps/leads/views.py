@@ -18,6 +18,7 @@ from django.views.decorators.http import require_POST
 
 from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction, Task
 from core.models import TenantUser, Tenant
+from notifications.utils import create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +310,14 @@ def change_status_view(request, lead_id):
 
         lead_estado.save()
 
+        create_notification(
+            tenant_id=lead.tenant_id,
+            tipo='sistema',
+            titulo=f'Estado cambiado a {nuevo_estado}',
+            mensaje=f'{lead.nombre or lead.telefono_norm} - {lead.titulo or ""}',
+            url=f'/leads/{lead_id}/',
+        )
+
     # Si viene del detalle, usar HX-Redirect para recargar la pagina completa
     if request.headers.get('HX-Target') == 'body':
         from django.urls import reverse
@@ -358,6 +367,14 @@ def add_note_view(request, lead_id):
             lead=lead,
             autor=request.user,
             texto=texto
+        )
+
+        create_notification(
+            tenant_id=lead.tenant_id,
+            tipo='sistema',
+            titulo=f'Nueva nota en lead',
+            mensaje=f'{lead.nombre or lead.telefono_norm}: {texto[:80]}',
+            url=f'/leads/{lead_id}/',
         )
 
         # Devolver HTML de la nota creada
@@ -1040,6 +1057,14 @@ def enqueue_contact_view(request, lead_id):
                 'message': 'Este lead ya esta en la cola de contacto',
                 'estado': queue_item.estado
             })
+
+        create_notification(
+            tenant_id=tenant_id,
+            tipo='contacto',
+            titulo=f'Contacto encolado',
+            mensaje=f'{lead.nombre or lead.telefono_norm} en {portal}',
+            url=f'/leads/{lead_id}/',
+        )
 
         return JsonResponse({
             'status': 'queued',
@@ -1799,3 +1824,79 @@ def analyze_lead_images_view(request, lead_id):
         logger.error(f"Image analysis error for {lead_id}: {e}")
         return HttpResponse(
             f'<span class="text-sm text-red-500">Error: {str(e)[:100]}</span>')
+
+
+@login_required
+def lead_timeline_view(request, lead_id):
+    """Unified activity timeline for a lead - aggregates notes, status changes, tasks, contacts, interactions."""
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+
+    if tenant_id and lead.tenant_id != tenant_id:
+        return HttpResponse(status=403)
+
+    events = []
+    lead_id_str = str(lead.lead_id)
+
+    # 1. Notes
+    for nota in Nota.objects.filter(lead_id=lead_id_str).select_related('autor'):
+        events.append({
+            'tipo': 'nota',
+            'titulo': f'Nota de {nota.autor.get_full_name() if nota.autor else "Sistema"}',
+            'descripcion': nota.texto[:200],
+            'fecha': nota.created_at,
+        })
+
+    # 2. Status changes (LeadEstado only has current state, so we show that)
+    lead_estado = LeadEstado.objects.filter(lead_id=lead_id_str).first()
+    if lead_estado and lead_estado.fecha_cambio_estado:
+        events.append({
+            'tipo': 'estado',
+            'titulo': f'Estado: {lead_estado.get_estado_display()}',
+            'descripcion': '',
+            'fecha': lead_estado.fecha_cambio_estado,
+        })
+    if lead_estado and lead_estado.fecha_primer_contacto:
+        events.append({
+            'tipo': 'estado',
+            'titulo': 'Primer contacto registrado',
+            'descripcion': '',
+            'fecha': lead_estado.fecha_primer_contacto,
+        })
+
+    # 3. Tasks
+    for task in Task.objects.filter(lead_id=lead_id_str).select_related('asignado_a'):
+        events.append({
+            'tipo': 'tarea',
+            'titulo': task.titulo,
+            'descripcion': f'{task.get_tipo_display()} - {task.get_prioridad_display()}' +
+                          (' (Completada)' if task.completada else ''),
+            'fecha': task.fecha_completada or task.created_at,
+        })
+
+    # 4. Contact Queue
+    from leads.models import ContactQueue
+    for cq in ContactQueue.objects.filter(lead_id=lead_id_str, tenant_id=tenant_id):
+        events.append({
+            'tipo': 'contacto',
+            'titulo': f'Contacto {cq.get_estado_display()} - {cq.portal}',
+            'descripcion': cq.error[:100] if cq.error else (cq.mensaje[:80] if cq.mensaje else ''),
+            'fecha': cq.processed_at or cq.created_at,
+        })
+
+    # 5. Interactions (via Contact by telefono_norm)
+    if lead.telefono_norm:
+        contact = Contact.objects.filter(tenant_id=tenant_id, telefono=lead.telefono_norm).first()
+        if contact:
+            for inter in Interaction.objects.filter(contact=contact).select_related('usuario'):
+                events.append({
+                    'tipo': 'interaccion',
+                    'titulo': inter.get_tipo_display(),
+                    'descripcion': inter.descripcion[:200] if inter.descripcion else '',
+                    'fecha': inter.fecha or inter.created_at,
+                })
+
+    # Sort all events by date descending
+    events.sort(key=lambda e: e['fecha'], reverse=True)
+
+    return render(request, 'leads/partials/timeline.html', {'events': events})

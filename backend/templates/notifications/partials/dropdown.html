@@ -1,0 +1,57 @@
+{% load tz %}
+<div class="py-2">
+    {% if notifications %}
+    <div class="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+        <span class="text-sm font-semibold text-gray-900 dark:text-white">Notificaciones</span>
+        <button hx-post="{% url 'notifications:mark_all_read' %}"
+                hx-target="#notification-dropdown"
+                hx-swap="innerHTML"
+                class="text-xs text-primary-600 dark:text-primary-400 hover:underline">
+            Marcar todo leido
+        </button>
+    </div>
+    {% for notif in notifications %}
+    <a href="{{ notif.url|default:'#' }}"
+       hx-post="{% url 'notifications:mark_read' notif.pk %}"
+       hx-target="#notification-dropdown"
+       hx-swap="innerHTML"
+       class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <div class="flex-shrink-0 mt-0.5">
+            {% if notif.tipo == 'nueva_lead' %}
+            <div class="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+            </div>
+            {% elif notif.tipo == 'bajada_precio' %}
+            <div class="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                <svg class="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+            </div>
+            {% elif notif.tipo == 'contacto' %}
+            <div class="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <svg class="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+            {% elif notif.tipo == 'tarea' %}
+            <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            </div>
+            {% else %}
+            <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                <svg class="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            {% endif %}
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ notif.titulo }}</p>
+            {% if notif.mensaje %}<p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ notif.mensaje }}</p>{% endif %}
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ notif.created_at|timesince }} ago</p>
+        </div>
+    </a>
+    {% endfor %}
+    {% else %}
+    <div class="px-4 py-8 text-center">
+        <svg class="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Sin notificaciones</p>
+    </div>
+    {% endif %}
+</div>

@@ -96,6 +96,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'notifications.context_processors.vapid_public_key',
+                'notifications.context_processors.notifications_context',
                 'core.context_processors.tasks_context',
             ],
         },

@@ -84,6 +84,39 @@ def send_push_to_user(user, title, body, url=None, tag=None):
     return sent
 
 
+def create_notification(tenant_id, tipo, titulo, mensaje='', url='', user=None):
+    """Create an in-app notification using Django ORM."""
+    from notifications.models import Notification
+    try:
+        return Notification.objects.create(
+            tenant_id=tenant_id,
+            user=user,
+            tipo=tipo,
+            titulo=titulo,
+            mensaje=mensaje,
+            url=url,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create notification: {e}")
+        return None
+
+
+def create_notification_raw(conn, tenant_id, tipo, titulo, mensaje='', url='', user_id=None):
+    """Create a notification using raw SQL via psycopg2. For scripts outside Django."""
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO notifications_notification (tenant_id, user_id, tipo, titulo, mensaje, url, is_read, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, false, NOW())
+        """, [tenant_id, user_id, tipo, titulo, mensaje, url])
+        conn.commit()
+        cursor.close()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create notification (raw): {e}")
+        return False
+
+
 def send_push_to_tenant(tenant_id, title, body, url=None, tag=None):
     """
     Send push notification to all users of a tenant.
