@@ -563,7 +563,9 @@ class CamoufoxFotocasa:
                     VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
                     WHERE raw_data->>'anuncio_id' IS NOT NULL
-                    DO NOTHING
+                    DO UPDATE SET
+                        raw_data = EXCLUDED.raw_data,
+                        scraping_timestamp = EXCLUDED.scraping_timestamp
                 """, (
                     self.tenant_id,
                     self.PORTAL_NAME,
@@ -571,8 +573,9 @@ class CamoufoxFotocasa:
                     json.dumps(raw_data, ensure_ascii=False),
                     now,
                 ))
+                rows = cur.rowcount
             self.postgres_conn.commit()
-            return True
+            return rows > 0
 
         except Exception as e:
             logger.error(f"PostgreSQL save error: {e}")

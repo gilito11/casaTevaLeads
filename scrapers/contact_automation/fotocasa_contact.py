@@ -31,7 +31,7 @@ class FotocasaContact(BaseContactAutomation):
     LOGIN_URL = "https://www.fotocasa.es/es/usuario/acceso/"
 
     # Selectors (multiple options for robustness)
-    # Updated Jan 2026 for Schibsted UI (sui-) framework
+    # Updated Mar 2026 for Schibsted UI (sui-) framework
     SELECTORS = {
         # Login page
         'login_email': 'input[name="email"], input[type="email"], #email',
@@ -47,13 +47,14 @@ class FotocasaContact(BaseContactAutomation):
         'phone_number': 'a[href^="tel:"], [class*="phone-number"], [class*="Phone"]',
 
         # Contact form - Fotocasa uses "Contacta con el anunciante" section
-        'contact_section': 'section:has-text("Contacta con el anunciante"), [class*="contact-form"], [class*="ContactForm"]',
-        'contact_form': 'form, [class*="contact-form"], [class*="ContactForm"]',
-        'input_name': 'input[placeholder*="nombre"], input[name="name"], input[aria-label*="nombre"]',
-        'input_email': 'input[placeholder*="mail"], input[type="email"], input[name="email"]',
-        'input_phone': 'input[placeholder*="teléfono"], input[type="tel"], input[name="phone"]',
-        'input_message': 'textarea[placeholder*="comentario"], textarea[placeholder*="mensaje"], textarea',
-        'contact_submit': 'button:has-text("Contactar"), button[type="submit"]:has-text("Contactar")',
+        'contact_section': '[data-testid="contact-form"], section:has-text("Contacta con el anunciante"), [class*="contact-form"], [class*="ContactForm"]',
+        'contact_form': '[data-testid="contact-form"], form:has(textarea), [class*="contact-form"], [class*="ContactForm"]',
+        'input_name': 'input[name="name"], input[placeholder*="nombre"], input[aria-label*="nombre"]',
+        'input_email': 'input[name="email"], input[placeholder*="mail"], input[type="email"]',
+        'input_phone': 'input[name="phone"], input[placeholder*="teléfono"], input[type="tel"]',
+        'input_message': 'textarea[name="commentary"], textarea[placeholder*="información"], textarea[placeholder*="comentario"], textarea[placeholder*="mensaje"], textarea',
+        'contact_submit': 'button:has-text("Enviar contacto"), button:has-text("Contactar"), button[type="submit"]',
+        'legal_checkbox': 'input[name="legal"], input[type="checkbox"][name="legal"]',
 
         # Seller info
         'seller_name': '[class*="particular"], [class*="Advertiser"], [class*="seller"]',
@@ -350,6 +351,8 @@ class FotocasaContact(BaseContactAutomation):
             # Fill message/comment field
             message_filled = False
             message_selectors = [
+                'textarea[name="commentary"]',
+                'textarea[placeholder*="información"]',
                 'textarea[placeholder*="comentario"]',
                 'textarea[placeholder*="mensaje"]',
                 'textarea[aria-label*="comentario"]',
@@ -392,13 +395,26 @@ class FotocasaContact(BaseContactAutomation):
                 except:
                     continue
 
-            # Submit form - look for "Contactar" button
+            # Accept legal checkbox if present (required since ~Feb 2026)
+            try:
+                legal_cb = await self.page.query_selector('input[name="legal"], input[type="checkbox"][name="legal"]')
+                if legal_cb:
+                    checked = await legal_cb.is_checked()
+                    if not checked:
+                        await legal_cb.check()
+                        logger.info("Legal checkbox accepted")
+                        await asyncio.sleep(0.3)
+            except:
+                pass
+
+            # Submit form - "Enviar contacto" (updated Mar 2026, was "Contactar")
             submit_btn = None
             submit_selectors = [
+                'button:has-text("Enviar contacto")',
+                'button[type="submit"]:has-text("Enviar")',
                 'button:has-text("Contactar")',
                 'button[type="submit"]:has-text("Contactar")',
-                'input[type="submit"][value*="Contactar"]',
-                '.sui-AtomButton--primary:has-text("Contactar")',
+                '.sui-AtomButton--primary:has-text("Enviar")',
                 'form button[type="submit"]',
             ]
             for selector in submit_selectors:

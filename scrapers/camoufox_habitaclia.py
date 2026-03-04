@@ -362,7 +362,9 @@ class CamoufoxHabitaclia:
             ) VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (tenant_id, portal, (raw_data->>'anuncio_id'))
             WHERE raw_data->>'anuncio_id' IS NOT NULL
-            DO NOTHING
+            DO UPDATE SET
+                raw_data = EXCLUDED.raw_data,
+                scraping_timestamp = EXCLUDED.scraping_timestamp
         """
 
         now = datetime.now()
