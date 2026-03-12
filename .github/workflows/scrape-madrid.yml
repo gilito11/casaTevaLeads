@@ -44,6 +44,8 @@ jobs:
 
       - name: Install Camoufox browser
         run: camoufox fetch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Fotocasa scraper (Camoufox + proxy)
         if: contains(github.event.inputs.portals || 'fotocasa,idealista', 'fotocasa')

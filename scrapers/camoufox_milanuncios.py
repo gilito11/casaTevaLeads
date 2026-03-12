@@ -126,6 +126,10 @@ ZONAS_GEOGRAFICAS = {
         'url_path': 'pisos-en-vila-seca-tarragona/',
     },
     # TERRES DE L'EBRE
+    'ametlla_mar': {
+        'nombre': "L'Ametlla de Mar",
+        'url_path': 'pisos-en-l-ametlla-de-mar-tarragona/',
+    },
     'tortosa': {
         'nombre': 'Tortosa',
         'url_path': 'pisos-en-tortosa-tarragona/',

@@ -52,6 +52,14 @@ ZONAS_GEOGRAFICAS = {
         'nombre': 'Les Borges Blanques',
         'url_path': 'les-borges-blanques-lleida',
     },
+    'tarrega': {
+        'nombre': 'Tàrrega',
+        'url_path': 'tarrega-lleida',
+    },
+    'tremp': {
+        'nombre': 'Tremp',
+        'url_path': 'tremp-lleida',
+    },
     # Cities - Tarragona
     'tarragona': {
         'nombre': 'Tarragona',
@@ -96,6 +104,30 @@ ZONAS_GEOGRAFICAS = {
     'amposta': {
         'nombre': 'Amposta',
         'url_path': 'amposta-tarragona',
+    },
+    'ametlla_mar': {
+        'nombre': "L'Ametlla de Mar",
+        'url_path': 'l-ametlla-de-mar-tarragona',
+    },
+    'miami_platja': {
+        'nombre': 'Miami Platja',
+        'url_path': 'miami-platja-tarragona',
+    },
+    'vila_seca': {
+        'nombre': 'Vila-seca',
+        'url_path': 'vila-seca-tarragona',
+    },
+    'la_pineda': {
+        'nombre': 'La Pineda',
+        'url_path': 'la-pineda-tarragona',
+    },
+    'montblanc': {
+        'nombre': 'Montblanc',
+        'url_path': 'montblanc-tarragona',
+    },
+    'deltebre': {
+        'nombre': 'Deltebre',
+        'url_path': 'deltebre-tarragona',
     },
     # Test zone
     'igualada': {

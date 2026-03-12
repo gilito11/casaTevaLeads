@@ -49,6 +49,8 @@ jobs:
 
       - name: Install Camoufox browser
         run: camoufox fetch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Playwright browsers
         run: python -m playwright install chromium firefox
