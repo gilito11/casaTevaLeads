@@ -6,9 +6,7 @@ name: Run Scrapers (Neon)
 on:
   schedule:
     - cron: '0 12 * * 1'  # Monday
-    - cron: '0 12 * * 2'  # Tuesday
     - cron: '0 12 * * 3'  # Wednesday
-    - cron: '0 12 * * 4'  # Thursday
     - cron: '0 12 * * 5'  # Friday
   workflow_dispatch:
     inputs:
@@ -45,16 +43,15 @@ jobs:
             echo "Using manual zones: $MANUAL_ZONES"
           else
             DAY=$(date -u +%u)
-            # Zone rotation: 18 zones across 5 days (~6 zones/day, ~60min)
-            # Each zone scraped 1-2x/week, spread evenly
+            # Zone rotation: 18 zones across 3 days L-X-V (~6 zones/day)
+            # Saves proxy bandwidth vs 5 days
             case $DAY in
-              1) ZONES="salou,cambrils,tarragona,lleida,la_pineda,ametlla_mar" ;;
-              2) ZONES="reus,miami_platja,balaguer,vila_seca,vendrell,valls" ;;
-              3) ZONES="salou,cambrils,tarragona,mollerussa,calafell,torredembarra" ;;
-              4) ZONES="reus,altafulla,tarrega,tremp,ametlla_mar,lleida" ;;
-              5) ZONES="salou,cambrils,tarragona,la_pineda,miami_platja,balaguer" ;;
+              1) ZONES="salou,cambrils,tarragona,reus,lleida,ametlla_mar" ;;
+              3) ZONES="salou,cambrils,vendrell,calafell,balaguer,miami_platja" ;;
+              5) ZONES="tarragona,reus,torredembarra,altafulla,mollerussa,valls" ;;
               *) ZONES="salou,cambrils,tarragona" ;;
             esac
+            # Remaining zones (la_pineda,vila_seca,tarrega,tremp) via manual dispatch
             echo "zones=$ZONES" >> $GITHUB_OUTPUT
             echo "Day $DAY rotation: $ZONES"
           fi
