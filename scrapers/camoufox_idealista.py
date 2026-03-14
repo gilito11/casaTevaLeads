@@ -407,27 +407,90 @@ class CamoufoxIdealista:
             page.goto(url, timeout=60000)
             self._human_delay(2, 3)
 
-            # Check if particular by looking at advertiser section
-            sections = page.query_selector_all('[class*="contact"], [id*="contact"]')
-            for sec in sections:
+            # Check if particular or professional by looking at advertiser section
+            # Use multiple selector strategies since Idealista changes HTML frequently
+            verified = False
+            vendedor_name = ''
+            advertiser_selectors = [
+                '[class*="contact"], [id*="contact"]',
+                '[class*="advertiser"], [id*="advertiser"]',
+                '[class*="owner"], [id*="owner"]',
+                '.professional-name',
+                '.sidebar',
+            ]
+
+            for selector in advertiser_selectors:
+                if verified:
+                    break
                 try:
-                    text = sec.inner_text()
-                    if 'Referencia del anuncio' in text:
-                        if '\nParticular\n' in text:
-                            listing['es_particular'] = True
-                            listing['verified'] = True
-                            # Extract advertiser name
-                            lines = text.split('\n')
-                            for i, line in enumerate(lines):
-                                if line.strip() == 'Particular' and i + 1 < len(lines):
-                                    listing['vendedor'] = lines[i + 1].strip()
-                                    break
-                        else:
-                            listing['es_particular'] = False
-                            listing['verified'] = True
-                        break
+                    sections = page.query_selector_all(selector)
+                    for sec in sections:
+                        try:
+                            text = sec.inner_text()
+                            # Professional indicators
+                            if 'Profesional' in text or 'Referencia del anuncio' in text:
+                                listing['es_particular'] = False
+                                verified = True
+                                lines = [l.strip() for l in text.split('\n') if l.strip()]
+                                skip_labels = {'Profesional', 'Particular', 'Referencia del anuncio',
+                                               'Ver teléfono', 'Contactar', 'Enviar email', 'Llamar'}
+                                for line in lines:
+                                    if line not in skip_labels and len(line) > 2 and len(line) < 80:
+                                        vendedor_name = line
+                                        break
+                                break
+                            # Particular indicator (only trust in short sections to avoid false matches)
+                            elif 'Particular' in text and len(text) < 500:
+                                listing['es_particular'] = True
+                                verified = True
+                                lines = [l.strip() for l in text.split('\n') if l.strip()]
+                                for i, line in enumerate(lines):
+                                    if line == 'Particular' and i + 1 < len(lines):
+                                        vendedor_name = lines[i + 1]
+                                        break
+                                break
+                        except:
+                            continue
                 except:
                     continue
+
+            # Fallback: search for professional CSS elements
+            if not verified:
+                try:
+                    pro_elements = page.query_selector_all(
+                        '.professional-name, .logo-branding, '
+                        '[class*="professional"], [class*="agency"], [class*="pro-badge"]'
+                    )
+                    if pro_elements:
+                        listing['es_particular'] = False
+                        verified = True
+                        logger.debug(f"Professional detected via CSS elements for {listing.get('anuncio_id')}")
+                except:
+                    pass
+
+            # Fallback: full page text search (conservative)
+            if not verified:
+                try:
+                    body_text = page.inner_text('body')
+                    if re.search(r'\bProfesional\b', body_text) and 'Referencia del anuncio' in body_text:
+                        listing['es_particular'] = False
+                        verified = True
+                    elif re.search(r'\bParticular\b', body_text) and 'Contactar' in body_text:
+                        if not re.search(r'\bProfesional\b', body_text):
+                            listing['es_particular'] = True
+                            verified = True
+                except:
+                    pass
+
+            # CONSERVATIVE DEFAULT: if we couldn't verify, mark as NOT particular
+            # Better to miss a lead than show a professional to the client
+            if not verified:
+                listing['es_particular'] = False
+                logger.warning(f"Could not verify particular status for {listing.get('anuncio_id')}, defaulting to professional")
+
+            if vendedor_name:
+                listing['vendedor'] = vendedor_name
+            listing['verified'] = verified
 
             # Try to get phone
             try:
@@ -706,7 +769,9 @@ class CamoufoxIdealista:
                 'descripcion': listing.get('descripcion', ''),
                 'fotos': listing.get('fotos', []),
                 'url': listing.get('url_anuncio', ''),
-                'es_particular': listing.get('es_particular', True),
+                'es_particular': listing.get('es_particular', False),
+                'verified': listing.get('verified', False),
+                'vendedor': listing.get('vendedor', ''),
                 'scraper_type': 'camoufox',
             }
 

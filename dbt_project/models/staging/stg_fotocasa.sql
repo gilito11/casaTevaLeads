@@ -123,8 +123,58 @@ classified AS (
     SELECT
         *,
 
-        -- Use zona_geografica from scraper (already has good zone names)
-        COALESCE(zona_geografica, 'Otros') AS zona_clasificada,
+        -- Normalize zone names consistently across portals
+        CASE
+            -- Lleida zones
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%lleida%' OR LOWER(COALESCE(ubicacion, '')) LIKE '%lerida%' THEN 'Lleida Ciudad'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%balaguer%' THEN 'Lleida - Balaguer'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%mollerussa%' THEN 'Lleida - Mollerussa'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%tarrega%' OR LOWER(COALESCE(ubicacion, '')) LIKE '%tàrrega%' THEN 'Lleida - Tarrega'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%tremp%' THEN 'Lleida - Tremp'
+
+            -- Tarragona Costa Dorada
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%salou%' THEN 'Costa Dorada - Salou'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%cambrils%' THEN 'Costa Dorada - Cambrils'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%tarragona%' THEN 'Tarragona Ciudad'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%reus%' THEN 'Tarragona - Reus'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%vila-seca%' OR LOWER(COALESCE(ubicacion, '')) LIKE '%vilaseca%' THEN 'Costa Dorada - Vila-seca'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%torredembarra%' THEN 'Costa Dorada - Torredembarra'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%vendrell%' THEN 'Costa Dorada - El Vendrell'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%calafell%' THEN 'Costa Dorada - Calafell'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%altafulla%' THEN 'Costa Dorada - Altafulla'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%miami%' THEN 'Costa Dorada - Miami Platja'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%montblanc%' THEN 'Tarragona - Montblanc'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%valls%' THEN 'Tarragona - Valls'
+
+            -- Terres de l'Ebre
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%tortosa%' THEN 'Terres Ebre - Tortosa'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%amposta%' THEN 'Terres Ebre - Amposta'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%deltebre%' THEN 'Terres Ebre - Deltebre'
+
+            -- Madrid zones (Find&Look)
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%chamartin%' OR LOWER(COALESCE(ubicacion, '')) LIKE '%chamartín%' THEN 'Madrid - Chamartin'
+            WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%hortaleza%' THEN 'Madrid - Hortaleza'
+
+            -- Fallback: normalize zona_geografica from scraper
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('salou', 'costa dorada - salou') THEN 'Costa Dorada - Salou'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('cambrils', 'costa dorada - cambrils') THEN 'Costa Dorada - Cambrils'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tarragona', 'tarragona ciudad') THEN 'Tarragona Ciudad'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('reus', 'tarragona - reus', 'tarragona/reus') THEN 'Tarragona - Reus'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('mollerussa', 'lleida - mollerussa') THEN 'Lleida - Mollerussa'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('lleida', 'lleida ciudad') THEN 'Lleida Ciudad'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('balaguer', 'lleida - balaguer') THEN 'Lleida - Balaguer'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tarrega', 'tàrrega', 'lleida - tarrega') THEN 'Lleida - Tarrega'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tremp', 'lleida - tremp') THEN 'Lleida - Tremp'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('vila-seca', 'vilaseca') THEN 'Costa Dorada - Vila-seca'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('torredembarra') THEN 'Costa Dorada - Torredembarra'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('calafell') THEN 'Costa Dorada - Calafell'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('vendrell', 'el vendrell') THEN 'Costa Dorada - El Vendrell'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('chamartin', 'chamartín') THEN 'Madrid - Chamartin'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('hortaleza') THEN 'Madrid - Hortaleza'
+            WHEN zona_geografica IS NOT NULL THEN zona_geografica
+
+            ELSE 'Otros'
+        END AS zona_clasificada,
 
         -- Calculate price per m2
         CASE

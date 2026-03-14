@@ -137,7 +137,36 @@ classified AS (
             WHEN LOWER(ubicacion) LIKE '%calafell%' THEN 'Costa Dorada - Calafell'
             WHEN LOWER(ubicacion) LIKE '%vendrell%' THEN 'Costa Dorada - El Vendrell'
 
-            -- Fallback to zona_geografica from scraper
+            -- Lleida extra zones
+            WHEN LOWER(ubicacion) LIKE '%tarrega%' OR LOWER(ubicacion) LIKE '%tàrrega%' THEN 'Lleida - Tarrega'
+            WHEN LOWER(ubicacion) LIKE '%tremp%' THEN 'Lleida - Tremp'
+
+            -- Costa Dorada extra zones
+            WHEN LOWER(ubicacion) LIKE '%altafulla%' THEN 'Costa Dorada - Altafulla'
+            WHEN LOWER(ubicacion) LIKE '%miami%' THEN 'Costa Dorada - Miami Platja'
+            WHEN LOWER(ubicacion) LIKE '%montblanc%' THEN 'Tarragona - Montblanc'
+            WHEN LOWER(ubicacion) LIKE '%valls%' THEN 'Tarragona - Valls'
+
+            -- Madrid zones (Find&Look)
+            WHEN LOWER(ubicacion) LIKE '%chamartin%' OR LOWER(ubicacion) LIKE '%chamartín%' THEN 'Madrid - Chamartin'
+            WHEN LOWER(ubicacion) LIKE '%hortaleza%' THEN 'Madrid - Hortaleza'
+
+            -- Fallback: normalize zona_geografica from scraper
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('salou') THEN 'Costa Dorada - Salou'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('cambrils') THEN 'Costa Dorada - Cambrils'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tarragona') THEN 'Tarragona Ciudad'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('reus', 'tarragona/reus') THEN 'Tarragona - Reus'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('mollerussa') THEN 'Lleida - Mollerussa'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('lleida') THEN 'Lleida Ciudad'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('balaguer') THEN 'Lleida - Balaguer'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tarrega', 'tàrrega') THEN 'Lleida - Tarrega'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tremp') THEN 'Lleida - Tremp'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('vila-seca', 'vilaseca') THEN 'Costa Dorada - Vila-seca'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('torredembarra') THEN 'Costa Dorada - Torredembarra'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('calafell') THEN 'Costa Dorada - Calafell'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('vendrell', 'el vendrell') THEN 'Costa Dorada - El Vendrell'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('chamartin', 'chamartín') THEN 'Madrid - Chamartin'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('hortaleza') THEN 'Madrid - Hortaleza'
             WHEN zona_geografica IS NOT NULL THEN zona_geografica
 
             ELSE 'Otros'
@@ -224,9 +253,9 @@ final AS (
     -- Apply filters
     WHERE
         precio > 5000  -- Filter out rentals
-        -- Don't hard-filter on es_particular — the scraper heuristic is unreliable
-        -- because idealista changes HTML frequently. Instead, filter by vendor name patterns.
-        -- Filter out agency names in vendedor/anunciante field
+        -- Hard-filter: scraper marks es_particular=FALSE for verified professionals
+        AND es_particular = TRUE
+        -- Filter out agency names in vendedor/anunciante field (safety net)
         AND NOT (
             LOWER(COALESCE(vendedor, '')) LIKE '%inmobiliaria%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%inmuebles%'
@@ -234,18 +263,31 @@ final AS (
             OR LOWER(COALESCE(vendedor, '')) LIKE '%agency%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%fincas%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%gestoria%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%gestoría%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%asesoría%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%asesoria%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%grupo%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '% s.l.%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '% sl%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% s.l%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '% s.a.%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '% sa%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%real estate%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%properties%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%servicios inmobiliarios%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%consulting%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%consultora%'
             OR LOWER(COALESCE(vendedor, '')) LIKE '%costa dorada%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%promotora%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%constructora%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%inversiones%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%patrimonio%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%realty%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%homes%'
+            OR LOWER(COALESCE(vendedor, '')) LIKE '%pisos.com%'
             OR COALESCE(vendedor, '') = 'Profesional'
         )
-        -- Filter out listings that reject agencies (looking for direct buyers only)
+        -- Filter out agency indicators in description
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%abstener%inmobiliaria%'
@@ -256,6 +298,11 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no se atienden%agencia%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%no se atienden%intermediario%'
             OR LOWER(COALESCE(descripcion, '')) LIKE '%exclusivamente%particular%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%nuestra agencia%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%nuestra inmobiliaria%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%llámenos%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%llamenos%'
+            OR LOWER(COALESCE(descripcion, '')) LIKE '%visite nuestra%'
         )
 )
 

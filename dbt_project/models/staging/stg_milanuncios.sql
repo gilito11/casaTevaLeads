@@ -132,7 +132,22 @@ classified AS (
             WHEN LOWER(ubicacion) LIKE '%vila-seca%' OR LOWER(ubicacion) LIKE '%vilaseca%' THEN 'Costa Dorada - Vila-seca'
             WHEN LOWER(ubicacion) LIKE '%torredembarra%' THEN 'Costa Dorada - Torredembarra'
 
-            -- Fallback to zona_busqueda from scraper
+            -- Fallback: normalize zona_busqueda from scraper keys
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('salou') THEN 'Costa Dorada - Salou'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('cambrils') THEN 'Costa Dorada - Cambrils'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('tarragona') THEN 'Tarragona Ciudad'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('reus') THEN 'Tarragona - Reus'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('mollerussa') THEN 'Lleida - Mollerussa'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('lleida') THEN 'Lleida Ciudad'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('balaguer') THEN 'Lleida - Balaguer'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('tarrega', 'tàrrega') THEN 'Lleida - Tarrega'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('tremp') THEN 'Lleida - Tremp'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('vila-seca', 'vilaseca') THEN 'Costa Dorada - Vila-seca'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('torredembarra') THEN 'Costa Dorada - Torredembarra'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('vendrell', 'el_vendrell') THEN 'Costa Dorada - El Vendrell'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('calafell') THEN 'Costa Dorada - Calafell'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('chamartin', 'chamartín') THEN 'Madrid - Chamartin'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('hortaleza') THEN 'Madrid - Hortaleza'
             WHEN zona_busqueda IS NOT NULL THEN zona_busqueda
 
             ELSE 'Otros'
