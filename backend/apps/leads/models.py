@@ -50,6 +50,7 @@ class Lead(models.Model):
     anuncio_id = models.CharField(max_length=255, blank=True, null=True, db_column='source_listing_id')
     # Additional dbt columns
     es_particular = models.BooleanField(null=True, blank=True)
+    permite_inmobiliarias = models.BooleanField(null=True, blank=True)
     lead_score = models.IntegerField(null=True, blank=True)
     fecha_publicacion = models.DateTimeField(null=True, blank=True)
     fotos = models.JSONField(null=True, blank=True, db_column='fotos_json')

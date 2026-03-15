@@ -669,18 +669,20 @@
 
                 <div class="space-y-2">
                     {% for estado_choice in estados %}
-                    <button hx-post="{% url 'leads:change_status' lead.lead_id %}"
-                            hx-vals='{"estado": "{{ estado_choice.0 }}"}'
-                            hx-target="body"
-                            hx-swap="outerHTML"
-                            class="w-full text-left p-3 rounded-lg border transition-colors
-                            {% if estado_actual == estado_choice.0 %}
-                            border-primary-500 bg-primary-50 dark:bg-primary-900/20
-                            {% else %}
-                            border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700
-                            {% endif %}">
-                        {% include 'components/estado_badge.html' with estado=estado_choice.0 %}
-                    </button>
+                    <form method="post" action="{% url 'leads:change_status' lead.lead_id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="estado" value="{{ estado_choice.0 }}">
+                        <input type="hidden" name="from" value="detail">
+                        <button type="submit"
+                                class="w-full text-left p-3 rounded-lg border transition-colors
+                                {% if estado_actual == estado_choice.0 %}
+                                border-primary-500 bg-primary-50 dark:bg-primary-900/20
+                                {% else %}
+                                border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700
+                                {% endif %}">
+                            {% include 'components/estado_badge.html' with estado=estado_choice.0 %}
+                        </button>
+                    </form>
                     {% endfor %}
                 </div>
             </div>

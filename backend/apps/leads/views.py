@@ -39,8 +39,8 @@ def lead_list_view(request):
     """Vista de lista de leads con filtros y paginacion"""
     tenant_id = get_user_tenant(request)
 
-    # Base queryset - exclude profesional/agency leads
-    leads_qs = Lead.objects.exclude(es_particular=False)
+    # Base queryset - exclude profesional/agency leads and those rejecting agencies
+    leads_qs = Lead.objects.exclude(es_particular=False).exclude(permite_inmobiliarias=False)
     if tenant_id:
         leads_qs = leads_qs.filter(tenant_id=tenant_id)
 
@@ -318,12 +318,10 @@ def change_status_view(request, lead_id):
             url=f'/leads/{lead_id}/',
         )
 
-    # Si viene del detalle, usar HX-Redirect para recargar la pagina completa
-    if request.headers.get('HX-Target') == 'body':
-        from django.urls import reverse
-        response = HttpResponse()
-        response['HX-Redirect'] = reverse('leads:detail', kwargs={'lead_id': lead_id})
-        return response
+    # Si viene del detalle, redirect normal (no HTMX)
+    if request.POST.get('from') == 'detail':
+        from django.shortcuts import redirect
+        return redirect('leads:detail', lead_id=lead_id)
 
     # Obtener estado actual de LeadEstado
     lead_estado = LeadEstado.objects.filter(lead_id=str(lead.lead_id)).first()

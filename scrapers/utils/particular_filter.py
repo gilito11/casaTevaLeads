@@ -44,15 +44,20 @@ FRASES_RECHAZO = [
     'solo particulares',
     'particular a particular',
     'abstenerse inmobiliarias',
+    'inmobiliarias abstenerse',
     'no intermediarios',
     'solo comprador directo',
     'sin agencias',
     'abstenerse agencias',
+    'agencias abstenerse',
     'no profesionales',
     'sin intermediarios',
     'trato directo',
     'particular vende',
     'vendo como particular',
+    'inmobiliarias no',
+    'agencias no contactar',
+    'inmobiliarias no contactar',
 ]
 
 # Umbral de anuncios activos para considerar profesional

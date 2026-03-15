@@ -149,7 +149,23 @@ enriched AS (
 
         -- Lead classification
         es_particular,
-        permite_inmobiliarias,
+        -- Override permite_inmobiliarias: check description for rejection phrases
+        CASE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%inmobiliarias abstenerse%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%abstenerse inmobiliarias%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%abstenerse agencias%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%agencias abstenerse%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%no inmobiliarias%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%no agencias%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%sin intermediarios%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%solo particulares%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%particular a particular%' THEN FALSE
+            WHEN LOWER(COALESCE(descripcion, '')) LIKE '%no intermediarios%' THEN FALSE
+            WHEN LOWER(COALESCE(titulo, '')) LIKE '%no inmobiliarias%' THEN FALSE
+            WHEN LOWER(COALESCE(titulo, '')) LIKE '%abstenerse%inmobiliaria%' THEN FALSE
+            WHEN LOWER(COALESCE(titulo, '')) LIKE '%abstenerse%agencia%' THEN FALSE
+            ELSE COALESCE(permite_inmobiliarias, TRUE)
+        END AS permite_inmobiliarias,
 
         -- CRM fields - initialize for new leads
         'NUEVO' AS estado,
