@@ -323,18 +323,15 @@ class ListingChecker:
             cursor.execute("""
                 INSERT INTO leads_lead_estado (
                     lead_id, tenant_id, telefono_norm, estado,
-                    fecha_cambio_estado, numero_intentos, notas
+                    fecha_cambio_estado, numero_intentos
                 ) VALUES (
-                    %s, %s, %s, 'YA_VENDIDO', NOW(), 0, %s
+                    %s, %s, %s, 'YA_VENDIDO', NOW(), 0
                 )
                 ON CONFLICT (lead_id) DO UPDATE SET
                     estado = 'YA_VENDIDO',
-                    fecha_cambio_estado = NOW(),
-                    notas = COALESCE(leads_lead_estado.notas, '') || %s
+                    fecha_cambio_estado = NOW()
             """, (
                 lead_id, tenant_id, telefono_norm or '',
-                f'[Auto] Anuncio eliminado del portal: {reason}',
-                f'\n[Auto] Anuncio eliminado del portal: {reason}',
             ))
 
             self.conn.commit()

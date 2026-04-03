@@ -26,6 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 PYTHON = os.path.join(PROJECT_ROOT, 'venv', 'Scripts', 'python.exe')
+DBT_EXE = os.path.join(PROJECT_ROOT, 'venv', 'Scripts', 'dbt.exe')
 LOG_DIR = os.path.join(PROJECT_ROOT, 'logs')
 DBT_DIR = os.path.join(PROJECT_ROOT, 'dbt_project')
 ZONES = os.environ.get('SCRAPE_ZONES', 'salou cambrils tarragona reus').split()
@@ -124,12 +125,12 @@ def main():
     # 2. dbt transformations
     results['dbt_staging'] = run_step(
         "dbt staging",
-        [PYTHON, "-m", "dbt", "run", "--select", "staging",
+        [DBT_EXE, "run", "--select", "staging",
          "--project-dir", DBT_DIR, "--profiles-dir", DBT_DIR],
     )
     results['dbt_marts'] = run_step(
         "dbt marts",
-        [PYTHON, "-m", "dbt", "run", "--select", "marts",
+        [DBT_EXE, "run", "--select", "marts",
          "--project-dir", DBT_DIR, "--profiles-dir", DBT_DIR],
     )
 

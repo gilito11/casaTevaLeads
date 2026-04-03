@@ -474,7 +474,34 @@ class CamoufoxHabitaclia:
                 page.close()
 
         except Exception as e:
-            logger.error(f"Scraper error: {e}")
+            err_str = str(e).lower()
+            if proxy_config and ('proxy' in err_str or '402' in err_str):
+                logger.warning(f"Proxy failed ({e}), retrying WITHOUT proxy...")
+                camoufox_opts.pop("proxy", None)
+                try:
+                    with Camoufox(**camoufox_opts) as browser:
+                        page = browser.new_page()
+                        logger.info("Warming up (no proxy)...")
+                        page.goto(self.BASE_URL, wait_until='domcontentloaded')
+                        self._human_delay(3, 5)
+                        self._accept_cookies(page)
+                        self._human_delay(2, 3)
+
+                        for zona_key in self.zones:
+                            zona_info = ZONAS_GEOGRAFICAS.get(zona_key)
+                            if not zona_info:
+                                continue
+                            if 'composite' in zona_info:
+                                for city_key in zona_info['composite']:
+                                    if city_key in ZONAS_GEOGRAFICAS:
+                                        self._scrape_zone(page, city_key, zona_info['nombre'])
+                            else:
+                                self._scrape_zone(page, zona_key)
+                        page.close()
+                except Exception as e2:
+                    logger.error(f"Scraper error (no proxy): {e2}")
+            else:
+                logger.error(f"Scraper error: {e}")
         finally:
             if self.postgres_conn:
                 self.postgres_conn.close()

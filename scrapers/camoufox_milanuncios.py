@@ -1185,9 +1185,70 @@ class CamoufoxMilanuncios:
                     self._human_delay(3, 6)
 
         except Exception as e:
-            logger.error(f"Camoufox error: {e}")
-            self.stats['errors'] += 1
-            raise
+            err_str = str(e).lower()
+            if proxy_config and ('proxy' in err_str or '402' in err_str):
+                logger.warning(f"Proxy failed ({e}), retrying WITHOUT proxy...")
+                camoufox_opts.pop("proxy", None)
+                try:
+                    with Camoufox(**camoufox_opts) as browser:
+                        page = browser.new_page()
+                        self._warmup_navigation(page)
+                        for zona_key in self.zones:
+                            zona_info = ZONAS_GEOGRAFICAS.get(zona_key)
+                            if not zona_info:
+                                continue
+                            logger.info(f"Scraping zone (no proxy): {zona_info['nombre']}")
+                            seen_ad_ids = set()
+                            for page_num in range(1, self.max_pages_per_zone + 1):
+                                try:
+                                    url = self.build_search_url(zona_key, page_num)
+                                    page.goto(url, wait_until='domcontentloaded', timeout=60000)
+                                    self._human_delay(3, 5)
+                                    try:
+                                        page.wait_for_load_state('networkidle', timeout=15000)
+                                    except:
+                                        pass
+                                    for _ in range(3):
+                                        page.mouse.wheel(0, random.randint(300, 600))
+                                        self._human_delay(0.5, 1)
+                                    self._human_delay(2, 3)
+                                    self.stats['pages_scraped'] += 1
+                                    listings = self._extract_listings_from_page(page, zona_key)
+                                    if not listings:
+                                        break
+                                    current_ids = {l.get('anuncio_id') for l in listings}
+                                    new_ids = current_ids - seen_ad_ids
+                                    if page_num > 1 and len(new_ids) == 0:
+                                        break
+                                    seen_ad_ids.update(current_ids)
+                                    new_listings = [l for l in listings if l.get('anuncio_id') in new_ids]
+                                    for listing in new_listings[:15]:
+                                        self.stats['listings_found'] += 1
+                                        listing = self._scrape_detail_page(page, listing)
+                                        if self.only_particulares and not listing.get('es_particular'):
+                                            continue
+                                        if self.filter_watermarks and listing.get('fotos'):
+                                            try:
+                                                if has_watermark(listing['fotos'][0]):
+                                                    self.stats['listings_skipped_watermark'] += 1
+                                                    continue
+                                            except:
+                                                pass
+                                        self._scraped_listings.append(listing)
+                                        if self.save_to_postgres(listing):
+                                            self.stats['listings_saved'] += 1
+                                        self._human_delay(1, 2)
+                                except Exception as e2:
+                                    logger.error(f"Error on page {page_num} (no proxy): {e2}")
+                                    self.stats['errors'] += 1
+                                    continue
+                            self._human_delay(3, 6)
+                except Exception as e2:
+                    logger.error(f"Camoufox error (no proxy): {e2}")
+                    self.stats['errors'] += 1
+            else:
+                logger.error(f"Camoufox error: {e}")
+                self.stats['errors'] += 1
 
         finally:
             if self.postgres_conn:

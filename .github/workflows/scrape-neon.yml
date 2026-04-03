@@ -71,6 +71,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check proxy health
+        id: proxy_check
+        continue-on-error: true
+        run: python scripts/check_proxy.py
+        env:
+          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Run Habitaclia scraper (Camoufox + proxy)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'habitaclia')
         continue-on-error: true

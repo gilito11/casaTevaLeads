@@ -984,9 +984,13 @@ class CamoufoxIdealista:
                     self._human_delay(3, 6)
 
         except Exception as e:
-            logger.error(f"Camoufox error: {e}")
-            self.stats['errors'] += 1
-            raise
+            err_str = str(e).lower()
+            if 'proxy' in err_str or '402' in err_str:
+                logger.error(f"Proxy failed ({e}) - idealista requires proxy, skipping")
+                self.stats['errors'] += 1
+            else:
+                logger.error(f"Camoufox error: {e}")
+                self.stats['errors'] += 1
 
         finally:
             if self.postgres_conn:
