@@ -242,6 +242,18 @@ postcss.config.js
 
 # TFG document (work in progress)
 docs/TFG_*.md
+docs/entrega_inicial.*
+docs/udl_logo.*
+
+# LaTeX build artifacts
+*.aux
+*.toc
+*.out
+*.lof
+*.lot
+*.synctex.gz
+*.fls
+*.fdb_latexmk
 
 # Analysis graphs
 publication_hours_analysis.png
