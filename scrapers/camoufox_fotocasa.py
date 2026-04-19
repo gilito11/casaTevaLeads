@@ -20,6 +20,7 @@ import psycopg2
 import requests as http_requests
 
 from scrapers.botasaurus_fotocasa import ZONAS_GEOGRAFICAS
+from scrapers.camoufox_idealista import check_proxy_health
 
 logger = logging.getLogger(__name__)
 
@@ -603,16 +604,18 @@ class CamoufoxFotocasa:
             "locale": ["es-ES", "es"],
         }
 
-        # Add proxy if configured (residential IP avoids GeeTest trigger)
-        proxy_config = self._parse_proxy(self.proxy)
-        if proxy_config:
-            camoufox_opts["proxy"] = proxy_config
-            logger.info(f"Using proxy: {proxy_config['server']}")
+        # Add proxy if configured and healthy
+        proxy_config = None
+        if self.proxy and check_proxy_health(self.proxy):
+            proxy_config = self._parse_proxy(self.proxy)
+            if proxy_config:
+                camoufox_opts["proxy"] = proxy_config
+                logger.info(f"Using proxy: {proxy_config['server']}")
 
         logger.info(f"Starting Camoufox Fotocasa scraper")
         logger.info(f"  Zones: {self.zones}")
         logger.info(f"  Headless: {self.headless}")
-        logger.info(f"  Proxy: {'configured' if proxy_config else 'none'}")
+        logger.info(f"  Proxy: {'configured' if proxy_config else 'none (direct IP)'}")
 
         try:
             with Camoufox(**camoufox_opts) as browser:

@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 import psycopg2
 
 from scrapers.botasaurus_habitaclia import ZONAS_GEOGRAFICAS
-from scrapers.camoufox_idealista import parse_proxy
+from scrapers.camoufox_idealista import parse_proxy, check_proxy_health
 from scrapers.utils.particular_filter import debe_scrapear
 
 logger = logging.getLogger(__name__)
@@ -435,10 +435,12 @@ class CamoufoxHabitaclia:
             "locale": ["es-ES", "es"],
         }
 
-        proxy_config = parse_proxy(self.proxy)
-        if proxy_config:
-            camoufox_opts["proxy"] = proxy_config
-            logger.info(f"Using proxy: {proxy_config['server']}")
+        proxy_config = None
+        if self.proxy and check_proxy_health(self.proxy):
+            proxy_config = parse_proxy(self.proxy)
+            if proxy_config:
+                camoufox_opts["proxy"] = proxy_config
+                logger.info(f"Using proxy: {proxy_config['server']}")
 
         logger.info(f"Starting Camoufox Habitaclia scraper")
         logger.info(f"  Zones: {self.zones}")

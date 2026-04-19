@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 import psycopg2
 
 from scrapers.watermark_detector import has_watermark
-from scrapers.camoufox_idealista import parse_proxy
+from scrapers.camoufox_idealista import parse_proxy, check_proxy_health
 
 logger = logging.getLogger(__name__)
 
@@ -1020,19 +1020,19 @@ class CamoufoxMilanuncios:
             "locale": ["es-ES", "es"],
         }
 
-        # Add proxy if configured (needed for datacenter IPs like GitHub Actions)
-        proxy_config = parse_proxy(self.proxy)
-        if proxy_config:
-            camoufox_opts["proxy"] = proxy_config
-            logger.info(f"Using proxy: {proxy_config['server']}")
-        else:
-            logger.warning("No proxy configured - may be blocked from datacenter IPs")
+        # Add proxy if configured and healthy
+        proxy_config = None
+        if self.proxy and check_proxy_health(self.proxy):
+            proxy_config = parse_proxy(self.proxy)
+            if proxy_config:
+                camoufox_opts["proxy"] = proxy_config
+                logger.info(f"Using proxy: {proxy_config['server']}")
 
         logger.info(f"Starting Camoufox Milanuncios scraper")
         logger.info(f"  Zones: {self.zones}")
         logger.info(f"  Max pages: {self.max_pages_per_zone}")
         logger.info(f"  Headless: {self.headless}")
-        logger.info(f"  Proxy: {'configured' if proxy_config else 'none'}")
+        logger.info(f"  Proxy: {'configured' if proxy_config else 'none (direct IP)'}")
 
         try:
             with Camoufox(**camoufox_opts) as browser:

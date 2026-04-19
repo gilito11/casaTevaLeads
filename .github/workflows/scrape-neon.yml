@@ -80,7 +80,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Habitaclia scraper (Camoufox + proxy)
+      - name: Run Habitaclia scraper (Camoufox)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'habitaclia')
         continue-on-error: true
         run: |
@@ -88,11 +88,10 @@ jobs:
           python run_habitaclia_scraper.py --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Fotocasa scraper (Camoufox + proxy)
+      - name: Run Fotocasa scraper (Camoufox)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'fotocasa')
         continue-on-error: true
         run: |
@@ -104,11 +103,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Milanuncios scraper (Camoufox + proxy)
+      - name: Run Milanuncios scraper (Camoufox)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'milanuncios')
         continue-on-error: true
         run: |
@@ -119,7 +117,6 @@ jobs:
             --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 

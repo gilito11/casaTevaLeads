@@ -198,6 +198,32 @@ def parse_proxy(proxy_str: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def check_proxy_health(proxy_str: str, timeout: int = 10) -> bool:
+    """Quick check if proxy is alive. Returns True if proxy works, False otherwise."""
+    import requests as _requests
+
+    config = parse_proxy(proxy_str)
+    if not config:
+        return False
+
+    proxies = {"http": config["server"], "https": config["server"]}
+    if "username" in config:
+        auth_server = config["server"].replace("http://", f"http://{config['username']}:{config['password']}@")
+        proxies = {"http": auth_server, "https": auth_server}
+
+    try:
+        resp = _requests.get("https://api.ipify.org", proxies=proxies, timeout=timeout)
+        logger.info(f"Proxy OK - IP: {resp.text}")
+        return True
+    except Exception as e:
+        err = str(e).lower()
+        if "402" in err or "payment" in err:
+            logger.warning("Proxy EXHAUSTED (402 Payment Required) - will scrape without proxy")
+        else:
+            logger.warning(f"Proxy DEAD ({e}) - will scrape without proxy")
+        return False
+
+
 class CamoufoxIdealista:
     """
     Idealista scraper using Camoufox anti-detect browser + IPRoyal proxy.
@@ -849,21 +875,24 @@ class CamoufoxIdealista:
             "locale": ["es-ES", "es"],
         }
 
-        # Add proxy if configured
-        proxy_config = parse_proxy(self.proxy)
-        if proxy_config:
-            camoufox_opts["proxy"] = proxy_config
-            camoufox_opts["geoip"] = True
-            logger.info(f"Using proxy: {proxy_config['server']}")
+        # Add proxy if configured and healthy
+        proxy_config = None
+        if self.proxy and check_proxy_health(self.proxy):
+            proxy_config = parse_proxy(self.proxy)
+            if proxy_config:
+                camoufox_opts["proxy"] = proxy_config
+                logger.info(f"Using proxy: {proxy_config['server']}")
+        elif self.proxy:
+            logger.warning("Proxy unavailable - idealista will likely be blocked without proxy")
         else:
-            camoufox_opts["geoip"] = True
-            logger.warning("No DATADOME_PROXY configured - may get blocked")
+            logger.warning("No DATADOME_PROXY configured - idealista will likely be blocked")
+        camoufox_opts["geoip"] = True
 
         logger.info(f"Starting Camoufox Idealista scraper")
         logger.info(f"  Zones: {self.zones}")
         logger.info(f"  Max pages: {self.max_pages_per_zone}")
         logger.info(f"  Headless: {self.headless}")
-        logger.info(f"  Proxy: {'configured' if proxy_config else 'none'}")
+        logger.info(f"  Proxy: {'configured' if proxy_config else 'none (direct IP)'}")
         logger.info(f"  GeoIP: {camoufox_opts.get('geoip', 'not set')}")
 
         try:
