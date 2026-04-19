@@ -199,7 +199,8 @@ def parse_proxy(proxy_str: str) -> Optional[Dict[str, Any]]:
 
 
 def check_proxy_health(proxy_str: str, timeout: int = 10) -> bool:
-    """Quick check if proxy is alive. Returns True if proxy works, False otherwise."""
+    """Quick check if proxy is alive. Returns True only on HTTP 200 + IP-looking body."""
+    import re as _re
     import requests as _requests
 
     config = parse_proxy(proxy_str)
@@ -213,7 +214,20 @@ def check_proxy_health(proxy_str: str, timeout: int = 10) -> bool:
 
     try:
         resp = _requests.get("https://api.ipify.org", proxies=proxies, timeout=timeout)
-        logger.info(f"Proxy OK - IP: {resp.text}")
+        if resp.status_code == 402:
+            logger.warning("Proxy EXHAUSTED (402 Payment Required) - will scrape without proxy")
+            return False
+        if resp.status_code == 407:
+            logger.warning("Proxy AUTH FAILED (407) - will scrape without proxy")
+            return False
+        if resp.status_code != 200:
+            logger.warning(f"Proxy returned HTTP {resp.status_code} - will scrape without proxy")
+            return False
+        body = (resp.text or "").strip()
+        if not _re.match(r"^\d{1,3}(\.\d{1,3}){3}$", body):
+            logger.warning(f"Proxy returned non-IP body (len={len(body)}) - treating as unhealthy")
+            return False
+        logger.info(f"Proxy OK - IP: {body}")
         return True
     except Exception as e:
         err = str(e).lower()
