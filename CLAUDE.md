@@ -1,6 +1,6 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 1 Febrero 2026
+> **Last Updated**: 11 Abril 2026
 
 ## Quick Reference
 
@@ -229,6 +229,78 @@ fly ssh console
 - After ANY correction from the user: update `tasks/lessons.md` with the pattern
 - Write rules that prevent the same mistake from recurring
 - Review lessons at session start
+
+---
+
+## Impact Analysis (OBLIGATORIO antes de implementar)
+
+Antes de tocar código en cambios no triviales: mapear dependencias → implementar en orden → validar en cada paso.
+
+### Cadenas de Dependencia
+
+```
+SCRAPER FIELD CHANGE:
+  scraper raw_data keys
+    → dbt staging (stg_*.sql)
+      → dbt marts (dim_leads.sql)
+        → Django Lead model (models.py, managed=False)
+          → views.py / api_views.py / serializers.py
+            → templates HTML
+
+DB SCHEMA CHANGE:
+  models.py (add/remove field)
+    → migrations/
+      → raw SQL en views.py, analytics/views.py, listing_checker.py
+        → API serializers
+
+SHARED UTILITY CHANGE:
+  camoufox_idealista.py (parse_proxy, check_proxy_health)
+    → camoufox_habitaclia.py, camoufox_fotocasa.py, camoufox_milanuncios.py
+      → contact_automation/milanuncios_contact.py
+  error_handling.py (validate_scraping_results, log_scraper_run)
+    → los 4 camoufox scrapers
+  utils/particular_filter.py (debe_scrapear)
+    → base_scraper.py, botasaurus_base.py, camoufox_habitaclia.py
+  utils/telegram_alerts.py
+    → error_handling.py, check_portal_health.py, check_proxy.py
+
+WORKFLOW CHANGE:
+  scrape-neon.yml
+    → run_*_scraper.py (runners)
+      → scrapers/camoufox_*.py (classes)
+        → utils/ (shared modules)
+  contact-queue.yml
+    → scripts/process_contact_queue.py
+      → scrapers/contact_automation/*.py
+```
+
+### Nodo Crítico: dim_leads
+
+`dim_leads` es el hub central — si cambias una columna aquí, verificar:
+1. Los 4 `stg_*.sql` (inputs)
+2. Los 7 `analytics_*.sql` (dependientes)
+3. `dim_lead_duplicates.sql`
+4. Django `Lead` model (db_column mappings)
+5. `LeadListSerializer` / `LeadDetailSerializer`
+6. Raw SQL en `analytics/views.py` y `analytics/api_views.py`
+7. `listing_checker.py`, `post_scrape_auto_queue.py`
+
+### Zona Imports (ZONAS_GEOGRAFICAS)
+
+Cada scraper tiene su propio dict, pero camoufox hereda del botasaurus:
+- `camoufox_habitaclia.py` → importa de `botasaurus_habitaclia.py`
+- `camoufox_fotocasa.py` → importa de `botasaurus_fotocasa.py`
+- `camoufox_milanuncios.py` → dict propio
+- `camoufox_idealista.py` → dict propio
+
+### Checklist Pre-Implementación
+
+Antes de cualquier cambio no trivial, responder:
+- [ ] ¿Qué archivos importan del archivo que voy a modificar?
+- [ ] ¿Hay raw SQL en views/scripts que referencia columnas afectadas?
+- [ ] ¿Hay workflows de GitHub Actions que ejecutan este script?
+- [ ] ¿El cambio afecta a dim_leads? → verificar los 7 puntos de arriba
+- [ ] ¿El cambio afecta a un shared utility? → verificar todos los importadores
 
 ---
 
