@@ -18,6 +18,11 @@ on:
         description: 'Zones to scrape (comma-separated, empty=auto rotation)'
         required: false
         default: ''
+      full_refresh:
+        description: 'dbt --full-refresh (rebuilds incremental marts from scratch)'
+        type: boolean
+        required: false
+        default: false
 
 env:
   DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -173,8 +178,13 @@ jobs:
                 sslmode: require
           EOF
           dbt deps --profiles-dir /tmp/dbt_profiles || true
-          dbt run --select staging --profiles-dir /tmp/dbt_profiles
-          dbt run --select marts --profiles-dir /tmp/dbt_profiles
+          FR=""
+          if [ "${{ github.event.inputs.full_refresh }}" = "true" ]; then
+            FR="--full-refresh"
+            echo "dbt: running with --full-refresh"
+          fi
+          dbt run --select staging --profiles-dir /tmp/dbt_profiles $FR
+          dbt run --select marts --profiles-dir /tmp/dbt_profiles $FR
         env:
           DBT_PASSWORD: ${{ secrets.NEON_DB_PASSWORD }}
 
