@@ -1,38 +1,39 @@
 # Casa Teva Lead System - CRM Inmobiliario
 
-> **Last Updated**: 11 Abril 2026
+> **Last Updated**: 4 Mayo 2026
 
 ## Quick Reference
 
 ### Stack
 - **Backend**: Django 5.x + DRF
 - **BD**: PostgreSQL 16 (Neon - serverless)
-- **Scrapers**: Botasaurus (habitaclia, fotocasa), Camoufox (milanuncios, idealista)
-- **Contacto**: Camoufox + IPRoyal proxy (4 portales)
-- **Orquestacion**: GitHub Actions (L-X-V 12:00 UTC)
+- **Scrapers**: Scrapling 0.4.7 + Patchright (4 portales, sin proxy desde 4 May 2026)
+- **Contacto**: Camoufox + IPRoyal proxy (4 portales — pendiente migrar a Scrapling)
+- **Orquestacion**: GitHub Actions (L-X-V 12:00 UTC) + VPS Contabo Windows
 - **ETL**: dbt (raw → staging → marts)
 - **Frontend**: Django Templates + HTMX + TailwindCSS
 
 ### Entornos
 | Servicio | Local | Produccion |
 |----------|-------|------------|
-| Web | localhost:8000 | casatevaleads.fly.dev |
+| Web | localhost:8000 | fincaradar.com (Contabo VPS) + casatevaleads.fly.dev |
 | BD | localhost:5432 | Neon (ep-ancient-darkness-*.neon.tech) |
-| Scrapers | manual | GitHub Actions |
+| Scrapers | manual | GitHub Actions + VPS scheduled |
 
 ### Comandos Frecuentes
 ```bash
-# Local scraping (Botasaurus)
-python run_habitaclia_scraper.py --zones salou --postgres
-
-# Local scraping Idealista (Camoufox + proxy)
-DATADOME_PROXY="user:pass_country-es@geo.iproyal.com:12321" python run_camoufox_idealista_scraper.py --zones igualada --postgres
+# Local scraping (Scrapling, sin proxy)
+python -m scrapers.scrapling_idealista --zones salou --max-pages 2 --postgres
+python -m scrapers.scrapling_fotocasa --zones salou cambrils --postgres
+python -m scrapers.scrapling_habitaclia --zones salou --postgres
+python -m scrapers.scrapling_milanuncios --zones tarragona --max-pages 2 --postgres
 
 # Trigger GitHub Actions scraping
-gh workflow run scrape-neon.yml -f portals="habitaclia,fotocasa,idealista" -f zones="salou"
+gh workflow run scrape-neon.yml -f portals="habitaclia,fotocasa,idealista,milanuncios" -f zones="salou,cambrils,reus"
 
-# dbt (local con Neon)
-cd dbt_project && dbt run --profiles-dir /tmp/dbt_profiles --select staging marts
+# dbt (local con Neon — usa /tmp/dbt_profiles sin search_path por compatibilidad pooler)
+DBT_HOST=ep-...neon.tech DBT_USER=neondb_owner DBT_PASSWORD=... DBT_DBNAME=neondb \
+  dbt run --select staging marts --project-dir dbt_project --profiles-dir /tmp/dbt_profiles
 ```
 
 ### Portal Names (BD constraint)
@@ -89,6 +90,7 @@ GitHub Actions (scraping)     Fly.io (Django)
 - [x] **PDF Valoración** - `/leads/<id>/valuation-pdf/`
 - [x] **ACM** - `/acm/api/generate/<id>/`, comparables + confianza
 - [x] **Task Agenda** - `/leads/agenda/`, tareas por comercial
+- [x] **"Es agencia" botón** - `/leads/<id>/mark-agency/`, blacklist + delete (botón naranja en list)
 
 ### Pendiente
 - [ ] UI para contacto desde app (cola → GitHub Actions)
@@ -97,19 +99,31 @@ GitHub Actions (scraping)     Fly.io (Django)
 
 ---
 
-## Scrapers
+## Scrapers (Mayo 2026 - Migrado a Scrapling)
 
-| Portal | Tecnología | Coste | Anti-bot |
-|--------|------------|-------|----------|
-| habitaclia | Botasaurus | Gratis | Ninguno |
-| fotocasa | Botasaurus | Gratis | Ninguno |
-| milanuncios | Camoufox | Gratis | GeeTest (bypass) |
-| idealista | Camoufox + IPRoyal | ~$1/mes | DataDome (bypass) |
+| Portal | Tecnología | Coste | Anti-bot | Detección Particular |
+|--------|------------|-------|----------|----------------------|
+| habitaclia | Scrapling 0.4.7 | Gratis | Imperva (bypass nativo) | URL `/viviendas-particulares-` |
+| fotocasa | Scrapling 0.4.7 | Gratis | Imperva (bypass nativo) | URL `/particulares/` + filtro `tu agente` |
+| milanuncios | Scrapling 0.4.7 | Gratis | GeeTest (bypass nativo) | JSON `sellerType=private` + 6 signals |
+| idealista | Scrapling 0.4.7 | Gratis | DataDome (bypass nativo) | Card `item_contains_branding` + detail `/pro/<slug>/` |
+
+### Archivos
+- Base class: `scrapers/scrapling_base.py` (StealthySession, multi-tenant, raw.raw_listings)
+- Por portal: `scrapers/scrapling_<portal>.py`
+- Camoufox antiguos: `scrapers/camoufox_*.py` (preservados como fallback)
 
 ### Schedule
 - **Workflow**: `.github/workflows/scrape-neon.yml`
 - **Cron**: `0 12 * * 1,3,5` (12:00 UTC, L-X-V)
 - **Manual**: `gh workflow run scrape-neon.yml`
+- **VPS scheduled**: `scripts/scheduled_scrape.py` corre los 4 portales L-X-V (antes solo 2)
+
+### Migración Scrapling (4 May 2026)
+- IPRoyal proxy ya NO necesario (DataDome/Imperva bypass sin proxy)
+- 2Captcha solo para Cloudflare Turnstile (auto via `solve_cloudflare=True`)
+- Todos los portales corren en VPS Y GH Actions (antes idealista+fotocasa solo en GH Actions)
+- StealthySession crucial: `StealthyFetcher.fetch` aislado → 403 en idealista detail; con sesión → OK
 
 ---
 
