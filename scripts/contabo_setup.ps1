@@ -43,6 +43,7 @@ Write-Host "  OK" -ForegroundColor Green
 Write-Host "`n[3/7] Installing browsers..." -ForegroundColor Yellow
 & "$PROJECT\venv\Scripts\camoufox.exe" fetch
 & $PYTHON -m playwright install chromium
+& "$PROJECT\venv\Scripts\scrapling.exe" install
 Write-Host "  OK" -ForegroundColor Green
 
 # ---- 4. Django setup ----

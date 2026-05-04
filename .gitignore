@@ -260,6 +260,10 @@ publication_hours_analysis.png
 
 # Claude Code temp directories
 tmpclaude-*
+.claude/
+
+# Scrapling test result artifacts
+scripts/scrapling_*.json
 
 # Debug/test screenshots  
 debug_*.png

@@ -14,11 +14,12 @@ python-decouple>=3.8
 python-dotenv>=1.0
 
 # Scrapers
-playwright>=1.48
+scrapling[fetchers]>=0.4.7
+playwright>=1.58
 botasaurus>=4.0
 camoufox[geoip]>=0.4.11
 requests>=2.31
-curl_cffi>=0.7
+curl_cffi>=0.15
 
 # dbt
 dbt-core>=1.8,<2.0

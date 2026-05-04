@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""VPS scraping scheduled task - runs portals that work from Contabo.
+"""VPS scraping scheduled task - runs ALL 4 portals via Scrapling.
 
 Schedule: L-X-V 13:00 CET (12:00 UTC) via Windows Task Scheduler.
 
-Runs habitaclia + milanuncios + dbt + auto-queue with Telegram alerts.
-fotocasa + idealista are blocked on VPS (Imperva/DataDome) → stay on GitHub Actions.
+Scrapling (Patchright) bypasses DataDome (idealista) and Imperva (fotocasa,
+habitaclia) without a proxy, so all 4 portals can now run on the VPS.
 """
 import os
 import sys
@@ -99,26 +99,46 @@ def main():
     results = {}
 
     # 1a. Scrapers Tenant 1 (Casa Teva - Catalonia)
-    # fotocasa (Imperva) and idealista (DataDome) are blocked → GitHub Actions only
     results['habitaclia'] = run_step(
         "Habitaclia (Catalonia)",
-        [PYTHON, "run_habitaclia_scraper.py", "--zones"] + ZONES + ["--postgres"],
+        [PYTHON, "-m", "scrapers.scrapling_habitaclia", "--zones"] + ZONES + ["--postgres"],
+        allow_fail=True,
+    )
+    results['fotocasa'] = run_step(
+        "Fotocasa (Catalonia)",
+        [PYTHON, "-m", "scrapers.scrapling_fotocasa", "--zones"] + ZONES + ["--postgres"],
+        allow_fail=True,
+    )
+    results['idealista'] = run_step(
+        "Idealista (Catalonia)",
+        [PYTHON, "-m", "scrapers.scrapling_idealista", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
+        allow_fail=True,
     )
     results['milanuncios'] = run_step(
         "Milanuncios (Catalonia)",
-        [PYTHON, "run_camoufox_milanuncios_scraper.py", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
+        [PYTHON, "-m", "scrapers.scrapling_milanuncios", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
         allow_fail=True,
     )
 
     # 1b. Scrapers Tenant 2 (Look and Find - Madrid)
     results['habitaclia_madrid'] = run_step(
         "Habitaclia (Madrid)",
-        [PYTHON, "run_habitaclia_scraper.py", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--postgres"],
+        [PYTHON, "-m", "scrapers.scrapling_habitaclia", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--postgres"],
+        allow_fail=True,
+    )
+    results['fotocasa_madrid'] = run_step(
+        "Fotocasa (Madrid)",
+        [PYTHON, "-m", "scrapers.scrapling_fotocasa", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--postgres"],
+        allow_fail=True,
+    )
+    results['idealista_madrid'] = run_step(
+        "Idealista (Madrid)",
+        [PYTHON, "-m", "scrapers.scrapling_idealista", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--max-pages", "2", "--postgres"],
         allow_fail=True,
     )
     results['milanuncios_madrid'] = run_step(
         "Milanuncios (Madrid)",
-        [PYTHON, "run_camoufox_milanuncios_scraper.py", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--max-pages", "2", "--postgres"],
+        [PYTHON, "-m", "scrapers.scrapling_milanuncios", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--max-pages", "2", "--postgres"],
         allow_fail=True,
     )
 

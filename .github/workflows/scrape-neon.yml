@@ -61,83 +61,57 @@ jobs:
             echo "Day $DAY rotation: $ZONES"
           fi
 
-      - name: Install Chrome and Xvfb
-        run: |
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable xvfb
-
       - name: Install dependencies
-        run: pip install botasaurus psycopg2-binary python-decouple python-dotenv dbt-postgres requests "camoufox[geoip]" Pillow
+        run: |
+          pip install "scrapling[fetchers]>=0.4.7" psycopg2-binary python-decouple python-dotenv dbt-postgres requests Pillow
 
-      - name: Install Camoufox browser
-        run: camoufox fetch
+      - name: Install Scrapling browsers (Patchright)
+        run: scrapling install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check proxy health
-        id: proxy_check
-        continue-on-error: true
-        run: python scripts/check_proxy.py
-        env:
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-
-      - name: Run Habitaclia scraper (Camoufox)
+      - name: Run Habitaclia scraper (Scrapling)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'habitaclia')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python run_habitaclia_scraper.py --zones ${ZONES//,/ } --postgres
+          python -m scrapers.scrapling_habitaclia --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Fotocasa scraper (Camoufox)
+      - name: Run Fotocasa scraper (Scrapling)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'fotocasa')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python run_camoufox_fotocasa_scraper.py \
-            --zones ${ZONES//,/ } \
-            --virtual \
-            --postgres
+          python -m scrapers.scrapling_fotocasa --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Milanuncios scraper (Camoufox)
+      - name: Run Milanuncios scraper (Scrapling)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'milanuncios')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python run_camoufox_milanuncios_scraper.py \
-            --zones ${ZONES//,/ } \
-            --max-pages 2 \
-            --postgres
+          python -m scrapers.scrapling_milanuncios --zones ${ZONES//,/ } --max-pages 2 --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Idealista scraper (Camoufox + Xvfb + proxy)
+      - name: Run Idealista scraper (Scrapling — DataDome bypass without proxy)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'idealista')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python run_camoufox_idealista_scraper.py \
-            --zones ${ZONES//,/ } \
-            --max-pages 2 \
-            --virtual \
-            --postgres
+          python -m scrapers.scrapling_idealista --zones ${ZONES//,/ } --max-pages 2 --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
