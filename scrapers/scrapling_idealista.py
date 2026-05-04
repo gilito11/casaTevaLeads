@@ -154,9 +154,34 @@ class ScraplingIdealista(ScraplingBaseScraper):
         if not html or len(html) < 50000:
             return listing  # likely soft-blocked, keep search-page data
 
-        # Trust the card-level classification (item_contains_branding /
-        # logo-branding). Don't second-guess on detail page — generic detail
-        # markup contains misleading strings on every listing.
+        # Detail-page Profesional detection — three highly reliable signals:
+        #   1) <div class="professional-name"> block (sidebar advertiser card)
+        #   2) <a href="/pro/<slug>/"> agency link (only agencies have a /pro/ profile)
+        #   3) <input name="professional"> hidden form input
+        # Any of these → professional. Otherwise keep card-level classification.
+        is_pro = False
+        try:
+            if page.css(".professional-name"):
+                is_pro = True
+            elif re.search(r'href="/pro/[a-z0-9_-]+/?"', html, re.IGNORECASE):
+                is_pro = True
+            elif re.search(r'<input[^>]+name="professional"', html, re.IGNORECASE):
+                is_pro = True
+        except Exception:
+            pass
+        if is_pro:
+            listing["es_particular"] = False
+
+        # Capture advertiser/agency name when available (overrides empty card-level)
+        try:
+            adv_link = page.css('a.about-advertiser-name')
+            if adv_link:
+                name = (adv_link[0].text.clean() or "").strip()
+                if name:
+                    listing["vendedor"] = name[:120]
+        except Exception:
+            pass
+
         listing["verified"] = True
 
         # 2) Full description

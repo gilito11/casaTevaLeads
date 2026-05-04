@@ -43,6 +43,7 @@ urlpatterns = [
     path('<str:lead_id>/change-status/', views.change_status_view, name='change_status'),
     path('<str:lead_id>/add-note/', views.add_note_view, name='add_note'),
     path('<str:lead_id>/delete/', views.delete_lead_view, name='delete'),
+    path('<str:lead_id>/mark-agency/', views.mark_as_agency_view, name='mark_agency'),
     path('<str:lead_id>/contact/', views.contact_from_lead_view, name='contact_from_lead'),
     path('<str:lead_id>/assign/', views.assign_lead_view, name='assign'),
     path('<str:lead_id>/enqueue/', views.enqueue_contact_view, name='enqueue_contact'),

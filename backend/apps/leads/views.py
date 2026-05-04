@@ -384,6 +384,53 @@ def add_note_view(request, lead_id):
 
 
 @login_required
+@require_POST
+def mark_as_agency_view(request, lead_id):
+    """Mark a lead as misclassified agency: blacklist + delete from pipeline.
+
+    User-facing action: "Esto es una agencia". Permanently prevents this
+    anuncio_id from being re-scraped (blacklist) and removes it from raw +
+    dim_leads (incremental, so it won't auto-clean).
+    """
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+    if tenant_id and lead.tenant_id != tenant_id:
+        return HttpResponse(status=403)
+
+    if not (lead.anuncio_id and lead.portal):
+        return HttpResponse("Lead sin anuncio_id/portal", status=400)
+
+    motivo = f"Marcado como agencia por {request.user.username} desde CRM"
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO leads_anuncio_blacklist (tenant_id, portal, anuncio_id, url_anuncio, titulo, motivo, created_at, created_by_id)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s)
+            ON CONFLICT (tenant_id, portal, anuncio_id) DO UPDATE SET motivo = EXCLUDED.motivo
+            """,
+            [tenant_id or lead.tenant_id, lead.portal, lead.anuncio_id,
+             lead.url_anuncio or '', (lead.titulo or '')[:500], motivo,
+             request.user.id if request.user.is_authenticated else None],
+        )
+        cursor.execute(
+            "DELETE FROM raw.raw_listings WHERE tenant_id=%s AND portal=%s AND raw_data->>'anuncio_id'=%s",
+            [tenant_id or lead.tenant_id, lead.portal, lead.anuncio_id],
+        )
+        cursor.execute(
+            "DELETE FROM public_marts.dim_leads WHERE tenant_id=%s AND source_portal=%s AND lead_id=%s",
+            [tenant_id or lead.tenant_id, lead.portal, lead_id],
+        )
+
+    LeadEstado.objects.filter(lead_id=str(lead_id)).delete()
+    with connection.cursor() as cursor:
+        cursor.execute("DELETE FROM leads_nota WHERE lead_id=%s", [lead_id])
+        cursor.execute("DELETE FROM leads_contact_queue WHERE lead_id=%s", [lead_id])
+
+    return HttpResponse("")
+
+
+@login_required
 def delete_lead_view(request, lead_id):
     """Vista para eliminar un lead (HTMX)"""
     if request.method != 'POST':
