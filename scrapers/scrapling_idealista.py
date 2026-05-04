@@ -27,6 +27,15 @@ class ScraplingIdealista(ScraplingBaseScraper):
     DETAIL_DELAY_RANGE = (3.0, 6.0)
     SEARCH_DELAY_RANGE = (5.0, 9.0)
 
+    def should_skip(self, listing: Dict[str, Any]) -> bool:
+        # Save both Particular and Profesional cards. Filtering happens in dbt
+        # staging via raw_data->>'es_particular'. Skipping pre-detail loses
+        # data we may want for future agency-detection improvements.
+        precio = listing.get("precio")
+        if precio is not None and precio < 10000:
+            return True
+        return False
+
     def build_search_url(self, zona_key: str, page: int = 1) -> str:
         zona = self.ZONAS[zona_key]
         url = f"{self.BASE_URL}/venta-viviendas/{zona['url_path']}/"
@@ -61,6 +70,10 @@ class ScraplingIdealista(ScraplingBaseScraper):
         return results
 
     def _parse_card(self, art, zona_key: str, zona_info: dict) -> Optional[Dict[str, Any]]:
+        # Skip "nearby suggestion" cards from neighboring zones — not real listings
+        cls = art.attrib.get("class", "")
+        if "geo-reach-card" in cls:
+            return None
         link_list = art.css("a.item-link")
         if not link_list:
             return None
@@ -141,47 +154,10 @@ class ScraplingIdealista(ScraplingBaseScraper):
         if not html or len(html) < 50000:
             return listing  # likely soft-blocked, keep search-page data
 
-        # 1) Verify particular vs professional with detail-page advertiser block
-        verified = False
-        try:
-            advertiser_blocks = (
-                page.css('[class*="advertiser"]')
-                + page.css('[class*="contact"]')
-                + page.css(".professional-name")
-                + page.css(".sidebar")
-            )
-            for blk in advertiser_blocks[:6]:
-                text = (blk.get_all_text() or "")[:600]
-                if "Profesional" in text or "Referencia del anuncio" in text:
-                    listing["es_particular"] = False
-                    verified = True
-                    break
-                if "Particular" in text and "Profesional" not in text and len(text) < 400:
-                    listing["es_particular"] = True
-                    verified = True
-                    break
-        except Exception:
-            pass
-
-        # CSS-class fallback
-        if not verified:
-            try:
-                pro_hits = (
-                    page.css(".professional-name")
-                    + page.css(".logo-branding")
-                    + page.css('[class*="professional"]')
-                    + page.css('[class*="agency"]')
-                )
-                if pro_hits:
-                    listing["es_particular"] = False
-                    verified = True
-            except Exception:
-                pass
-
-        # Conservative default
-        if not verified:
-            listing["es_particular"] = False
-        listing["verified"] = verified
+        # Trust the card-level classification (item_contains_branding /
+        # logo-branding). Don't second-guess on detail page — generic detail
+        # markup contains misleading strings on every listing.
+        listing["verified"] = True
 
         # 2) Full description
         try:
