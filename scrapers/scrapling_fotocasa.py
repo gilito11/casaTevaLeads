@@ -35,6 +35,45 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             url = f"{url}/{page}"
         return url
 
+    def search_page_action(self):
+        """Scroll to hydrate lazy-loaded cards, then extract structured data
+        from the live DOM (precio/m²/hab live in React-rendered text nodes
+        that don't always survive into HTML serialization). Stash JSON in a
+        <script id="__SCRAPLING_LISTINGS__"> tag for parse_search_page to read.
+        """
+        def _hydrate_and_extract(page):
+            try:
+                for _ in range(8):
+                    page.evaluate("window.scrollBy(0, 900)")
+                    page.wait_for_timeout(600)
+                page.evaluate("window.scrollTo(0, 0)")
+                page.wait_for_timeout(800)
+                # Extract listings via DOM walk + stash as JSON script tag
+                page.evaluate(r"""() => {
+                    const seen = {};
+                    const results = [];
+                    document.querySelectorAll('a[href*="/es/comprar/vivienda/"]').forEach(link => {
+                        const href = link.getAttribute('href');
+                        const m = href.match(/\/(\d{7,})\//);
+                        if (!m || seen[m[1]]) return;
+                        seen[m[1]] = true;
+                        const card = link.closest('article') || link.parentElement;
+                        const text = card ? card.textContent.replace(/\s+/g, ' ').trim() : '';
+                        results.push({href, id: m[1], text: text.slice(0, 2000)});
+                    });
+                    let s = document.getElementById('__SCRAPLING_LISTINGS__');
+                    if (!s) {
+                        s = document.createElement('script');
+                        s.id = '__SCRAPLING_LISTINGS__';
+                        s.type = 'application/json';
+                        document.body.appendChild(s);
+                    }
+                    s.textContent = JSON.stringify(results);
+                }""")
+            except Exception:
+                pass
+        return _hydrate_and_extract
+
     def run(self) -> Dict[str, Any]:
         from scrapling.fetchers import StealthySession
 
@@ -100,7 +139,32 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             self.stats["details_blocked"] += 1
             return results
 
-        # Cut off agency listings (Fotocasa shows particulares first, then agencies after a divider)
+        zona_info = self.ZONAS.get(zona_key, {})
+
+        # Preferred path: read structured listings stashed by search_page_action
+        # via JS DOM extraction. Each entry has {href, id, text} where text
+        # is the full card textContent post-hydration (precio, m², hab, vendedor).
+        m = re.search(
+            r'<script[^>]*id="__SCRAPLING_LISTINGS__"[^>]*>(.*?)</script>',
+            html,
+            re.DOTALL,
+        )
+        if m:
+            try:
+                import json as _json
+                items = _json.loads(m.group(1)) or []
+                logger.info(f"[fotocasa] {zona_key}: extracted {len(items)} items via JS DOM")
+                for item in items:
+                    listing = self._listing_from_card_text(item, zona_key, zona_info)
+                    if listing:
+                        results.append(listing)
+                if results:
+                    return results  # JS path won; skip HTML fallback
+            except Exception as e:
+                logger.warning(f"[fotocasa] JS-stashed listings parse error: {e}")
+
+        # Fallback path: regex over server-rendered HTML (only ~2 cards visible)
+        # Cut off agency listings (Fotocasa shows particulares first)
         html_lower = html.lower()
         divider_pos = len(html)
         for marker in ("anuncios de inmobiliarias", "ver más anuncios", "mira algunos de los anuncios"):
@@ -109,10 +173,8 @@ class ScraplingFotocasa(ScraplingBaseScraper):
                 divider_pos = pos
         particulares_html = html[:divider_pos]
 
-        # Listing links carry numeric id at the end: /es/comprar/vivienda/<slug>/<id>/d
         links = re.findall(r'href="(/es/comprar/vivienda/[^"]+/(\d{7,})/d)', particulares_html)
         seen = set()
-        zona_info = self.ZONAS.get(zona_key, {})
 
         for href, anuncio_id in links:
             if anuncio_id in seen:
@@ -134,7 +196,127 @@ class ScraplingFotocasa(ScraplingBaseScraper):
         return results
 
     # ------------------------------------------------------------------
-    # Detail-page enrichment
+    # Helpers
+    # ------------------------------------------------------------------
+    # Spanish agency suffixes / patterns inside the rendered card text
+    _AGENCY_NAME_RE = re.compile(
+        r"\b(s\.?l\.?|s\.?a\.?|inmobiliaria|inmueble|inmuebles|inmofactory|fincas|"
+        r"agencia|agency|gestor|asesor|properties|properti|partners?|grupo|"
+        r"servicios inmobiliarios|imm?obili[a-z]*)\b",
+        re.IGNORECASE,
+    )
+
+    def _listing_from_card_text(self, item: Dict[str, str], zona_key: str, zona_info: dict):
+        """Convert a {href, id, text} entry from the JS DOM extraction into
+        a full listing dict with precio/m²/hab/vendedor parsed out of text.
+        """
+        href = item.get("href") or ""
+        anuncio_id = item.get("id") or ""
+        text = item.get("text") or ""
+        if not anuncio_id or not href or not text:
+            return None
+
+        # Skip "obra-nueva" promotional links (developer projects, not particular)
+        if "/vivienda/obra-nueva/" in href:
+            return None
+
+        # Price: prefer the first standalone X.XXX € or XXX.XXX € that's > 10000
+        precio = None
+        for raw in re.findall(r"(\d{1,4}[.,]\d{3}(?:[.,]\d{3})?)\s*€", text):
+            try:
+                v = float(raw.replace(".", "").replace(",", "."))
+                # Sanity: must be a real property price (10k–10M)
+                if 10_000 < v < 10_000_000:
+                    precio = v
+                    break
+            except Exception:
+                pass
+
+        # Surface: <number> m² / m2
+        metros = None
+        m2_m = re.search(r"(\d{2,4})\s*m[²2]", text)
+        if m2_m:
+            try:
+                metros = float(m2_m.group(1))
+            except Exception:
+                pass
+
+        # Bedrooms: <number> habs / hab
+        habitaciones = None
+        hab_m = re.search(r"(\d+)\s*hab", text)
+        if hab_m:
+            try:
+                habitaciones = int(hab_m.group(1))
+            except Exception:
+                pass
+
+        # Particular vs Profesional. Fotocasa shows agency branding badges:
+        # "Calidad Fotocasa", "Tu partner inmobiliario", "Top+", "Pro+"
+        # are signals of a PAID agency account. "Tu agente" is the particular
+        # widget (NOT an agency marker). Plain corporate suffixes (S.L., S.A.)
+        # in the visible card text also identify agencies.
+        es_particular = True
+        vendedor = ""
+        agency_signals = [
+            "Calidad Fotocasa",
+            "Tu partner inmobiliario",
+            "Top+",
+            "Pro+",
+            "Anunciante: Profesional",
+        ]
+        if any(sig in text for sig in agency_signals):
+            es_particular = False
+        elif re.search(r"\b(S\.?L\.?|S\.?A\.?|S\.?L\.?U\.?)\b", text):
+            es_particular = False
+
+        # Extract clean agency name: prefer ALL-CAPS chunk before "·" separator.
+        # If extraction is messy, leave empty rather than save garbage substring.
+        if not es_particular:
+            ag_m = re.search(r"([A-ZÁÉÍÓÚÑ]{2,}[A-ZÁÉÍÓÚÑ\s'\-\.]{2,40}[A-ZÁÉÍÓÚÑ])\s*(?:[·•]|inmobiliaria|IMMOBILIARIA|S\.?L\.?|S\.?A\.?)", text)
+            if ag_m:
+                cand = re.sub(r"\s+", " ", ag_m.group(1).strip())
+                if 3 <= len(cand) <= 80 and not cand.isdigit():
+                    vendedor = cand[:120]
+        elif "Particular" in text:
+            vendedor = "Particular"
+
+        # Title fallback from text (something like "Apartamento en Carrer ...")
+        titulo = ""
+        title_m = re.search(
+            r"(Apartamento|Piso|Casa|Chalet|D[uú]plex|[ÁA]tico|Loft|Estudio|Vivienda)\s+(?:en|de)\s+([^|·]{5,150})",
+            text,
+        )
+        if title_m:
+            titulo = (title_m.group(1) + " " + title_m.group(2)).strip()[:200]
+
+        # Strip query params (`?from=list&isGalleryOpen=true&...`) — they
+        # come from the gallery widget and trigger HTTP 405 on the detail page.
+        clean_href = href.split("?", 1)[0]
+        url_anuncio = clean_href if clean_href.startswith("http") else f"{self.BASE_URL}{clean_href}"
+
+        return {
+            "anuncio_id": anuncio_id,
+            "titulo": titulo,
+            "precio": precio,
+            "habitaciones": habitaciones,
+            "metros": metros,
+            "url_anuncio": url_anuncio,
+            "zona_geografica": zona_info.get("nombre", zona_key),
+            "zona_busqueda": zona_key,
+            "es_particular": es_particular,
+            "vendedor": vendedor,
+            "tipo_inmueble": "piso",
+        }
+
+    def _wants_detail(self) -> bool:
+        # Fotocasa detail pages reliably return HTTP 405 (server rejects GET on
+        # the detail URL pattern, even after stripping query params). The
+        # search-page JS DOM extraction already gives us titulo/precio/m²/hab/
+        # vendedor/es_particular — skip detail entirely.
+        return False
+
+    # ------------------------------------------------------------------
+    # Detail-page enrichment (kept for fallback / future re-enable)
     # ------------------------------------------------------------------
     def parse_detail_page(self, page, listing: Dict[str, Any]) -> Dict[str, Any]:
         try:

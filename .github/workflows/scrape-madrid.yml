@@ -34,7 +34,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install "scrapling[fetchers]>=0.4.7" psycopg2-binary python-decouple python-dotenv dbt-postgres requests Pillow
+          pip install "scrapling[fetchers]>=0.4.7" psycopg2-binary python-decouple python-dotenv dbt-postgres requests Pillow botasaurus "camoufox[geoip]"
 
       - name: Install Scrapling browsers (Patchright)
         run: scrapling install

@@ -346,6 +346,13 @@ class ScraplingBaseScraper:
         """
         return None
 
+    def search_page_action(self):
+        """Return a callable(page) -> None executed AFTER navigation on search
+        pages. Useful for scrolling to hydrate lazy-loaded cards. Default:
+        None. Override in subclasses (e.g. fotocasa skeleton hydration).
+        """
+        return None
+
     # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
@@ -394,7 +401,11 @@ class ScraplingBaseScraper:
             url = self.build_search_url(zona_key, page_num)
             logger.info(f"[{self.PORTAL_NAME}] {zona_key} p{page_num}: {url}")
             try:
-                page = session.fetch(url, network_idle=True, wait=2000)
+                fetch_kwargs = {"network_idle": True, "wait": 2000}
+                action = self.search_page_action()
+                if action is not None:
+                    fetch_kwargs["page_action"] = action
+                page = session.fetch(url, **fetch_kwargs)
             except Exception as e:
                 logger.warning(f"  fetch failed: {e}")
                 self.stats["errors"] += 1
