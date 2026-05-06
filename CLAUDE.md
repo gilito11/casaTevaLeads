@@ -111,6 +111,7 @@ GitHub Actions (scraping)     Fly.io (Django)
 ### Archivos
 - Base class: `scrapers/scrapling_base.py` (StealthySession, multi-tenant, raw.raw_listings)
 - Por portal: `scrapers/scrapling_<portal>.py`
+- ZONAS_GEOGRAFICAS: `scrapers/zones/<portal>.py` (módulo neutro, sin deps)
 - Camoufox antiguos: `scrapers/camoufox_*.py` (preservados como fallback)
 
 ### Schedule
@@ -120,10 +121,32 @@ GitHub Actions (scraping)     Fly.io (Django)
 - **VPS scheduled**: `scripts/scheduled_scrape.py` corre los 4 portales L-X-V (antes solo 2)
 
 ### Migración Scrapling (4 May 2026)
-- IPRoyal proxy ya NO necesario (DataDome/Imperva bypass sin proxy)
+- IPRoyal proxy ya NO necesario (DataDome/Imperva bypass sin proxy desde IP española)
 - 2Captcha solo para Cloudflare Turnstile (auto via `solve_cloudflare=True`)
-- Todos los portales corren en VPS Y GH Actions (antes idealista+fotocasa solo en GH Actions)
 - StealthySession crucial: `StealthyFetcher.fetch` aislado → 403 en idealista detail; con sesión → OK
+
+### Geo-block matrix (validado 6 May 2026)
+| Origen | habitaclia | fotocasa | idealista | milanuncios |
+|--------|:----------:|:--------:|:---------:|:-----------:|
+| Local sandbox (España) | ✅ | ✅* | ✅ | ✅ |
+| GH Actions (Azure US) | ✅ | ❌ | ❌ | ❌ |
+| VPS Contabo (Alemania) | ❌ | ❌ | ❌ | ✅ |
+
+*Fotocasa: Salou primera petición OK; siguientes mismas IP rate-limited.
+
+**Implicación**: GH Actions cron sirve para habitaclia (mejor productor) sin proxy.
+Idealista/fotocasa requieren IP española o proxy ES (Decodo $0.70/GB recomendado).
+
+### Idealista — extracción específica
+- m² + habitaciones del search card: concat de TODAS las `.item-detail` spans (single span loses 2/3)
+- Detección Profesional: `<div class="professional-name">`, `<a href="/pro/<slug>/">`, `<input name="professional">` (cualquiera dispara `es_particular=False`)
+- Phone reveal `page_action`: clica `button.see-phones-btn` / `.hidden-contact-phones_link` / `a:has-text("Ver teléfono")` antes de capturar HTML
+
+### Fotocasa — JS DOM extraction
+- Lazy-loads cards (~2 cards iniciales, ~30 skeletons que hidratan en scroll)
+- `search_page_action()` hace 8x scroll, luego `page.evaluate()` extrae listings + stash JSON en `<script id="__SCRAPLING_LISTINGS__">`
+- `parse_search_page` lee ese JSON en lugar del HTML serializado (que está incompleto)
+- `_wants_detail()` returns False — detail page reliably 405. Card-level data es suficiente.
 
 ---
 
