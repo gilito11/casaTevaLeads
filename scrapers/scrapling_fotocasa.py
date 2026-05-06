@@ -232,12 +232,12 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             except Exception:
                 pass
 
-        # Surface: <number> m² / m2
+        # Surface: <number> m² / m2 — INT (dbt stg_fotocasa casts to INTEGER)
         metros = None
         m2_m = re.search(r"(\d{2,4})\s*m[²2]", text)
         if m2_m:
             try:
-                metros = float(m2_m.group(1))
+                metros = int(m2_m.group(1))
             except Exception:
                 pass
 
