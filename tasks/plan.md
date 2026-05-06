@@ -140,8 +140,18 @@ curl -s https://fincaradar.com/leads/ -I | head
 
 ## Notas históricas
 
-- **Migración Scrapling**: 4-6 May 2026 — 9 commits (`fa2591d`, `d707097`, `e26b20c`, `4f1f57d`, `f941dc9`, `44674c5`, `bdad082`, `dac6cef`, `c0ef59b`)
+- **Migración Scrapling**: 4-6 May 2026 — 12 commits totales
 - **IPRoyal exhausted**: 1 Apr 2026 — driver de la migración
 - **VPS deploy completed**: 5 May 2026 23:08 (Patchright Chromium 1208 instalado)
-- **Geo-block VPS confirmado**: 6 May 2026 — Contabo IP alemana → 403 en idealista/fotocasa/habitaclia. Solo milanuncios funciona desde VPS. Local sandbox (España) y GH Actions (a verificar) son las únicas opciones para los 3 portales protegidos.
-- **Big scrape**: 6 May 2026 ~15:00-15:25 — 4 portales × 8 zonas (T1 4 + T2 2) × 2 pages = 208 raw rows, 58 particulares, 25 min
+- **Geo-block confirmado** (6 May 2026):
+  - **VPS Contabo (DE)**: 403 en idealista/fotocasa/habitaclia. Solo milanuncios funciona.
+  - **GH Actions (Azure US)**: 403 en idealista/fotocasa/habitaclia/milanuncios. **TODO bloqueado**.
+  - **Local sandbox (ES)**: TODOS funcionan (con rate-limit progresivo en uso intensivo).
+  - **Conclusión**: Para producción cron sin proxy, necesitamos VPS español (Contabo Madrid/Barcelona) o IPRoyal.
+- **Big scrape día 6 May**: ~15:00-17:00 (3h), local sandbox
+  - 14 zonas únicas × 4 portales = ~480 raw rows scrapling
+  - 65 leads NUEVOS con fecha_primera_captura del día
+  - dim_leads: 386 → **413** (+27 net tras dedup con Camoufox previos)
+  - Por portal: habitaclia 113 leads particulares (todos campos 100%), idealista 5/180 (DataDome OK pero zonas = agencias), fotocasa 2 (rate-limit severo en mi IP), milanuncios 0
+- **Fotocasa rewrite (16:00)**: scroll page_action + JS DOM extraction + stash JSON en script tag → leemos titulo/precio/m²/hab/vendedor del card. Detail page skipeado (siempre 405). Salou page 1 funciona; siguiente zona ya rate-limited.
+- **Idealista phone reveal (15:30)**: page_action que clica "Ver teléfono". Código en sitio, validación 0% — todos los listings testeados eran agencias o details bloqueados.
