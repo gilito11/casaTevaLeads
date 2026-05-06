@@ -268,15 +268,44 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             es_particular = False
         elif re.search(r"\b(S\.?L\.?|S\.?A\.?|S\.?L\.?U\.?)\b", text):
             es_particular = False
+        elif re.search(r"(?:^|\s)[Ii]nmobiliari[ao]s?(?=[\s\d/]|$)|IMMOBILIARI[AE]S?\b|\bfincas\b|\bConsulting\b", text):
+            # Word "inmobiliaria"/"IMMOBILIARIA"/"fincas" appearing standalone is
+            # an agency name suffix (e.g. "DOMUUM inmobiliaria"), not generic
+            # branding (which is filtered by the agency_signals above first).
+            es_particular = False
 
-        # Extract clean agency name: prefer ALL-CAPS chunk before "·" separator.
-        # If extraction is messy, leave empty rather than save garbage substring.
+        # Extract clean agency name. Pattern observed in Fotocasa cards:
+        #   "<media-button-text><AGENCY> · <signal>"  e.g.
+        #   "Tour virtual del inmuebleOPTIMA IMMOBILIARIA · Calidad Fotocasa"
+        #   "Video del inmuebleINMOSEGUR · Tu partner inmobiliario"
+        #   "DOMUUM inmobiliaria1/26..."
+        # We strip leading media-button noise then capture up to the next " · "
+        # separator OR the digits of the gallery counter.
         if not es_particular:
-            ag_m = re.search(r"([A-ZÁÉÍÓÚÑ]{2,}[A-ZÁÉÍÓÚÑ\s'\-\.]{2,40}[A-ZÁÉÍÓÚÑ])\s*(?:[·•]|inmobiliaria|IMMOBILIARIA|S\.?L\.?|S\.?A\.?)", text)
-            if ag_m:
-                cand = re.sub(r"\s+", " ", ag_m.group(1).strip())
-                if 3 <= len(cand) <= 80 and not cand.isdigit():
-                    vendedor = cand[:120]
+            # Strategy 1: ALL-CAPS or Title-Case agency block directly before " · " separator
+            for m in re.finditer(r"([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ&\s'\-\.]{2,60}[\wÁÉÍÓÚÑáéíóúñ])\s*[·•]", text):
+                cand = re.sub(r"\s+", " ", m.group(1).strip())
+                # Skip media-button noise
+                if re.search(r"\b(TOUR|VIDEO|VIRTUAL|INMUEBLE|FOTOS|PLANO|GALER|inmuebleN|inmueble)\b", cand):
+                    continue
+                if 3 <= len(cand) <= 80:
+                    # Strip prefix media-button noise glued by extraction
+                    cand = re.sub(r"^.*?(?:inmueble|inmuebles)", "", cand, flags=re.IGNORECASE).strip()
+                    if 3 <= len(cand) <= 80:
+                        vendedor = cand[:120]
+                        break
+            # Strategy 2: AgencyName + " inmobiliaria" / "IMMOBILIARIA" / S.L.
+            if not vendedor:
+                m = re.search(
+                    r"([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ\.\-' ]{2,60})\s+(?:inmobiliaria|IMMOBILIARIA|S\.?L\.?|S\.?A\.?)\b",
+                    text,
+                )
+                if m:
+                    cand = re.sub(r"\s+", " ", m.group(1).strip())
+                    # Drop leading media-button noise
+                    cand = re.sub(r"^.*?(?:inmueble|inmuebles)\s*", "", cand, flags=re.IGNORECASE).strip()
+                    if 3 <= len(cand) <= 80:
+                        vendedor = cand[:120]
         elif "Particular" in text:
             vendedor = "Particular"
 
