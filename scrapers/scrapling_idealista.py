@@ -107,15 +107,17 @@ class ScraplingIdealista(ScraplingBaseScraper):
 
         habitaciones = None
         metros = None
-        detail_el = art.css(".item-detail")
-        if detail_el:
-            txt = detail_el[0].text.clean() if hasattr(detail_el[0], "text") else ""
-            if not txt:
-                txt = detail_el[0].get_all_text() if hasattr(detail_el[0], "get_all_text") else ""
-            rooms_m = re.search(r"(\d+)\s*hab", txt, re.I)
+        # Idealista renders one <span class="item-detail"> per feature
+        # (hab, m², planta). Concatenate all.
+        detail_text = " ".join(
+            (el.text.clean() if hasattr(el, "text") else el.get_all_text() or "")
+            for el in (art.css(".item-detail") or [])
+        )
+        if detail_text:
+            rooms_m = re.search(r"(\d+)\s*hab", detail_text, re.I)
             if rooms_m:
                 habitaciones = int(rooms_m.group(1))
-            m2_m = re.search(r"(\d+)\s*m[²2]", txt)
+            m2_m = re.search(r"(\d+)\s*m[²2]", detail_text)
             if m2_m:
                 metros = float(m2_m.group(1))
 
