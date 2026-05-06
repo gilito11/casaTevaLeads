@@ -35,6 +35,20 @@ import psycopg2
 
 logger = logging.getLogger(__name__)
 
+# Load .env once on import — needed when running scrapers via `python -m scrapers.scrapling_*`
+# without a wrapper. Project root is the parent of scrapers/.
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for _path in (
+        os.path.join(_project_root, ".env"),
+        os.path.join(_project_root, "backend", ".env"),
+    ):
+        if os.path.exists(_path):
+            _load_dotenv(_path, override=False)
+except ImportError:
+    pass
+
 
 def get_db_config() -> Dict[str, Any]:
     """Build psycopg2 config dict from DATABASE_URL or NEON_DATABASE_URL."""
