@@ -22,7 +22,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from scrapers.scrapling_base import ScraplingBaseScraper
-from scrapers.camoufox_milanuncios import ZONAS_GEOGRAFICAS
+from scrapers.zones.milanuncios import ZONAS_GEOGRAFICAS
 
 logger = logging.getLogger(__name__)
 

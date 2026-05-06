@@ -34,7 +34,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install "scrapling[fetchers]>=0.4.7" psycopg2-binary python-decouple python-dotenv dbt-postgres requests Pillow botasaurus "camoufox[geoip]"
+          # ZONAS_GEOGRAFICAS lives in scrapers/zones/* — Scrapling-only scrape.
+          pip install "scrapling[fetchers]>=0.4.7" psycopg2-binary python-decouple python-dotenv dbt-postgres requests Pillow
 
       - name: Install Scrapling browsers (Patchright)
         run: scrapling install

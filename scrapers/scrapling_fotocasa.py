@@ -10,7 +10,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from scrapers.scrapling_base import ScraplingBaseScraper
-from scrapers.botasaurus_fotocasa import ZONAS_GEOGRAFICAS
+from scrapers.zones.fotocasa import ZONAS_GEOGRAFICAS
 
 logger = logging.getLogger(__name__)
 

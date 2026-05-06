@@ -13,7 +13,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from scrapers.scrapling_base import ScraplingBaseScraper
-from scrapers.camoufox_idealista import ZONAS_GEOGRAFICAS
+from scrapers.zones.idealista import ZONAS_GEOGRAFICAS
 
 logger = logging.getLogger(__name__)
 
