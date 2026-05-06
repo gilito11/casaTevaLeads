@@ -1,7 +1,9 @@
 {% load static %}
-{# Tenant logo mapping. Each tenant.id can have its own logo file in
-   backend/static/img/tenant_<id>_logo.webp. If absent, the default FR/FincaRadar
-   block is rendered. #}
+{% comment %}
+Tenant logo mapping. Each tenant.id can have its own logo file in
+backend/static/img/tenant_X_logo.webp. Default tenant (no tenant_id, or
+tenant.id == 1) shows Casa Teva. Tenant 2 (Find&Look) shows FR fallback.
+{% endcomment %}
 <!--
 Sidebar — Jerarquía visual + WCAG 2.1 AA
 =========================================
@@ -36,8 +38,8 @@ Accesibilidad:
         <a href="{% url 'dashboard' %}"
            class="flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg flex-1 min-w-0"
            aria-label="{{ current_tenant.nombre|default:'FincaRadar' }} — Inicio">
-            {% if current_tenant.id == 1 %}
-                {# Casa Teva — logo with house silhouette + brand mark #}
+            {% if current_tenant.id != 2 %}
+                {# Default → Casa Teva (id=1 or no tenant set). Only tenant 2 (Find&Look) gets FR fallback. #}
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white dark:bg-white" aria-hidden="true">
                     <img src="{% static 'img/tenant_1_logo.webp' %}" alt="" class="w-full h-full object-contain p-0.5">
                 </div>
