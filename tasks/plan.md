@@ -23,12 +23,15 @@
 ### Gaps conocidos en datos extraídos
 | Portal | Campo | Estado | Nota |
 |--------|-------|--------|------|
-| idealista | telefono | Vacío | Click "Ver teléfono" no implementado en Scrapling (necesita `page_action`) |
-| idealista | metros | A veces vacío | `.item-detail` regex `m²` falla cuando texto vacío |
+| idealista | telefono | 0% | Click "Ver teléfono" no implementado en Scrapling (necesita `page_action`) |
+| idealista | metros | 100% (post-fix `c0ef59b`) | Concat de TODAS las `.item-detail` spans |
+| idealista | habitaciones | 93% | Misma fix |
 | idealista | ubicacion | A veces vacío | `.item-location` no en todas las cards |
-| fotocasa | (similar) | (similar) | Detail page extrae descripción/precio/fotos OK |
-| habitaclia | telefono | Mejor (en descripción) | regex sobre desc |
-| milanuncios | seller_type | OK (JSON) | Confiable |
+| fotocasa | volumen | Bajo | parse_search_page solo URL+id; detail bloqueado a veces → row vacío. Data-quality gate `dac6cef` ahora skipea esos, pero perdemos volumen. **TODO**: rewrite parse_search_page para extraer titulo/precio del card directamente |
+| fotocasa | URL filter | Roto | `/particulares/` URL devuelve SPA shell sin listings. Ahora usamos URL genérica `c0ef59b` (deteccion particulares se hace por divider HTML) |
+| habitaclia | telefono | 0% | Buscar en descripción es insuficiente; añadir regex robusto sobre detail HTML |
+| milanuncios | madrid URLs | 403 | URL pattern `/venta-de-pisos-en-X-madrid-madrid/` no existe — buscar pattern correcto |
+| milanuncios | seller_type | OK (JSON) | Confiable, todos los signals funcionando |
 
 ## Prioridades inmediatas (próximas 1-2 semanas)
 
@@ -110,8 +113,35 @@ gh workflow run scrape-neon.yml -f portals=idealista,fotocasa,habitaclia,milanun
 curl -s https://fincaradar.com/leads/ -I | head
 ```
 
+## Big scrape 6 May 2026 — Resultados
+
+### Volumen scrape (4 portales × Tenant 1+2 × 2 pages)
+
+| Portal | T1 raw saved | T2 raw saved | Particulares | Profesionales | Tiempo |
+|--------|-------------:|-------------:|-------------:|--------------:|-------:|
+| idealista | 90 | 60 | 0 | 150 | ~25min |
+| habitaclia | 45 | 12 | **57** | 0 | ~13min |
+| fotocasa | 1 (post-cleanup) | 0 | 1 | 0 | ~5min |
+| milanuncios | 0 | 0 | 0 | 0 (Tarragona/Madrid agencias) | ~1min |
+| **Total** | **136** | **72** | **58** | **150** | |
+
+### Tras dbt run staging+marts
+
+- dim_leads antes: 386
+- dim_leads después: **393** (+7 visibles tras dedup; 40 rows con `fecha_primera_captura` reciente)
+- 5 leads ejemplo nuevos: precios €170K-€2M, descripciones 700-1845 chars, 10 fotos c/u
+
+### Auditoría calidad (post-fix)
+- ✅ habitaclia: 100% titulo/precio/desc/fotos/m2, hab 91%
+- ✅ idealista: 100% titulo/precio, desc 80-91%, **m2 100% post-fix `c0ef59b`**, hab 93% post-fix
+- ❌ idealista telefono: 0% (pendiente page_action)
+- ⚠️ fotocasa: 1 row con datos completos; el resto data-quality-gated (URL bug fixed pero parse_search_page necesita rewrite)
+- ✅ 0 duplicados en dim_leads
+
 ## Notas históricas
 
-- **Migración Scrapling**: 4-6 May 2026 — 5 commits (`fa2591d`, `d707097`, `e26b20c`, `4f1f57d`, `f941dc9`, `44674c5`)
+- **Migración Scrapling**: 4-6 May 2026 — 9 commits (`fa2591d`, `d707097`, `e26b20c`, `4f1f57d`, `f941dc9`, `44674c5`, `bdad082`, `dac6cef`, `c0ef59b`)
 - **IPRoyal exhausted**: 1 Apr 2026 — driver de la migración
 - **VPS deploy completed**: 5 May 2026 23:08 (Patchright Chromium 1208 instalado)
+- **Geo-block VPS confirmado**: 6 May 2026 — Contabo IP alemana → 403 en idealista/fotocasa/habitaclia. Solo milanuncios funciona desde VPS. Local sandbox (España) y GH Actions (a verificar) son las únicas opciones para los 3 portales protegidos.
+- **Big scrape**: 6 May 2026 ~15:00-15:25 — 4 portales × 8 zonas (T1 4 + T2 2) × 2 pages = 208 raw rows, 58 particulares, 25 min
