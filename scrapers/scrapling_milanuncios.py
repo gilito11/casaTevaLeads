@@ -610,7 +610,7 @@ def main():
     ap.add_argument("--tenant-id", type=int, default=1)
     ap.add_argument("--postgres", action="store_true", default=True)
     ap.add_argument("--no-postgres", dest="postgres", action="store_false")
-    ap.add_argument("--proxy", default=os.environ.get("DATADOME_PROXY", ""))
+    ap.add_argument("--proxy", default="", help="Optional proxy http://user:pass@host:port (Scrapling does not need a proxy)")
     args = ap.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

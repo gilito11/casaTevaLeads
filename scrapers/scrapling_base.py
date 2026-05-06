@@ -298,7 +298,10 @@ class ScraplingBaseScraper:
     def get_session_kwargs(self) -> Dict[str, Any]:
         kw = dict(self.SESSION_KWARGS)
         if self.proxy:
-            kw["proxy"] = self.proxy
+            proxy = self.proxy.strip()
+            if proxy and "://" not in proxy:
+                proxy = "http://" + proxy  # Scrapling requires scheme
+            kw["proxy"] = proxy
         return kw
 
     # ------------------------------------------------------------------
