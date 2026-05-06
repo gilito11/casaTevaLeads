@@ -143,11 +143,11 @@ curl -s https://fincaradar.com/leads/ -I | head
 - **Migración Scrapling**: 4-6 May 2026 — 12 commits totales
 - **IPRoyal exhausted**: 1 Apr 2026 — driver de la migración
 - **VPS deploy completed**: 5 May 2026 23:08 (Patchright Chromium 1208 instalado)
-- **Geo-block confirmado** (6 May 2026):
+- **Geo-block matrix confirmado** (6 May 2026, post-validation):
   - **VPS Contabo (DE)**: 403 en idealista/fotocasa/habitaclia. Solo milanuncios funciona.
-  - **GH Actions (Azure US)**: 403 en idealista/fotocasa/habitaclia/milanuncios. **TODO bloqueado**.
+  - **GH Actions (Azure US)**: 403 en idealista/fotocasa/milanuncios. **HABITACLIA SÍ FUNCIONA** ✅ (Imperva tolera Azure US, en run 25441353279 saved=27). Idealista DataDome bloquea.
   - **Local sandbox (ES)**: TODOS funcionan (con rate-limit progresivo en uso intensivo).
-  - **Conclusión**: Para producción cron sin proxy, necesitamos VPS español (Contabo Madrid/Barcelona) o IPRoyal.
+  - **Conclusión actualizada**: Habitaclia (#1 productor de leads) puede correr en GH Actions cron sin proxy. Solo idealista necesitará proxy o solución alternativa para producción.
 - **Big scrape día 6 May**: ~15:00-17:00 (3h), local sandbox
   - 14 zonas únicas × 4 portales = ~480 raw rows scrapling
   - 65 leads NUEVOS con fecha_primera_captura del día
