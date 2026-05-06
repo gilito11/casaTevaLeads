@@ -40,9 +40,11 @@ logger = logging.getLogger(__name__)
 try:
     from dotenv import load_dotenv as _load_dotenv
     _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # backend/.env is the source of truth (points to Neon); root .env is legacy localhost.
+    # Load backend first so its DATABASE_URL wins over the root file.
     for _path in (
-        os.path.join(_project_root, ".env"),
         os.path.join(_project_root, "backend", ".env"),
+        os.path.join(_project_root, ".env"),
     ):
         if os.path.exists(_path):
             _load_dotenv(_path, override=False)
