@@ -36,6 +36,35 @@ class ScraplingIdealista(ScraplingBaseScraper):
             return True
         return False
 
+    def detail_page_action(self):
+        """Click the 'Ver teléfono' button so the phone number is revealed in
+        the DOM by the time `page.html_content` is read. Idealista hides the
+        number behind a click via JS — without this, parse_detail_page can
+        never see a `tel:` link.
+        """
+        def _reveal_phone(page):
+            # Brief settle before interacting
+            try:
+                page.wait_for_timeout(500)
+            except Exception:
+                pass
+            for selector in (
+                'button.see-phones-btn',
+                'a.see-phones-btn',
+                '.hidden-contact-phones_link',
+                'button:has-text("Ver teléfono")',
+                'a:has-text("Ver teléfono")',
+            ):
+                try:
+                    el = page.query_selector(selector)
+                    if el:
+                        el.click(timeout=3000)
+                        page.wait_for_timeout(1500)
+                        return
+                except Exception:
+                    continue
+        return _reveal_phone
+
     def build_search_url(self, zona_key: str, page: int = 1) -> str:
         zona = self.ZONAS[zona_key]
         url = f"{self.BASE_URL}/venta-viviendas/{zona['url_path']}/"
@@ -210,9 +239,13 @@ class ScraplingIdealista(ScraplingBaseScraper):
         except Exception:
             pass
 
-        # 4) Phone — extract from initial HTML if pre-rendered (no click needed in many cases)
+        # 4) Phone — page_action `_reveal_phone` clicks "Ver teléfono" before
+        # HTML is captured, so the tel: link is visible in `html` here.
         try:
             phones = re.findall(r"tel:(?:\+?34)?([679]\d{8})", html)
+            if not phones:
+                # Fallback: phone may be embedded in adProperties JSON or data-phone attrs
+                phones = re.findall(r'data-phone="([679]\d{8})"', html)
             if phones:
                 listing["telefono"] = phones[0]
                 listing["telefono_norm"] = self.normalize_phone(phones[0])

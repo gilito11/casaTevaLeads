@@ -338,6 +338,14 @@ class ScraplingBaseScraper:
             return True
         return False
 
+    def detail_page_action(self):
+        """Return a callable(page) -> None executed AFTER navigation on detail
+        pages. Useful for clicking phone-reveal buttons or accepting cookies
+        before the HTML is captured. Default: None (no action).
+        Override in subclasses that need it (e.g. idealista phone reveal).
+        """
+        return None
+
     # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
@@ -413,7 +421,11 @@ class ScraplingBaseScraper:
                 if detail_url and self._wants_detail():
                     try:
                         self.human_delay(self.DETAIL_DELAY_RANGE)
-                        dpage = session.fetch(detail_url, network_idle=True, wait=2000)
+                        fetch_kwargs = {"network_idle": True, "wait": 2000}
+                        action = self.detail_page_action()
+                        if action is not None:
+                            fetch_kwargs["page_action"] = action
+                        dpage = session.fetch(detail_url, **fetch_kwargs)
                         if self._is_blocked_page(dpage):
                             self.stats["details_blocked"] += 1
                         else:

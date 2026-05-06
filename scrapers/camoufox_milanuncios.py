@@ -143,13 +143,16 @@ ZONAS_GEOGRAFICAS = {
         'url_path': 'pisos-en-deltebre-tarragona/',
     },
     # Madrid Districts (Tenant 2: Look and Find)
+    # Milanuncios no expone filtros por distrito en Madrid — ambas zonas
+    # apuntan a la búsqueda city-wide. Filtrar por location en raw_data
+    # si Find&Look necesita granularidad de distrito.
     'chamartin': {
         'nombre': 'Chamartín',
-        'url_path': 'venta-de-pisos-en-chamartin-madrid-madrid/',
+        'url_path': 'pisos-en-madrid-madrid/',
     },
     'hortaleza': {
         'nombre': 'Hortaleza',
-        'url_path': 'venta-de-pisos-en-hortaleza-madrid-madrid/',
+        'url_path': 'pisos-en-madrid-madrid/',
     },
 }
 
