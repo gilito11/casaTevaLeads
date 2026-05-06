@@ -170,6 +170,14 @@ class ScraplingBaseScraper:
             self.stats["listings_skipped"] += 1
             return False
 
+        # Data-quality gate: require at least titulo OR precio. Otherwise the
+        # row is just (anuncio_id, url) which is useless and pollutes raw.
+        # This typically happens when detail-page was blocked for portals
+        # whose search card only carries the URL+id (e.g. fotocasa).
+        if not (listing.get("titulo") or listing.get("precio")):
+            self.stats["listings_skipped"] += 1
+            return False
+
         # Mirror the schema used by camoufox scrapers (raw.raw_listings.raw_data JSONB)
         raw_data = {
             "anuncio_id": anuncio_id,

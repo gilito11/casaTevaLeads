@@ -24,9 +24,13 @@ class ScraplingFotocasa(ScraplingBaseScraper):
     SEARCH_DELAY_RANGE = (4.0, 7.0)
 
     def build_search_url(self, zona_key: str, page: int = 1) -> str:
+        # Fotocasa's `/particulares/` URL filter returns an empty SPA shell
+        # (no pre-rendered listings). Use the generic search URL — particular
+        # vs profesional is detected later via 'Anunciante' label and the agency
+        # divider in the HTML.
         zona = self.ZONAS.get(zona_key, {})
         url_path = zona.get("url_path", f"{zona_key}/todas-las-zonas")
-        url = f"{self.BASE_URL}/es/comprar/viviendas/particulares/{url_path}/pl"
+        url = f"{self.BASE_URL}/es/comprar/viviendas/{url_path}/l"
         if page > 1:
             url = f"{url}/{page}"
         return url
