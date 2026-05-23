@@ -76,7 +76,39 @@ class ScraplingBaseScraper:
     BASE_URL: str = ""
     ZONAS: Dict[str, Any] = {}
 
-    # Stealth defaults — subclasses can tweak per portal
+    # Domains observed wasting bandwidth in IPRoyal usage report (Feb–Mar 2026):
+    # 5.75 GB consumed in 20 days; 76.8% was waste. Blocking these saves ~$45/mes.
+    WASTE_DOMAINS = {
+        # idealista HD video previews — 2.1 GB / 36% of total alone
+        "st3v.idealista.com",
+        # uBlock / malware / phishing filter lists fetched *through the proxy* (387 MB / 6.6%)
+        "ublockorigin.pages.dev", "ublockorigin.github.io",
+        "malware-filter.gitlab.io", "malware-filter.pages.dev",
+        "phishing-filter.pages.dev",
+        "pgl.yoyo.org", "filters.adtidy.org",
+        "curbengh.github.io", "cdn.statically.io",
+        # Google/Apple/embedded widgets — 280 MB / 4.8%
+        "accounts.google.com", "apis.google.com", "play.google.com",
+        "maps.googleapis.com", "maps.gstatic.com",
+        "fonts.googleapis.com", "fonts.gstatic.com",
+        "appleid.cdn-apple.com",
+        # Third-party embeds inside portal pages
+        "widget.trustpilot.com", "connect.facebook.net", "www.facebook.com",
+        "sdk.privacy-center.org",
+        "cdn.jsdelivr.net", "unpkg.com", "code.jquery.com",
+        # OCSP / cert validation — tiny but adds up across requests
+        "o.pki.goog", "ocsp.digicert.com", "ocsp.globalsign.com",
+        "ocsp.r2m01.amazontrust.com", "ocsp.r2m04.amazontrust.com",
+        "ocsp.e2m01.amazontrust.com", "status.rapidssl.com",
+        # IP-check services the browser pings on startup
+        "api.ipify.org", "ipv4.icanhazip.com", "checkip.amazonaws.com", "ipinfo.io",
+    }
+
+    # Stealth defaults — subclasses can tweak per portal.
+    # Bandwidth controls (disable_resources, block_ads, blocked_domains) added
+    # 2026-05-23 after the IPRoyal usage audit showed ~70% of traffic was
+    # images/fonts/ads we never use. Image URLs are still preserved in <img src>
+    # HTML attrs — only the binary download is dropped.
     SESSION_KWARGS: Dict[str, Any] = {
         "headless": True,
         "humanize": True,
@@ -86,6 +118,9 @@ class ScraplingBaseScraper:
         "timeout": 60000,
         "max_pages": 5,
         "network_idle": True,
+        "disable_resources": True,   # font/image/media/stylesheet/beacon/etc.
+        "block_ads": True,           # ~3500 ad/tracking domains
+        "blocked_domains": WASTE_DOMAINS,
     }
 
     DETAIL_DELAY_RANGE = (2.0, 5.0)
@@ -312,6 +347,14 @@ class ScraplingBaseScraper:
             if proxy and "://" not in proxy:
                 proxy = "http://" + proxy  # Scrapling requires scheme
             kw["proxy"] = proxy
+
+        # Allow killing bandwidth controls per-run if a portal stops working
+        # because of them. SCRAPLING_DISABLE_RESOURCES=false disables the block.
+        if os.environ.get("SCRAPLING_DISABLE_RESOURCES", "").lower() == "false":
+            kw.pop("disable_resources", None)
+            logger.info(f"[{self.PORTAL_NAME}] disable_resources OFF (env override)")
+        if os.environ.get("SCRAPLING_BLOCK_ADS", "").lower() == "false":
+            kw.pop("block_ads", None)
         return kw
 
     # ------------------------------------------------------------------
