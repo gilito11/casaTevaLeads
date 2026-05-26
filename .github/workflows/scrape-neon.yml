@@ -83,37 +83,43 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Fotocasa scraper (Scrapling)
+      # GH Actions runners viven en Azure US y fotocasa / idealista / milanuncios
+      # geo-bloquean tráfico no-ES. Inyectamos el proxy IPRoyal (ES residential)
+      # SOLO para esos 3 portales. Habitaclia no geo-bloquea US — ahorra bandwidth.
+      - name: Run Fotocasa scraper (Scrapling + IPRoyal ES)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'fotocasa')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python -m scrapers.scrapling_fotocasa --zones ${ZONES//,/ } --postgres
+          python -m scrapers.scrapling_fotocasa --zones ${ZONES//,/ } --postgres --proxy "$DATADOME_PROXY"
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Milanuncios scraper (Scrapling)
+      - name: Run Milanuncios scraper (Scrapling + IPRoyal ES)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'milanuncios')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python -m scrapers.scrapling_milanuncios --zones ${ZONES//,/ } --max-pages 2 --postgres
+          python -m scrapers.scrapling_milanuncios --zones ${ZONES//,/ } --max-pages 2 --postgres --proxy "$DATADOME_PROXY"
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Idealista scraper (Scrapling — DataDome bypass without proxy)
+      - name: Run Idealista scraper (Scrapling + IPRoyal ES — DataDome bypass requires ES IP)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'idealista')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python -m scrapers.scrapling_idealista --zones ${ZONES//,/ } --max-pages 2 --postgres
+          python -m scrapers.scrapling_idealista --zones ${ZONES//,/ } --max-pages 2 --postgres --proxy "$DATADOME_PROXY"
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
