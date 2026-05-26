@@ -1575,9 +1575,13 @@ def export_csv_view(request):
 
     def generate_csv():
         pseudo_buffer = Echo()
-        writer = csv.writer(pseudo_buffer)
+        # Excel ES locale expects ';' as delimiter and a UTF-8 BOM to detect
+        # encoding correctly. Without these the file opens as a single column
+        # with mangled accents.
+        writer = csv.writer(pseudo_buffer, delimiter=';', quoting=csv.QUOTE_MINIMAL)
 
-        # Headers en espanol
+        yield '﻿'  # UTF-8 BOM
+
         yield writer.writerow([
             'Telefono',
             'Titulo',
@@ -1589,15 +1593,23 @@ def export_csv_view(request):
             'Fecha Scraping'
         ])
 
-        # Iterar en batches para memoria eficiente
         for lead in leads_qs.iterator(chunk_size=500):
             estado_actual = lead_estados.get(str(lead.lead_id), lead.estado or 'NUEVO')
             fecha = lead.fecha_scraping.strftime('%Y-%m-%d %H:%M') if lead.fecha_scraping else ''
+            precio = lead.precio
+            if precio is not None:
+                # Excel ES uses ',' as decimal separator — emit raw int when possible
+                try:
+                    precio_str = str(int(precio))
+                except (TypeError, ValueError):
+                    precio_str = str(precio).replace('.', ',')
+            else:
+                precio_str = ''
 
             yield writer.writerow([
                 lead.telefono_norm or '',
                 lead.titulo or lead.direccion or '',
-                lead.precio or '',
+                precio_str,
                 lead.portal or '',
                 lead.zona_geografica or '',
                 estado_actual,
