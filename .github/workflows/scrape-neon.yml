@@ -111,15 +111,16 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Idealista scraper (Scrapling + IPRoyal ES — DataDome bypass requires ES IP)
+      - name: Run Idealista scraper (Bright Data Web Unlocker — DataDome bypass managed)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'idealista')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python -m scrapers.scrapling_idealista --zones ${ZONES//,/ } --max-pages 2 --postgres --proxy "$DATADOME_PROXY"
+          python -m scrapers.scrapling_idealista_bd --zones ${ZONES//,/ } --max-pages 1 --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          BRIGHTDATA_ZONE: web_unlocker1
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
