@@ -27,6 +27,18 @@ class ScraplingIdealista(ScraplingBaseScraper):
     DETAIL_DELAY_RANGE = (3.0, 6.0)
     SEARCH_DELAY_RANGE = (5.0, 9.0)
 
+    # DataDome (idealista) flags the browser as bot if ANY of disable_resources,
+    # block_ads or blocked_domains is enabled — even one of them shifts the
+    # network/timing fingerprint enough to trigger a 403 on the first request.
+    # Verified 26 May 2026: with all three on → 403; all three off → 200.
+    # Bandwidth cost vs the other 3 portals is higher but unavoidable for now.
+    SESSION_KWARGS = {
+        **ScraplingBaseScraper.SESSION_KWARGS,
+        "disable_resources": False,
+        "block_ads": False,
+        "blocked_domains": set(),
+    }
+
     def should_skip(self, listing: Dict[str, Any]) -> bool:
         # Save both Particular and Profesional cards. Filtering happens in dbt
         # staging via raw_data->>'es_particular'. Skipping pre-detail loses

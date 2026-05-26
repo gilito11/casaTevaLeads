@@ -23,6 +23,17 @@ class ScraplingFotocasa(ScraplingBaseScraper):
     DETAIL_DELAY_RANGE = (3.0, 6.0)
     SEARCH_DELAY_RANGE = (4.0, 7.0)
 
+    # Fotocasa cards are React-hydrated on scroll. With base-class bandwidth
+    # controls on the JS waits for blocked image/font requests that never come,
+    # so only 1–2 cards hydrate per page. Verified 26 May 2026: bandwidth on →
+    # 1 listing, bandwidth off → 7+ listings (same scroll routine).
+    SESSION_KWARGS = {
+        **ScraplingBaseScraper.SESSION_KWARGS,
+        "disable_resources": False,
+        "block_ads": False,
+        "blocked_domains": set(),
+    }
+
     def build_search_url(self, zona_key: str, page: int = 1) -> str:
         # Fotocasa's `/particulares/` URL filter returns an empty SPA shell
         # (no pre-rendered listings). Use the generic search URL — particular
