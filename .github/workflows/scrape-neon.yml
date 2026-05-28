@@ -114,6 +114,7 @@ jobs:
       - name: Run Idealista scraper (Bright Data Web Unlocker — DataDome bypass managed)
         if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,idealista,milanuncios', 'idealista')
         continue-on-error: true
+        timeout-minutes: 20  # hard cap: a slow idealista must never starve dbt of the 60-min job budget
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
           python -m scrapers.scrapling_idealista_bd --zones ${ZONES//,/ } --max-pages 1 --postgres

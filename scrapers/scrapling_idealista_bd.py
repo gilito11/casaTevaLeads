@@ -119,8 +119,18 @@ class ScraplingIdealistaBD(ScraplingIdealista):
                 if self.should_skip(listing):
                     self.stats["listings_skipped"] += 1
                     continue
+                # Cost/time optimisation: each BD detail fetch costs a request
+                # (~$0.0015) and ~20-25s. In coastal zones ~95% of cards are
+                # agencies already flagged at card level (logo-branding). We
+                # only fetch the detail page for cards that LOOK like a
+                # particular, to CONFIRM via /pro/ + professional-name (detail
+                # detection can only downgrade to professional, never the
+                # reverse). Verified 27 May 2026: this skips ~28/30 fetches per
+                # zone, cutting idealista from ~24 min/zone to ~1 min/zone and
+                # letting the cron actually reach the interior zones where real
+                # particulares exist.
                 detail_url = listing.get("url_anuncio")
-                if detail_url and self._wants_detail():
+                if detail_url and listing.get("es_particular"):
                     time.sleep(2)  # small courtesy delay between BD requests
                     dpage = self._bd_fetch(detail_url)
                     if dpage is not None:
