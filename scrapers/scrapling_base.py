@@ -175,6 +175,76 @@ class ScraplingBaseScraper:
             logger.warning("DB connection dropped, reconnecting")
         self._init_postgres()
 
+    # Label for the proxy/service used, recorded per-zone for the cost study.
+    # Subclasses using a managed service (e.g. Bright Data) override this.
+    SERVICE_LABEL: Optional[str] = None
+
+    def _service_label(self) -> str:
+        if self.SERVICE_LABEL:
+            return self.SERVICE_LABEL
+        return "proxy" if self.proxy else "none"
+
+    def record_zone_metrics(self, zona_key: str, before: Dict[str, int], elapsed: float):
+        """Persist per-zone operational metrics to raw.scraper_zone_runs.
+
+        Complements raw.raw_listings (which captures yield/particular per zone)
+        with the operational layer raw can't hold: timing, blocks, detail
+        fetches and which proxy/service was used. Feeds the performance study
+        (scripts/portal_zone_report.py) on the cost/speed axis.
+        Best-effort: never let metrics logging break a scrape.
+        """
+        if not self.postgres_conn:
+            return
+        s = self.stats
+        delta = {k: s.get(k, 0) - before.get(k, 0) for k in (
+            "listings_found", "listings_saved", "listings_skipped",
+            "details_fetched", "details_blocked", "errors",
+        )}
+        try:
+            self._ensure_db()
+            cur = self.postgres_conn.cursor()
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS raw.scraper_zone_runs (
+                    id              bigserial PRIMARY KEY,
+                    tenant_id       integer,
+                    portal          text,
+                    zona            text,
+                    scraped_at      timestamptz DEFAULT now(),
+                    found           integer,
+                    saved           integer,
+                    skipped         integer,
+                    details_fetched integer,
+                    details_blocked integer,
+                    errors          integer,
+                    elapsed_seconds numeric,
+                    service         text
+                )
+                """
+            )
+            cur.execute(
+                """
+                INSERT INTO raw.scraper_zone_runs
+                  (tenant_id, portal, zona, found, saved, skipped,
+                   details_fetched, details_blocked, errors, elapsed_seconds, service)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (
+                    self.tenant_id, self.PORTAL_NAME, zona_key,
+                    delta["listings_found"], delta["listings_saved"], delta["listings_skipped"],
+                    delta["details_fetched"], delta["details_blocked"], delta["errors"],
+                    round(elapsed, 1), self._service_label(),
+                ),
+            )
+            self.postgres_conn.commit()
+            cur.close()
+        except Exception as e:
+            logger.debug(f"record_zone_metrics skipped: {e}")
+            try:
+                self.postgres_conn.rollback()
+            except Exception:
+                pass
+
     def _is_blacklisted(self, anuncio_id: str) -> bool:
         if not self.postgres_conn:
             return False
@@ -422,6 +492,8 @@ class ScraplingBaseScraper:
                     logger.warning(f"[{self.PORTAL_NAME}] Zone not found: {zona_key}")
                     self.stats["zones_failed"] += 1
                     continue
+                before = dict(self.stats)
+                t0 = time.time()
                 try:
                     self._scrape_zone(session, zona_key)
                     self.stats["zones_completed"] += 1
@@ -429,6 +501,8 @@ class ScraplingBaseScraper:
                     logger.exception(f"[{self.PORTAL_NAME}] zone={zona_key} failed: {e}")
                     self.stats["zones_failed"] += 1
                     self.stats["errors"] += 1
+                finally:
+                    self.record_zone_metrics(zona_key, before, time.time() - t0)
 
         elapsed = (datetime.now() - start).total_seconds()
         self.stats["elapsed_seconds"] = round(elapsed, 1)

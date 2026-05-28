@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 class ScraplingIdealistaBD(ScraplingIdealista):
     BD_API_URL = "https://api.brightdata.com/request"
     BD_COUNTRY = "es"
+    SERVICE_LABEL = "brightdata"
 
     def __init__(self, *args, brightdata_api_key: Optional[str] = None,
                  brightdata_zone: str = "web_unlocker1", **kwargs):
@@ -84,6 +85,8 @@ class ScraplingIdealistaBD(ScraplingIdealista):
                 logger.warning(f"[{self.PORTAL_NAME}-bd] Zone not found: {zona_key}")
                 self.stats["zones_failed"] += 1
                 continue
+            before = dict(self.stats)
+            t0 = time.time()
             try:
                 self._scrape_zone_bd(zona_key)
                 self.stats["zones_completed"] += 1
@@ -91,6 +94,8 @@ class ScraplingIdealistaBD(ScraplingIdealista):
                 logger.exception(f"[{self.PORTAL_NAME}-bd] zone={zona_key} failed: {e}")
                 self.stats["zones_failed"] += 1
                 self.stats["errors"] += 1
+            finally:
+                self.record_zone_metrics(zona_key, before, time.time() - t0)
 
         elapsed = (datetime.now() - start).total_seconds()
         self.stats["elapsed_seconds"] = round(elapsed, 1)
