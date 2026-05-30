@@ -24,6 +24,7 @@ Uso:
 import argparse
 import logging
 import os
+import sys
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -32,6 +33,11 @@ from urllib.parse import urlparse
 import psycopg2
 
 logger = logging.getLogger(__name__)
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 # Estados del CRM que NO se tocan (ya gestionados por el comercial)
 EXCLUDED_ESTADOS = (
@@ -89,10 +95,17 @@ def _make_scraper(portal: str, proxy: Optional[str]):
 class LeadRefresher:
     DELAY = 2.5  # cortesía entre peticiones
 
-    def __init__(self, dry_run: bool = False, proxy: Optional[str] = None):
+    def __init__(self, dry_run: bool = False, proxy: Optional[str] = None,
+                 update_prices: bool = False):
         self.conn = _db()
         self.dry_run = dry_run
         self.proxy = proxy
+        # Price update is OPT-IN: the per-portal detail price parsers are not all
+        # reliable (habitaclia's returns a constant bogus value), so writing the
+        # re-parsed price by default would corrupt data. The authoritative
+        # price-drop signal lives in raw.listing_price_history (scrape-time
+        # prices) and is surfaced by scripts/opportunities_report.py instead.
+        self.update_prices = update_prices
         self.stats = {
             "checked": 0, "removed": 0, "agency": 0,
             "price_changed": 0, "unchanged": 0, "errors": 0,
@@ -108,15 +121,21 @@ class LeadRefresher:
     # ------------------------------------------------------------------
     def get_leads(self, portal: str, limit: int) -> List[Dict[str, Any]]:
         cur = self.conn.cursor()
+        # El anuncio_id real del portal (el que vive en raw_data->>'anuncio_id')
+        # es el último segmento de data_lake_path, NO source_listing_id (que es
+        # un id surrogate y solo coincide por casualidad en idealista). Usar el
+        # id equivocado haría que los UPDATE/DELETE sobre raw no afectaran a
+        # ninguna fila en habitaclia/fotocasa/milanuncios.
         cur.execute(
             """
-            SELECT d.lead_id, d.source_listing_id, d.listing_url, d.precio,
-                   d.es_particular, d.tenant_id, d.titulo
+            SELECT d.lead_id,
+                   (regexp_match(d.data_lake_path, '([^/]+)$'))[1] AS anuncio_id,
+                   d.listing_url, d.precio, d.es_particular, d.tenant_id, d.titulo
             FROM public_marts.dim_leads d
             LEFT JOIN leads_lead_estado e ON d.lead_id = e.lead_id
             WHERE d.source_portal = %s
               AND d.listing_url IS NOT NULL AND d.listing_url <> ''
-              AND d.source_listing_id IS NOT NULL
+              AND d.data_lake_path IS NOT NULL
               AND (e.estado IS NULL OR e.estado NOT IN %s)
             ORDER BY d.ultima_actualizacion ASC NULLS FIRST
             LIMIT %s
@@ -125,11 +144,9 @@ class LeadRefresher:
         )
         rows = cur.fetchall()
         cur.close()
-        # anuncio_id se compara contra raw_data->>'anuncio_id' (texto); source_listing_id
-        # puede llegar como entero → castear a str para evitar "text = integer".
         return [
-            {"lead_id": r[0], "anuncio_id": str(r[1]), "url": r[2], "precio": r[3],
-             "es_particular": r[4], "tenant_id": r[5], "titulo": r[6]}
+            {"lead_id": r[0], "anuncio_id": str(r[1]) if r[1] else "", "url": r[2],
+             "precio": r[3], "es_particular": r[4], "tenant_id": r[5], "titulo": r[6]}
             for r in rows
         ]
 
@@ -275,15 +292,18 @@ class LeadRefresher:
             self._blacklist_agency(lead)
             return
 
-        # 3) ¿Cambió el precio?
+        # 3) ¿Cambió el precio? (solo si se pide explícitamente — ver __init__)
+        if not self.update_prices:
+            self.stats["unchanged"] += 1
+            return
         nuevo = parsed.get("precio")
         viejo = float(lead["precio"]) if lead["precio"] is not None else None
         if nuevo is not None and viejo is not None and abs(float(nuevo) - viejo) >= 1:
             pct = 100 * (float(nuevo) - viejo) / viejo
             self.stats["price_changed"] += 1
-            arrow = "▼" if nuevo < viejo else "▲"
+            arrow = "v" if nuevo < viejo else "^"
             self.events.append(
-                f"PRECIO {arrow} {portal} {lead['anuncio_id']}: {viejo:.0f}→{float(nuevo):.0f}€ ({pct:+.1f}%)"
+                f"PRECIO {arrow} {portal} {lead['anuncio_id']}: {viejo:.0f}->{float(nuevo):.0f}EUR ({pct:+.1f}%)"
             )
             self._update_price(lead, float(nuevo))
         else:
@@ -321,11 +341,14 @@ def main():
     ap.add_argument("--portal", help="habitaclia|fotocasa|milanuncios|idealista (omitir = los seguros)")
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--update-prices", action="store_true",
+                    help="re-escribir precios desde el detalle (OJO: parsers no fiables)")
     ap.add_argument("--proxy", default=os.environ.get("DATADOME_PROXY", ""))
     args = ap.parse_args()
 
     portals = [args.portal] if args.portal else ["habitaclia", "fotocasa"]
-    r = LeadRefresher(dry_run=args.dry_run, proxy=args.proxy or None)
+    r = LeadRefresher(dry_run=args.dry_run, proxy=args.proxy or None,
+                      update_prices=args.update_prices)
     try:
         for p in portals:
             r.refresh_portal(p, args.limit)
