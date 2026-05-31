@@ -35,13 +35,16 @@ class ScraplingFotocasa(ScraplingBaseScraper):
     }
 
     def build_search_url(self, zona_key: str, page: int = 1) -> str:
-        # Fotocasa's `/particulares/` URL filter returns an empty SPA shell
-        # (no pre-rendered listings). Use the generic search URL — particular
-        # vs profesional is detected later via 'Anunciante' label and the agency
-        # divider in the HTML.
+        # Fotocasa's `/particulares/` URL filter (suffix `/pl`) returns ONLY
+        # private-seller listings. The generic `/l` search is dominated by paid
+        # agency placements (~100% professional), burying the few particulares.
+        # The particulares page lacks the per-listing clientType JSON, so we read
+        # the cards via JS DOM walk; the URL itself is the particular filter and
+        # high-precision agency badges (Top+, "· Tu partner inmobiliario",
+        # "Obra Nueva") drop the rare developer promotions Fotocasa still injects.
         zona = self.ZONAS.get(zona_key, {})
         url_path = zona.get("url_path", f"{zona_key}/todas-las-zonas")
-        url = f"{self.BASE_URL}/es/comprar/viviendas/{url_path}/l"
+        url = f"{self.BASE_URL}/es/comprar/viviendas/particulares/{url_path}/pl"
         if page > 1:
             url = f"{url}/{page}"
         return url
@@ -239,7 +242,11 @@ class ScraplingFotocasa(ScraplingBaseScraper):
         import json as _json
         results: List[Dict[str, Any]] = []
         seen: set = set()
-        for m in re.finditer(r'"clientType":"(?:professional|private)"', html):
+        # Anchor on clientTypeId (present on BOTH the generic /l page — which also
+        # has the clientType string — and the /particulares/ /pl page, which only
+        # carries the numeric clientTypeId). This pulls clean structured data
+        # (rawPrice, features, phone) instead of fragile card textContent.
+        for m in re.finditer(r'"clientTypeId":\d+', html):
             obj_str = self._enclosing_object(html, m.start())
             if not obj_str:
                 continue
@@ -248,7 +255,7 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             except Exception:
                 continue
             anuncio_id = str(d.get("id") or "")
-            if not anuncio_id or anuncio_id in seen or "clientType" not in d:
+            if not anuncio_id or anuncio_id in seen or "clientTypeId" not in d:
                 continue
             seen.add(anuncio_id)
 
@@ -324,11 +331,13 @@ class ScraplingFotocasa(ScraplingBaseScraper):
         if "/vivienda/obra-nueva/" in href:
             return None
 
-        # Price: prefer the first standalone X.XXX € or XXX.XXX € that's > 10000
+        # Price: require Spanish thousands grouping (XXX.XXX / X.XXX.XXX) so the
+        # gallery counter glued in textContent ("1/25137.000 €") can't merge its
+        # digits into the price — \d{1,3} before the first group rejects "25137".
         precio = None
-        for raw in re.findall(r"(\d{1,4}[.,]\d{3}(?:[.,]\d{3})?)\s*€", text):
+        for raw in re.findall(r"(\d{1,3}(?:\.\d{3})+)\s*€", text):
             try:
-                v = float(raw.replace(".", "").replace(",", "."))
+                v = float(raw.replace(".", ""))
                 # Sanity: must be a real property price (10k–10M)
                 if 10_000 < v < 10_000_000:
                     precio = v
@@ -354,31 +363,25 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             except Exception:
                 pass
 
-        # Particular vs Profesional (textContent fallback only — JSON clientType
-        # is the primary source). Conservative: default to AGENCY and only flag
-        # particular with positive evidence, so agencies never leak if this path
-        # runs. Fotocasa shows agency branding ("Calidad Fotocasa", "Tu partner
-        # inmobiliario", "Top+", "Pro+", "<Name> inmobiliaria", S.L./S.A.).
+        # Particular vs Profesional. The /particulares/ URL already filters to
+        # private sellers, so default es_particular=True and only drop the rare
+        # agency/developer promotions Fotocasa still injects. Use HIGH-PRECISION
+        # structural badges only — NOT generic "inmobiliaria"/"S.L." word matches,
+        # which fire on owners' descriptions ("abstenerse inmobiliarias" is in
+        # fact a particular saying "no agencies"). The "·" separator before the
+        # branding marks a paid agency badge; Top+/Pro+ and "Obra Nueva" are
+        # developer/agency-only placements.
         vendedor = ""
         agency_signals = [
-            "Calidad Fotocasa",
-            "Tu partner inmobiliario",
+            "· Tu partner inmobiliario",
+            "· Calidad Fotocasa",
             "Top+",
             "Pro+",
-            "Anunciante: Profesional",
+            "Obra Nueva",
             "Líder de zona",
         ]
-        has_agency_signal = (
-            any(sig in text for sig in agency_signals)
-            or bool(re.search(r"\b(S\.?L\.?|S\.?A\.?|S\.?L\.?U\.?)\b", text))
-            or bool(re.search(
-                r"(?:^|\s)[Ii]nmobiliari[ao]s?(?=[\s\d/]|$)|IMMOBILIARI[AE]S?\b|"
-                r"\bfincas\b|\bConsulting\b|\bImmobiliaris\b|\bSERVICIOS\b",
-                text,
-            ))
-        )
-        has_particular_signal = bool(re.search(r"\bParticular\b", text))
-        es_particular = has_particular_signal and not has_agency_signal
+        has_agency_signal = any(sig in text for sig in agency_signals)
+        es_particular = not has_agency_signal
 
         # Extract clean agency name. Pattern observed in Fotocasa cards:
         #   "<media-button-text><AGENCY> · <signal>"  e.g.
