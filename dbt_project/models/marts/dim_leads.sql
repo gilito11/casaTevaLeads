@@ -36,6 +36,7 @@ WITH all_staging_sources AS (
     SELECT
         raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
+        latitud, longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
         tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
         es_particular, permite_inmobiliarias, fecha_publicacion, fotos_json
@@ -50,6 +51,7 @@ WITH all_staging_sources AS (
     SELECT
         raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
+        NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
         tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
         es_particular, permite_inmobiliarias, fecha_publicacion, fotos_json
@@ -64,6 +66,7 @@ WITH all_staging_sources AS (
     SELECT
         raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
+        NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
         tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
         es_particular, permite_inmobiliarias, fecha_publicacion, fotos_json
@@ -78,6 +81,7 @@ WITH all_staging_sources AS (
     SELECT
         raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
+        NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
         tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
         es_particular, permite_inmobiliarias, fecha_publicacion, fotos_json
@@ -126,6 +130,8 @@ enriched AS (
         url AS listing_url,
         ubicacion,
         zona_clasificada,
+        latitud,
+        longitud,
         -- Normalize tipo_propiedad to Title Case and merge variants
         CASE
             WHEN LOWER(tipo_propiedad) IN ('piso', 'pisos') THEN 'Piso'
@@ -286,6 +292,8 @@ final AS (
         e.listing_url,
         e.ubicacion,
         e.zona_clasificada,
+        e.latitud,
+        e.longitud,
         e.tipo_propiedad,
         e.superficie_m2,
         e.habitaciones,

@@ -42,6 +42,9 @@ extracted AS (
         raw_data->>'nombre' AS nombre_contacto,
         raw_data->>'vendedor' AS anunciante,
         raw_data->>'zona_geografica' AS zona_geografica,
+        NULLIF(raw_data->>'municipio', '') AS municipio,
+        (raw_data->>'latitud')::FLOAT AS latitud,
+        (raw_data->>'longitud')::FLOAT AS longitud,
 
         -- Numeric fields (already stored as numbers by scraper)
         (raw_data->>'precio')::NUMERIC AS precio_num,
@@ -125,6 +128,10 @@ classified AS (
 
         -- Normalize zone names consistently across portals
         CASE
+            -- Precise municipality from the listing JSON wins (e.g. Torà, Alpicat)
+            -- so small towns aren't lumped into Lleida by the province substring.
+            WHEN municipio IS NOT NULL THEN municipio
+
             -- Lleida zones
             WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%lleida%' OR LOWER(COALESCE(ubicacion, '')) LIKE '%lerida%' THEN 'Lleida Ciudad'
             WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%balaguer%' THEN 'Lleida - Balaguer'
@@ -206,6 +213,8 @@ final AS (
         descripcion,
         ubicacion,
         zona_clasificada,
+        latitud,
+        longitud,
 
         -- Contact information
         telefono_raw,

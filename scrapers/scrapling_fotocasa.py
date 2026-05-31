@@ -271,11 +271,15 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             url_anuncio = href if href.startswith("http") else f"{self.BASE_URL}{href}"
 
             feats = self._features_to_dict(d.get("features"))
-            addr = d.get("address") or {}
-            ubicacion = ", ".join(
-                str(addr[k]) for k in ("district", "municipality", "province")
-                if isinstance(addr, dict) and addr.get(k)
-            )
+            addr = d.get("address") if isinstance(d.get("address"), dict) else {}
+            # Precise municipality — drives zona_clasificada so a flat in Torà is
+            # bucketed at Torà, not lumped into Lleida by the province substring.
+            municipio = (addr.get("municipality") or addr.get("city") or "").strip()
+
+            # Exact coordinates so the map pin lands on the real location.
+            coords = d.get("coordinates") if isinstance(d.get("coordinates"), dict) else {}
+            latitud = coords.get("latitude")
+            longitud = coords.get("longitude")
 
             phone = d.get("phone") or ""
             phone_digits = re.sub(r"\D", "", phone)[-9:] if phone else ""
@@ -297,8 +301,11 @@ class ScraplingFotocasa(ScraplingBaseScraper):
                 "telefono_norm": self.normalize_phone(phone_digits) if phone_digits else None,
                 "fotos": photos[:10] or None,
                 "url_anuncio": url_anuncio,
-                "direccion": ubicacion or None,
-                "zona_geografica": zona_info.get("nombre", zona_key),
+                "direccion": municipio or None,
+                "municipio": municipio or None,
+                "latitud": latitud,
+                "longitud": longitud,
+                "zona_geografica": municipio or zona_info.get("nombre", zona_key),
                 "zona_busqueda": zona_key,
                 "es_particular": es_particular,
                 "vendedor": (d.get("clientAlias") or ("Particular" if es_particular else "Agencia")),

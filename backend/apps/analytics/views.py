@@ -523,7 +523,9 @@ def map_view(request):
                     COUNT(*) FILTER (WHERE precio > 0) as con_precio,
                     COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio,
                     COALESCE(MIN(precio) FILTER (WHERE precio > 0), 0) as precio_min,
-                    COALESCE(MAX(precio) FILTER (WHERE precio > 0), 0) as precio_max
+                    COALESCE(MAX(precio) FILTER (WHERE precio > 0), 0) as precio_max,
+                    AVG(latitud) FILTER (WHERE latitud IS NOT NULL) as lat_avg,
+                    AVG(longitud) FILTER (WHERE longitud IS NOT NULL) as lon_avg
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
                   AND zona_clasificada IS NOT NULL
@@ -539,7 +541,17 @@ def map_view(request):
             merged = {}
             for row in rows:
                 zona_nombre = row['zona_clasificada']
-                coords = find_zone_coords(zona_nombre)
+                # Exact per-listing coordinates (Fotocasa JSON) win over zone
+                # geocoding — a flat in Torà pins on Torà, not a preset centroid.
+                if row.get('lat_avg') is not None and row.get('lon_avg') is not None:
+                    coords = {
+                        'lat': float(row['lat_avg']),
+                        'lon': float(row['lon_avg']),
+                        'nombre': zona_nombre,
+                        'region': '',
+                    }
+                else:
+                    coords = find_zone_coords(zona_nombre)
                 if not coords:
                     logger.debug(f"Map: Could not find coords for zone '{zona_nombre}'")
                     continue

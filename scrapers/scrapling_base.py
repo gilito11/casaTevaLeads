@@ -291,7 +291,7 @@ class ScraplingBaseScraper:
             "telefono_norm": listing.get("telefono_norm", ""),
             "email": listing.get("email"),
             "nombre": listing.get("vendedor", ""),
-            "direccion": listing.get("ubicacion", ""),
+            "direccion": listing.get("direccion") or listing.get("ubicacion", ""),
             "zona": listing.get("zona_geografica", ""),
             "zona_busqueda": listing.get("zona_busqueda", ""),
             "zona_geografica": listing.get("zona_geografica", ""),
@@ -310,8 +310,9 @@ class ScraplingBaseScraper:
             "scraper_type": "scrapling",
         }
         # Optional portal-specific fields can be passed through unchanged
-        for k in ("hasShop", "shopName", "isPrivate", "sellerBadge"):
-            if k in listing:
+        for k in ("hasShop", "shopName", "isPrivate", "sellerBadge",
+                  "municipio", "latitud", "longitud"):
+            if listing.get(k) is not None:
                 raw_data[k] = listing[k]
 
         try:
