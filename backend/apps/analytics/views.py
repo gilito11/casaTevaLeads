@@ -34,41 +34,61 @@ def normalize_zone_name(name):
 
 
 def find_zone_coords(zona_nombre):
-    """Find coordinates for a zone name using fuzzy matching."""
+    """Find coordinates for a zone name using fuzzy matching.
+
+    Zone names follow a "Region - Municipio" convention (e.g. "Lleida - Tàrrega",
+    "Costa Dorada - Altafulla"). The marker must land on the *municipio* (the most
+    specific, last segment), never on the region prefix. We therefore split on the
+    " - " separator and try the most-specific segment first.
+    """
     if not zona_nombre:
         return None
 
     normalized_input = normalize_zone_name(zona_nombre)
 
-    # First pass: exact match on normalized name
-    for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
-        normalized_preset = normalize_zone_name(zona_data['nombre'])
-        if normalized_input == normalized_preset:
-            return {
-                'lat': zona_data['lat'],
-                'lon': zona_data['lon'],
-                'region': zona_data.get('region_nombre', ''),
-            }
+    # Split "lleida - tarrega" -> ["lleida", "tarrega"] and try most-specific first.
+    # Only split on " - "/":" surrounded by spaces so intra-name hyphens survive
+    # (mont-roig, vila-seca, coma-ruga).
+    parts = [p.strip() for p in re.split(r'\s+-\s+|\s*:\s*', normalized_input) if p.strip()]
+    candidates = list(reversed(parts))  # municipio first, region last
+    if normalized_input not in candidates:
+        candidates.append(normalized_input)
 
-    # Second pass: one contains the other
-    for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
-        normalized_preset = normalize_zone_name(zona_data['nombre'])
-        if normalized_preset in normalized_input or normalized_input in normalized_preset:
-            return {
-                'lat': zona_data['lat'],
-                'lon': zona_data['lon'],
-                'region': zona_data.get('region_nombre', ''),
-            }
+    presets = [
+        (slug, normalize_zone_name(zona_data['nombre']), zona_data)
+        for slug, zona_data in ZONAS_PREESTABLECIDAS.items()
+    ]
 
-    # Third pass: slug match
-    for slug, zona_data in ZONAS_PREESTABLECIDAS.items():
-        slug_normalized = slug.replace('_', ' ')
-        if slug_normalized in normalized_input:
-            return {
-                'lat': zona_data['lat'],
-                'lon': zona_data['lon'],
-                'region': zona_data.get('region_nombre', ''),
-            }
+    def _result(zona_data):
+        return {
+            'lat': zona_data['lat'],
+            'lon': zona_data['lon'],
+            'region': zona_data.get('region_nombre', ''),
+            'nombre': zona_data['nombre'],
+        }
+
+    # Pass 1: exact match, most-specific segment first
+    for cand in candidates:
+        for slug, normalized_preset, zona_data in presets:
+            if cand == normalized_preset:
+                return _result(zona_data)
+
+    # Pass 2: substring match, most-specific segment first; prefer the longest
+    # (most specific) preset name so "lleida ciudad" still resolves to Lleida.
+    for cand in candidates:
+        best = None
+        for slug, normalized_preset, zona_data in presets:
+            if normalized_preset and (normalized_preset in cand or cand in normalized_preset):
+                if best is None or len(normalized_preset) > len(best[0]):
+                    best = (normalized_preset, zona_data)
+        if best:
+            return _result(best[1])
+
+    # Pass 3: slug match, most-specific segment first
+    for cand in candidates:
+        for slug, normalized_preset, zona_data in presets:
+            if slug.replace('_', ' ') in cand:
+                return _result(zona_data)
 
     return None
 
@@ -513,26 +533,52 @@ def map_view(request):
             """, [tenant_id])
             rows = dict_fetchall(cursor)
 
+            # Merge zonas that resolve to the same municipio so "Valls" and
+            # "Tarragona - Valls" (or "Altafulla" and "Costa Dorada - Altafulla")
+            # show as a single marker instead of overlapping duplicates.
+            merged = {}
             for row in rows:
                 zona_nombre = row['zona_clasificada']
-
-                # Try to find coordinates using improved matching
                 coords = find_zone_coords(zona_nombre)
+                if not coords:
+                    logger.debug(f"Map: Could not find coords for zone '{zona_nombre}'")
+                    continue
 
-                if coords:
-                    zones_data.append({
-                        'nombre': zona_nombre,
+                key = coords['nombre']
+                n = row['total_leads']
+                if key not in merged:
+                    merged[key] = {
+                        'nombre': coords['nombre'],
                         'lat': coords['lat'],
                         'lon': coords['lon'],
                         'region': coords['region'],
-                        'total_leads': row['total_leads'],
-                        'precio_medio': round(float(row['precio_medio']), 0),
-                        'precio_min': round(float(row['precio_min']), 0),
-                        'precio_max': round(float(row['precio_max']), 0),
-                    })
-                else:
-                    # Log unmatched zones for debugging
-                    logger.debug(f"Map: Could not find coords for zone '{zona_nombre}'")
+                        'total_leads': 0,
+                        '_precio_sum': 0.0,
+                        '_precio_n': 0,
+                        'precio_min': None,
+                        'precio_max': None,
+                    }
+                z = merged[key]
+                z['total_leads'] += n
+                pmed = float(row['precio_medio'])
+                pmin = float(row['precio_min'])
+                pmax = float(row['precio_max'])
+                if pmed > 0:
+                    z['_precio_sum'] += pmed * n
+                    z['_precio_n'] += n
+                if pmin > 0:
+                    z['precio_min'] = pmin if z['precio_min'] is None else min(z['precio_min'], pmin)
+                if pmax > 0:
+                    z['precio_max'] = pmax if z['precio_max'] is None else max(z['precio_max'], pmax)
+
+            for z in merged.values():
+                z['precio_medio'] = round(z['_precio_sum'] / z['_precio_n'], 0) if z['_precio_n'] else 0
+                z['precio_min'] = round(z['precio_min'], 0) if z['precio_min'] else 0
+                z['precio_max'] = round(z['precio_max'], 0) if z['precio_max'] else 0
+                del z['_precio_sum'], z['_precio_n']
+                zones_data.append(z)
+
+            zones_data.sort(key=lambda x: x['total_leads'], reverse=True)
 
         except Exception as e:
             logger.error(f"Error fetching map data: {e}")
@@ -586,32 +632,33 @@ def map_data_api(request):
             """, [tenant_id])
             rows = dict_fetchall(cursor)
 
-            # Group by zone
+            # Group by resolved municipio so "Valls"/"Tarragona - Valls" merge into
+            # one marker instead of overlapping duplicates.
             zones_dict = {}
             for row in rows:
-                zona = row['zona_clasificada']
-                if zona not in zones_dict:
-                    zones_dict[zona] = {
-                        'nombre': zona,
+                coords = find_zone_coords(row['zona_clasificada'])
+                if not coords:
+                    continue
+                key = coords['nombre']
+                if key not in zones_dict:
+                    zones_dict[key] = {
+                        'nombre': coords['nombre'],
                         'total_leads': 0,
                         'portales': {},
-                        'coords': None,
+                        'coords': {'lat': coords['lat'], 'lon': coords['lon']},
                     }
-                zones_dict[zona]['total_leads'] += row['total_leads']
-                zones_dict[zona]['portales'][row['portal']] = {
-                    'count': row['total_leads'],
-                    'precio_medio': round(float(row['precio_medio']), 0),
-                }
+                z = zones_dict[key]
+                z['total_leads'] += row['total_leads']
+                portal = row['portal']
+                if portal in z['portales']:
+                    z['portales'][portal]['count'] += row['total_leads']
+                else:
+                    z['portales'][portal] = {
+                        'count': row['total_leads'],
+                        'precio_medio': round(float(row['precio_medio']), 0),
+                    }
 
-            # Add coordinates using improved matching
-            for zona_nombre, zona_data in zones_dict.items():
-                coords = find_zone_coords(zona_nombre)
-                if coords:
-                    zona_data['coords'] = {
-                        'lat': coords['lat'],
-                        'lon': coords['lon'],
-                    }
-                    zones_data.append(zona_data)
+            zones_data = list(zones_dict.values())
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
