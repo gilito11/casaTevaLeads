@@ -240,6 +240,9 @@ final AS (
     -- Apply filters as specified
     WHERE
         precio IS NOT NULL  -- Must have a valid price
+        -- Only genuine particulares. The scraper now derives es_particular from
+        -- Fotocasa's authoritative `clientType` JSON field; this is the safety net.
+        AND COALESCE(es_particular, FALSE) = TRUE
         -- Filter out listings that reject agencies (they're looking for direct buyers)
         AND NOT (
             LOWER(COALESCE(descripcion, '')) LIKE '%abstener%agencia%'

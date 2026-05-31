@@ -152,9 +152,22 @@ class ScraplingFotocasa(ScraplingBaseScraper):
 
         zona_info = self.ZONAS.get(zona_key, {})
 
-        # Preferred path: read structured listings stashed by search_page_action
-        # via JS DOM extraction. Each entry has {href, id, text} where text
-        # is the full card textContent post-hydration (precio, m², hab, vendedor).
+        # Primary path: parse Fotocasa's embedded listing JSON. Each listing
+        # object carries the AUTHORITATIVE `clientType` ("professional"/"private")
+        # — the only reliable particular/agency signal. Fotocasa is heavily
+        # agency-dominated, so most results are correctly dropped here.
+        results = self._parse_embedded_listings(html, zona_key, zona_info)
+        if results:
+            n_part = sum(1 for r in results if r["es_particular"])
+            logger.info(
+                f"[fotocasa] {zona_key}: {len(results)} listings via JSON "
+                f"({n_part} particulares, {len(results) - n_part} agencias)"
+            )
+            return results
+
+        # Fallback: JS-stashed card textContent (only used if the JSON state is
+        # absent). Conservative — _listing_from_card_text only flags es_particular
+        # True when no agency signal is present.
         m = re.search(
             r'<script[^>]*id="__SCRAPLING_LISTINGS__"[^>]*>(.*?)</script>',
             html,
@@ -164,46 +177,126 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             try:
                 import json as _json
                 items = _json.loads(m.group(1)) or []
-                logger.info(f"[fotocasa] {zona_key}: extracted {len(items)} items via JS DOM")
+                logger.info(f"[fotocasa] {zona_key}: JSON state missing, {len(items)} items via JS DOM fallback")
                 for item in items:
                     listing = self._listing_from_card_text(item, zona_key, zona_info)
                     if listing:
                         results.append(listing)
                 if results:
-                    return results  # JS path won; skip HTML fallback
+                    return results
             except Exception as e:
                 logger.warning(f"[fotocasa] JS-stashed listings parse error: {e}")
 
-        # Fallback path: regex over server-rendered HTML (only ~2 cards visible)
-        # Cut off agency listings (Fotocasa shows particulares first)
-        html_lower = html.lower()
-        divider_pos = len(html)
-        for marker in ("anuncios de inmobiliarias", "ver más anuncios", "mira algunos de los anuncios"):
-            pos = html_lower.find(marker)
-            if 0 < pos < divider_pos:
-                divider_pos = pos
-        particulares_html = html[:divider_pos]
-
-        links = re.findall(r'href="(/es/comprar/vivienda/[^"]+/(\d{7,})/d)', particulares_html)
-        seen = set()
-
-        for href, anuncio_id in links:
-            if anuncio_id in seen:
-                continue
-            seen.add(anuncio_id)
-            url_anuncio = href if href.startswith("http") else f"{self.BASE_URL}{href}"
-            results.append({
-                "anuncio_id": anuncio_id,
-                "titulo": "",
-                "url_anuncio": url_anuncio,
-                "zona_geografica": zona_info.get("nombre", zona_key),
-                "zona_busqueda": zona_key,
-                "es_particular": True,
-                "tipo_inmueble": "piso",
-            })
-
         if not results:
             logger.warning(f"[fotocasa] {zona_key}: no listings found (html={len(html)} bytes)")
+        return results
+
+    @staticmethod
+    def _enclosing_object(text: str, idx: int) -> Optional[str]:
+        """Return the JSON object literal (as a string) that directly encloses
+        position `idx`. Scans backward for the opening brace whose match wraps
+        idx, then forward-matches to its closing brace."""
+        depth = 0
+        i = idx
+        while i > 0:
+            ch = text[i]
+            if ch == '}':
+                depth += 1
+            elif ch == '{':
+                if depth == 0:
+                    d = 0
+                    j = i
+                    while j < len(text):
+                        c = text[j]
+                        if c == '{':
+                            d += 1
+                        elif c == '}':
+                            d -= 1
+                            if d == 0:
+                                return text[i:j + 1]
+                        j += 1
+                    return None
+                depth -= 1
+            i -= 1
+        return None
+
+    @staticmethod
+    def _features_to_dict(features) -> Dict[str, int]:
+        out: Dict[str, int] = {}
+        if isinstance(features, list):
+            for f in features:
+                if isinstance(f, dict) and "key" in f:
+                    try:
+                        out[f["key"]] = int(f.get("value") or 0)
+                    except (TypeError, ValueError):
+                        pass
+        return out
+
+    def _parse_embedded_listings(self, html: str, zona_key: str, zona_info: dict) -> List[Dict[str, Any]]:
+        """Parse Fotocasa's embedded per-listing JSON objects. Authoritative
+        source for clientType (particular/agency), price, rooms, m², phone,
+        photos and address — no fragile textContent heuristics."""
+        import json as _json
+        results: List[Dict[str, Any]] = []
+        seen: set = set()
+        for m in re.finditer(r'"clientType":"(?:professional|private)"', html):
+            obj_str = self._enclosing_object(html, m.start())
+            if not obj_str:
+                continue
+            try:
+                d = _json.loads(obj_str)
+            except Exception:
+                continue
+            anuncio_id = str(d.get("id") or "")
+            if not anuncio_id or anuncio_id in seen or "clientType" not in d:
+                continue
+            seen.add(anuncio_id)
+
+            # Skip developer / new-construction promotions (never particulares)
+            if d.get("isNewConstruction") or d.get("isPromotion") or d.get("promotionId"):
+                continue
+
+            es_particular = d.get("clientTypeId") == 1 or d.get("clientType") == "private"
+
+            detail = d.get("detail") or {}
+            href = detail.get("es-ES") if isinstance(detail, dict) else ""
+            href = (href or "").split("?", 1)[0]
+            url_anuncio = href if href.startswith("http") else f"{self.BASE_URL}{href}"
+
+            feats = self._features_to_dict(d.get("features"))
+            addr = d.get("address") or {}
+            ubicacion = ", ".join(
+                str(addr[k]) for k in ("district", "municipality", "province")
+                if isinstance(addr, dict) and addr.get(k)
+            )
+
+            phone = d.get("phone") or ""
+            phone_digits = re.sub(r"\D", "", phone)[-9:] if phone else ""
+
+            photos = []
+            for mm in (d.get("multimedia") or []):
+                if isinstance(mm, dict) and mm.get("type") == "image" and mm.get("src"):
+                    photos.append(mm["src"])
+
+            results.append({
+                "anuncio_id": anuncio_id,
+                "titulo": (d.get("description") or "")[:200] if d.get("description") else "",
+                "precio": d.get("rawPrice") or None,
+                "habitaciones": feats.get("rooms") or None,
+                "metros": feats.get("surface") or None,
+                "banos": feats.get("bathrooms") or None,
+                "descripcion": d.get("description") or "",
+                "telefono": phone_digits or None,
+                "telefono_norm": self.normalize_phone(phone_digits) if phone_digits else None,
+                "fotos": photos[:10] or None,
+                "url_anuncio": url_anuncio,
+                "direccion": ubicacion or None,
+                "zona_geografica": zona_info.get("nombre", zona_key),
+                "zona_busqueda": zona_key,
+                "es_particular": es_particular,
+                "vendedor": (d.get("clientAlias") or ("Particular" if es_particular else "Agencia")),
+                "tipo_inmueble": "piso",
+            })
         return results
 
     # ------------------------------------------------------------------
@@ -261,12 +354,11 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             except Exception:
                 pass
 
-        # Particular vs Profesional. Fotocasa shows agency branding badges:
-        # "Calidad Fotocasa", "Tu partner inmobiliario", "Top+", "Pro+"
-        # are signals of a PAID agency account. "Tu agente" is the particular
-        # widget (NOT an agency marker). Plain corporate suffixes (S.L., S.A.)
-        # in the visible card text also identify agencies.
-        es_particular = True
+        # Particular vs Profesional (textContent fallback only — JSON clientType
+        # is the primary source). Conservative: default to AGENCY and only flag
+        # particular with positive evidence, so agencies never leak if this path
+        # runs. Fotocasa shows agency branding ("Calidad Fotocasa", "Tu partner
+        # inmobiliario", "Top+", "Pro+", "<Name> inmobiliaria", S.L./S.A.).
         vendedor = ""
         agency_signals = [
             "Calidad Fotocasa",
@@ -274,16 +366,19 @@ class ScraplingFotocasa(ScraplingBaseScraper):
             "Top+",
             "Pro+",
             "Anunciante: Profesional",
+            "Líder de zona",
         ]
-        if any(sig in text for sig in agency_signals):
-            es_particular = False
-        elif re.search(r"\b(S\.?L\.?|S\.?A\.?|S\.?L\.?U\.?)\b", text):
-            es_particular = False
-        elif re.search(r"(?:^|\s)[Ii]nmobiliari[ao]s?(?=[\s\d/]|$)|IMMOBILIARI[AE]S?\b|\bfincas\b|\bConsulting\b", text):
-            # Word "inmobiliaria"/"IMMOBILIARIA"/"fincas" appearing standalone is
-            # an agency name suffix (e.g. "DOMUUM inmobiliaria"), not generic
-            # branding (which is filtered by the agency_signals above first).
-            es_particular = False
+        has_agency_signal = (
+            any(sig in text for sig in agency_signals)
+            or bool(re.search(r"\b(S\.?L\.?|S\.?A\.?|S\.?L\.?U\.?)\b", text))
+            or bool(re.search(
+                r"(?:^|\s)[Ii]nmobiliari[ao]s?(?=[\s\d/]|$)|IMMOBILIARI[AE]S?\b|"
+                r"\bfincas\b|\bConsulting\b|\bImmobiliaris\b|\bSERVICIOS\b",
+                text,
+            ))
+        )
+        has_particular_signal = bool(re.search(r"\bParticular\b", text))
+        es_particular = has_particular_signal and not has_agency_signal
 
         # Extract clean agency name. Pattern observed in Fotocasa cards:
         #   "<media-button-text><AGENCY> · <signal>"  e.g.
