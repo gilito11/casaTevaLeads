@@ -40,17 +40,18 @@ Accesibilidad:
            aria-label="{{ current_tenant.nombre|default:'FincaRadar' }} — Inicio">
             {% if current_tenant.id != 2 %}
                 {# Default → Casa Teva (id=1 or no tenant set). Only tenant 2 (Find&Look) gets FR fallback. #}
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white dark:bg-white" aria-hidden="true">
+                {# Collapsed: show only the logo icon (bigger). Expanded: show the full wordmark, no duplicate. #}
+                <div x-show="!open" class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white dark:bg-white" aria-hidden="true">
                     <img src="{% static 'img/tenant_1_logo.webp' %}" alt="" class="w-full h-full object-contain p-0.5">
                 </div>
                 <img x-show="open" x-transition
                      src="{% static 'img/tenant_1_logo.webp' %}"
                      alt="Casa Teva — Real Estate"
-                     class="hidden md:block h-9 w-auto object-contain dark:bg-white dark:rounded dark:px-1 dark:py-0.5">
+                     class="hidden md:block h-12 w-auto object-contain dark:bg-white dark:rounded dark:px-1 dark:py-0.5">
             {% else %}
                 {# Default — FincaRadar fallback for tenants without custom logo #}
-                <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                    <span class="text-white font-bold text-lg">FR</span>
+                <div x-show="!open" class="w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                    <span class="text-white font-bold text-xl">FR</span>
                 </div>
                 <span x-show="open" x-transition class="font-semibold text-lg dark:text-white">FincaRadar</span>
             {% endif %}
