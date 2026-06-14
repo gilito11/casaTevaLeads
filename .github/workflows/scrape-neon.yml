@@ -65,7 +65,11 @@ jobs:
         run: |
           # ZONAS_GEOGRAFICAS now lives in scrapers/zones/* — no botasaurus or
           # camoufox dependency at runtime for Scrapling-only scrapes.
-          pip install "scrapling[fetchers]>=0.4.7" psycopg2-binary python-decouple python-dotenv dbt-postgres requests Pillow
+          # dbt pinned <1.10: dbt-postgres 1.10 pulls dbt-core 2.0 ("Fusion"),
+          # whose Rust engine dropped the postgres adapter (dbt1005). Pin keeps
+          # the classic 1.9 engine. scrapling pinned <0.5 to avoid surprise
+          # breaking upgrades from the cron's fresh installs.
+          pip install "scrapling[fetchers]>=0.4.7,<0.5" psycopg2-binary python-decouple python-dotenv "dbt-postgres>=1.9,<1.10" requests Pillow
 
       - name: Install Scrapling browsers (Patchright)
         run: scrapling install

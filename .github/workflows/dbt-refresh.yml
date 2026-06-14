@@ -18,7 +18,7 @@ jobs:
           cache: 'pip'
 
       - name: Install dbt
-        run: pip install dbt-postgres
+        run: pip install "dbt-postgres>=1.9,<1.10"  # <1.10 avoids dbt-core 2.0 Fusion (drops postgres adapter)
 
       - name: Run dbt full refresh
         run: |

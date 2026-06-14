@@ -268,17 +268,16 @@ def check_portal(portal_check: PortalCheck, verbose: bool = False) -> PortalResu
 
     result.http_status = status_code
 
-    if status_code == 403 or status_code == 429:
+    # A plain-requests probe cannot bypass Imperva / DataDome / GeeTest, so ANY
+    # non-200 (403, 405, 429, 5xx...) just means the anti-bot layer refused us —
+    # NOT that the portal changed its HTML. The real scrapers use Scrapling +
+    # proxy and succeed regardless. Only a 200 whose required patterns are
+    # missing signals a genuine interface change worth alerting on.
+    if status_code != 200:
         result.status = "blocked"
         result.blocked = True
-        result.error_message = f"HTTP {status_code} - access denied"
-        result.score = -1  # blocked, not a structural change
-        return result
-
-    if status_code != 200:
-        result.status = "error"
-        result.error_message = f"HTTP {status_code}"
-        result.score = 0
+        result.error_message = f"HTTP {status_code} - not reachable via plain request (expected)"
+        result.score = -1
         return result
 
     # Check for bot challenge pages

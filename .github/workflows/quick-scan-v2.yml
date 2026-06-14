@@ -45,7 +45,7 @@ jobs:
           sudo apt-get install -y google-chrome-stable xvfb
 
       - name: Install dependencies
-        run: pip install botasaurus psycopg2-binary python-decouple python-dotenv dbt-postgres requests "camoufox[geoip]" Pillow playwright
+        run: pip install botasaurus psycopg2-binary python-decouple python-dotenv "dbt-postgres>=1.9,<1.10" requests "camoufox[geoip]" Pillow playwright
 
       - name: Install Camoufox browser
         run: camoufox fetch
