@@ -130,12 +130,12 @@ def dashboard_view(request):
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT
-                    fecha_scraping::date as dia,
+                    fecha_primera_captura::date as dia,
                     COUNT(*) as total
                 FROM public_marts.dim_leads
                 WHERE tenant_id = %s
-                  AND fecha_scraping >= CURRENT_DATE - INTERVAL '30 days'
-                GROUP BY fecha_scraping::date
+                  AND fecha_primera_captura >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY fecha_primera_captura::date
                 ORDER BY dia
             """, [tenant_id])
             rows = cursor.fetchall()
