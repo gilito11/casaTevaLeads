@@ -216,9 +216,13 @@ enriched AS (
             -- 2. Tiene telefono visible: +20pts (menos spam recibido)
             + CASE WHEN telefono_norm IS NOT NULL AND telefono_norm != '' THEN 20 ELSE 0 END
             -- 3. Pocas fotos (<5): +10pts (particular amateur, no agencia)
+            -- Defensivo: jsonb_array_length peta si fotos_json es un escalar JSON
+            -- (algún portal lo guarda como string/number en vez de array). Solo
+            -- llamamos array_length cuando es realmente un array.
             + CASE
                 WHEN fotos_json IS NULL THEN 10
-                WHEN jsonb_array_length(fotos_json) < 5 THEN 10
+                WHEN jsonb_typeof(fotos_json) = 'array' AND jsonb_array_length(fotos_json) < 5 THEN 10
+                WHEN jsonb_typeof(fotos_json) <> 'array' THEN 10
                 ELSE 0
             END
             -- 4. Precio bajo (<100k): +20pts (vendedor motivado)
