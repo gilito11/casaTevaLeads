@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Patrones de nombre de vendedor que delatan una inmobiliaria/profesional.
 _AGENCY_NAME_RE = re.compile(
-    r"(yaencontre|ya\s*encontr|inmobiliari|inmoblil|inmuebles?|fincas|finques|"
+    r"(yaencontre|ya\s*encontr|\binmo\w*|inmuebles?|fincas|finques|"
     r"agencia|agency|real\s*estate|properties|property|propiedad|gestion|"
     r"gesti[oó]n|gestora|gestor[ií]a|asesor|consult|promotora|promocion|"
     r"realty|homes|housfy|housell|tecnocasa|redpiso|red\s*piso|engel|"
@@ -295,11 +295,17 @@ class ScraplingWallapop(ScraplingBaseScraper):
             if isinstance(img, dict):
                 urls = img.get("urls") if isinstance(img.get("urls"), dict) else None
                 if urls:
+                    # detalle: cada imagen trae urls.{small,medium,big}
                     url = (urls.get("big") or urls.get("medium") or urls.get("original")
                            or urls.get("small") or "")
                 else:
-                    url = (img.get("big") or img.get("medium") or img.get("original")
+                    # listado SSR: una sola miniatura como smallUrl (W320)
+                    url = (img.get("bigUrl") or img.get("mediumUrl") or img.get("smallUrl")
+                           or img.get("big") or img.get("medium") or img.get("original")
                            or img.get("url") or img.get("src") or "")
+                # subir resolución de la miniatura del listado para la ficha
+                if url and "pictureSize=W320" in url:
+                    url = url.replace("pictureSize=W320", "pictureSize=W800")
             elif isinstance(img, str):
                 url = img
             if url:
@@ -329,10 +335,68 @@ class ScraplingWallapop(ScraplingBaseScraper):
             return True
         return False
 
+    @staticmethod
+    def _phone_from_text(text: str) -> Optional[str]:
+        """Extrae un móvil/fijo ES (9 dígitos) de la descripción. Evita IDs de
+        imagen (10 dígitos) con límites estrictos y números repetidos."""
+        if not text:
+            return None
+        cleaned = re.sub(r"[\s.\-/]", "", text)
+        for m in re.findall(r"(?<!\d)[6789]\d{8}(?!\d)", cleaned):
+            if len(set(m)) > 3:
+                return m
+        return None
+
     def _wants_detail(self) -> bool:
-        # El SSR (__NEXT_DATA__) ya trae título, descripción, precio, vendedor y
-        # atributos -> no hace falta visitar el detalle.
-        return False
+        # El listado SSR solo trae 1 miniatura. Visitamos el detalle SOLO para
+        # los anuncios que pasan should_skip (particulares con precio > umbral,
+        # un puñado por zona) para sacar las 10 fotos, el teléfono y verificar al
+        # vendedor con su perfil. Barato porque las agencias ya se filtraron antes.
+        return True
+
+    def parse_detail_page(self, page, listing: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            html = page.html_content or ""
+        except Exception:
+            html = ""
+        data = self._extract_next_data(html)
+        if not data:
+            return listing
+        pp = (data.get("props") or {}).get("pageProps") or {}
+        item = pp.get("item") if isinstance(pp.get("item"), dict) else {}
+        seller = pp.get("itemSeller") if isinstance(pp.get("itemSeller"), dict) else {}
+
+        # Fotos completas (hasta 10) desde item.images (urls.{small,medium,big})
+        fotos = self._extract_photos(item)
+        if fotos:
+            listing["fotos"] = fotos
+
+        # Descripción más completa
+        desc = item.get("description") or ""
+        if isinstance(desc, str) and len(desc) > len(listing.get("descripcion", "")):
+            listing["descripcion"] = desc[:2000]
+
+        # Teléfono desde la descripción (Wallapop no expone teléfono directo)
+        if not listing.get("telefono_norm"):
+            phone = self._phone_from_text(listing.get("descripcion", ""))
+            if phone:
+                listing["telefono"] = phone
+                listing["telefono_norm"] = phone
+
+        # Re-verificar profesional con el perfil del vendedor (itemSeller)
+        vendedor = (
+            seller.get("userName") or seller.get("name")
+            or seller.get("micro_name") or listing.get("vendedor") or ""
+        )
+        if seller and self._is_professional(
+            seller, item, vendedor, listing.get("titulo", ""), listing.get("descripcion", "")
+        ):
+            listing["es_particular"] = False
+            listing["seller_type"] = "professional"
+            if vendedor:
+                listing["vendedor"] = vendedor
+        listing["verified"] = True
+        return listing
 
 
 def main():

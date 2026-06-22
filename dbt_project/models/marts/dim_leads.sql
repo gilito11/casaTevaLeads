@@ -169,7 +169,16 @@ enriched AS (
         fotos_json,
 
         -- Lead classification
-        es_particular,
+        -- Guarda global anti-agencia por NOMBRE de vendedor/anunciante: protege a
+        -- TODOS los portales (fotocasa, wallapop, etc.). El prefijo "inmo" (inmo*,
+        -- p.ej. "inmoteck2024") es señal fuerte de inmobiliaria que los filtros por
+        -- portal no cazaban. Si el nombre delata agencia -> es_particular = FALSE.
+        CASE
+            WHEN es_particular = FALSE THEN FALSE
+            WHEN LOWER(COALESCE(nombre_contacto, '')) ~ '(^| )inmo|inmobiliari|inmuebles|fincas|finques|agencia|tecnocasa|redpiso|re/?max|century ?21|housfy|housell|engel|gestio|gestora|asesor|consult|promotora|promocion|servicios inmobiliari|real ?estate|properties|realty| homes|patrimoni|inversion| s\.?l\.?( |$)| s\.?a\.?( |$)|\.com|\.es' THEN FALSE
+            WHEN LOWER(COALESCE(anunciante, '')) ~ '(^| )inmo|inmobiliari|inmuebles|fincas|agencia|tecnocasa|redpiso|housfy|gestora|promotora|real ?estate|properties|realty|\.com' THEN FALSE
+            ELSE es_particular
+        END AS es_particular,
         -- Override permite_inmobiliarias: check description for rejection phrases
         CASE
             WHEN LOWER(COALESCE(descripcion, '')) LIKE '%inmobiliarias abstenerse%' THEN FALSE
