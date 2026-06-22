@@ -24,7 +24,7 @@ sources:
             tests:
               - not_null
               - accepted_values:
-                  values: ['habitaclia', 'fotocasa', 'milanuncios', 'idealista']
+                  values: ['habitaclia', 'fotocasa', 'milanuncios', 'idealista', 'wallapop']
 
           - name: data_lake_path
             description: "Path to the JSON file in MinIO Data Lake"

@@ -120,6 +120,8 @@ class ZonaSerializer(serializers.ModelSerializer):
             portales.append('habitaclia')
         if obj.scrapear_idealista:
             portales.append('idealista')
+        if getattr(obj, 'scrapear_wallapop', False):
+            portales.append('wallapop')
         return portales
 
 

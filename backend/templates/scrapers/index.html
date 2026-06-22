@@ -47,13 +47,14 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">Portales inmobiliarios soportados</p>
         </div>
         <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 {% for scraper in scrapers %}
                 <div class="p-4 rounded-lg border border-gray-200 dark:border-gray-600">
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 rounded-lg flex items-center justify-center
                             {% if scraper.id == 'milanuncios' %}bg-blue-100 text-blue-600
                             {% elif scraper.id == 'habitaclia' %}bg-teal-100 text-teal-600
+                            {% elif scraper.id == 'wallapop' %}bg-cyan-100 text-cyan-600
                             {% elif scraper.id == 'pisos' %}bg-orange-100 text-orange-600
                             {% else %}bg-purple-100 text-purple-600{% endif %}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

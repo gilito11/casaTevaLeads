@@ -119,6 +119,11 @@ def main():
         [PYTHON, "-m", "scrapers.scrapling_milanuncios", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
         allow_fail=True,
     )
+    results['wallapop'] = run_step(
+        "Wallapop (Catalonia)",
+        [PYTHON, "-m", "scrapers.scrapling_wallapop", "--zones"] + ZONES + ["--max-pages", "2", "--postgres"],
+        allow_fail=True,
+    )
 
     # 1b. Scrapers Tenant 2 (Look and Find - Madrid)
     results['habitaclia_madrid'] = run_step(
@@ -139,6 +144,11 @@ def main():
     results['milanuncios_madrid'] = run_step(
         "Milanuncios (Madrid)",
         [PYTHON, "-m", "scrapers.scrapling_milanuncios", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--max-pages", "2", "--postgres"],
+        allow_fail=True,
+    )
+    results['wallapop_madrid'] = run_step(
+        "Wallapop (Madrid)",
+        [PYTHON, "-m", "scrapers.scrapling_wallapop", "--zones"] + MADRID_ZONES + ["--tenant-id", str(MADRID_TENANT_ID), "--max-pages", "2", "--postgres"],
         allow_fail=True,
     )
 

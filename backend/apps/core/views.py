@@ -290,6 +290,7 @@ def scrapers_view(request):
         {'id': 'fotocasa', 'nombre': 'Fotocasa', 'descripcion': 'Portal inmobiliario (Botasaurus)'},
         {'id': 'milanuncios', 'nombre': 'Milanuncios', 'descripcion': 'Anuncios clasificados (ScrapingBee)'},
         {'id': 'idealista', 'nombre': 'Idealista', 'descripcion': 'Portal inmobiliario (ScrapingBee)'},
+        {'id': 'wallapop', 'nombre': 'Wallapop', 'descripcion': 'Marketplace C2C - particulares (Scrapling)'},
     ]
 
     context = {
@@ -622,10 +623,11 @@ def _run_botasaurus_scraper(job_id, portal, zona_slug):
         # Mapeo de portales a scripts
         BOTASAURUS_PORTALS = {'habitaclia', 'fotocasa'}
         SCRAPINGBEE_PORTALS = {'milanuncios', 'idealista'}
+        SCRAPLING_PORTALS = {'wallapop'}  # se invocan como `python -m scrapers.scrapling_<portal>`
 
         # Determinar qué portales ejecutar
         if portal == 'all':
-            portals_to_run = ['habitaclia', 'fotocasa', 'milanuncios', 'idealista']
+            portals_to_run = ['habitaclia', 'fotocasa', 'milanuncios', 'idealista', 'wallapop']
         else:
             portals_to_run = [portal]
 
@@ -644,10 +646,14 @@ def _run_botasaurus_scraper(job_id, portal, zona_slug):
                 # ScrapingBee scraper
                 script_path = os.path.join(project_root, f'run_scrapingbee_{p}_scraper.py')
                 cmd = [sys.executable, script_path, '--zones', zona_slug, '--postgres']
+            elif p in SCRAPLING_PORTALS:
+                # Scrapling scraper invocado como módulo (sin run_*.py)
+                script_path = None
+                cmd = [sys.executable, '-m', f'scrapers.scrapling_{p}', '--zones', zona_slug, '--postgres']
             else:
                 continue
 
-            if not os.path.exists(script_path):
+            if script_path and not os.path.exists(script_path):
                 errors.append(f"{p}: script not found")
                 continue
 
@@ -900,7 +906,7 @@ def toggle_zona_portal_view(request, zona_id, portal):
     """Toggle un portal para una zona (HTMX)."""
     from django.http import HttpResponse
 
-    portales_validos = ['milanuncios', 'fotocasa', 'habitaclia', 'idealista']
+    portales_validos = ['milanuncios', 'fotocasa', 'habitaclia', 'idealista', 'wallapop']
     if portal not in portales_validos:
         return HttpResponse(status=400)
 

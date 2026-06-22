@@ -46,7 +46,7 @@ class ZonaGeograficaViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ZonaGeograficaSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['activa', 'tipo', 'scrapear_milanuncios', 'scrapear_fotocasa', 'scrapear_habitaclia', 'scrapear_idealista']
+    filterset_fields = ['activa', 'tipo', 'scrapear_milanuncios', 'scrapear_fotocasa', 'scrapear_habitaclia', 'scrapear_idealista', 'scrapear_wallapop']
     search_fields = ['nombre', 'slug']
 
     def get_queryset(self):
@@ -140,7 +140,7 @@ class ZonaGeograficaViewSet(viewsets.ModelViewSet):
         portal = request.data.get('portal')
         activo = request.data.get('activo', True)
 
-        portales_validos = ['milanuncios', 'fotocasa', 'habitaclia', 'idealista']
+        portales_validos = ['milanuncios', 'fotocasa', 'habitaclia', 'idealista', 'wallapop']
         if portal not in portales_validos:
             return Response(
                 {'error': f'Portal invalido. Opciones: {portales_validos}'},

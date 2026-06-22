@@ -29,11 +29,11 @@ models:
           - not_null
 
       - name: source_portal
-        description: "Origin portal (habitaclia, fotocasa, milanuncios, idealista)"
+        description: "Origin portal (habitaclia, fotocasa, milanuncios, idealista, wallapop)"
         tests:
           - not_null
           - accepted_values:
-              values: ['habitaclia', 'fotocasa', 'milanuncios', 'idealista']
+              values: ['habitaclia', 'fotocasa', 'milanuncios', 'idealista', 'wallapop']
 
       - name: estado
         description: "CRM status of the lead"

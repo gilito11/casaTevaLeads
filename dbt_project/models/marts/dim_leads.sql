@@ -89,6 +89,21 @@ WITH all_staging_sources AS (
     {% if is_incremental() %}
     WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
     {% endif %}
+
+    UNION ALL
+
+    -- Wallapop listings
+    SELECT
+        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        url, titulo, descripcion, ubicacion, zona_clasificada,
+        NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
+        telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
+        tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
+        es_particular, permite_inmobiliarias, fecha_publicacion, fotos_json
+    FROM {{ ref('stg_wallapop') }}
+    {% if is_incremental() %}
+    WHERE scraping_timestamp > (SELECT MAX(ultima_actualizacion) FROM {{ this }})
+    {% endif %}
 ),
 
 deduplicated AS (

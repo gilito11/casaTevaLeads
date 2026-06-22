@@ -28,6 +28,7 @@ class ZonaGeograficaSerializer(serializers.ModelSerializer):
             'latitud', 'longitud', 'radio_km', 'provincia_id',
             'activa', 'precio_minimo',
             'scrapear_milanuncios', 'scrapear_fotocasa', 'scrapear_habitaclia', 'scrapear_idealista',
+            'scrapear_wallapop',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']

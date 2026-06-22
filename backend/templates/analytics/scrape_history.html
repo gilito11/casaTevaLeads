@@ -31,6 +31,7 @@
                     {% elif item.portal == 'fotocasa' %}bg-green-100 text-green-700
                     {% elif item.portal == 'habitaclia' %}bg-blue-100 text-blue-700
                     {% elif item.portal == 'idealista' %}bg-purple-100 text-purple-700
+                    {% elif item.portal == 'wallapop' %}bg-teal-100 text-teal-700
                     {% else %}bg-gray-100 text-gray-700{% endif %}">
                     {{ item.zona|truncatechars:15 }}
                     <span class="ml-1 font-semibold">{{ item.listings }}</span>

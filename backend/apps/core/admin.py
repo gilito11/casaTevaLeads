@@ -37,6 +37,7 @@ class ZonaGeograficaAdmin(admin.ModelAdmin):
         if obj.scrapear_fotocasa: portales.append('FC')
         if obj.scrapear_habitaclia: portales.append('HA')
         if obj.scrapear_idealista: portales.append('ID')
+        if obj.scrapear_wallapop: portales.append('WP')
         return ', '.join(portales)
     get_portales.short_description = 'Portales'
 

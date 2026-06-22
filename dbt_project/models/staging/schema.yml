@@ -72,3 +72,21 @@ models:
         description: "Property price in EUR"
       - name: fotos
         description: "Array of photo URLs"
+
+  - name: stg_wallapop
+    description: "Staging model for Wallapop listings (incl. hidden-agency filter, e.g. yaencontre)"
+    columns:
+      - name: raw_listing_id
+        description: "ID from raw.raw_listings table"
+        tests:
+          - not_null
+      - name: tenant_id
+        description: "Tenant identifier"
+        tests:
+          - not_null
+      - name: telefono_norm
+        description: "Normalized phone number (optional)"
+      - name: precio
+        description: "Property price in EUR"
+      - name: fotos
+        description: "Array of photo URLs"

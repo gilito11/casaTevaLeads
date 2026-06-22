@@ -4,6 +4,7 @@
     <td class="px-6 py-4 whitespace-nowrap">
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
             {% if item.portal == 'fotocasa' %}bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300
+            {% elif item.portal == 'wallapop' %}bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300
             {% else %}bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300{% endif %}">
             {{ item.portal|title }}
         </span>

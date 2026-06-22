@@ -188,6 +188,35 @@ PORTAL_CHECKS: Dict[str, PortalCheck] = {
             r'captcha',
         ],
     ),
+    "wallapop": PortalCheck(
+        name="wallapop",
+        url="https://es.wallapop.com/inmobiliaria/tarragona",
+        patterns=[
+            PortalPattern(
+                "item_links",
+                "Item URL pattern (/item/<slug>)",
+                r'/item/',
+            ),
+            PortalPattern(
+                "api_host",
+                "Internal API host reference",
+                r'api\.wallapop\.com',
+                required=False,
+            ),
+            PortalPattern(
+                "price",
+                "Euro currency indicator",
+                r'€|EUR',
+                required=False,
+            ),
+        ],
+        blocked_indicators=[
+            r'datadome',
+            r'DataDome',
+            r'geo\.captcha-delivery\.com',
+            r'captcha',
+        ],
+    ),
 }
 
 

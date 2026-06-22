@@ -220,6 +220,7 @@ class ZonaGeografica(models.Model):
     scrapear_fotocasa = models.BooleanField(default=True)
     scrapear_habitaclia = models.BooleanField(default=True)
     scrapear_idealista = models.BooleanField(default=True)
+    scrapear_wallapop = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -334,6 +335,7 @@ class ScrapingJob(models.Model):
         ('fotocasa', 'Fotocasa'),
         ('habitaclia', 'Habitaclia'),
         ('idealista', 'Idealista'),
+        ('wallapop', 'Wallapop'),
         ('all', 'Todos los portales'),
     ]
 

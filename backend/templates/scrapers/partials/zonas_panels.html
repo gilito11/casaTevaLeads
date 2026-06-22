@@ -60,6 +60,13 @@
                                         {% if zona.scrapear_idealista %}bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300{% else %}bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500{% endif %}">
                                     ID
                                 </button>
+                                <button hx-post="{% url 'toggle_zona_portal' zona.id 'wallapop' %}"
+                                        hx-target="#zonas-panels-container"
+                                        hx-swap="outerHTML"
+                                        class="px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer transition-colors
+                                        {% if zona.scrapear_wallapop %}bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300{% else %}bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500{% endif %}">
+                                    WP
+                                </button>
                             </span>
                         </div>
                     </div>
