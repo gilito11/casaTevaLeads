@@ -19,6 +19,24 @@ sys.path.insert(0, PROJECT_ROOT)
 from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
+# dbt (profiles.yml) lee DBT_HOST/USER/PASSWORD/DBNAME. El .env del VPS solo
+# trae DATABASE_URL, así que derivamos las DBT_* de ahí si no están -> el canal
+# dbt del VPS deja de irse a localhost.
+def _ensure_dbt_env():
+    from urllib.parse import urlparse
+    if os.environ.get('DBT_HOST'):
+        return
+    url = os.environ.get('DATABASE_URL') or os.environ.get('NEON_DATABASE_URL', '')
+    if not url:
+        return
+    p = urlparse(url)
+    os.environ['DBT_HOST'] = p.hostname or ''
+    os.environ['DBT_USER'] = p.username or ''
+    os.environ['DBT_PASSWORD'] = p.password or ''
+    os.environ['DBT_DBNAME'] = (p.path or '').lstrip('/').split('?')[0]
+
+_ensure_dbt_env()
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -55,8 +73,12 @@ def notify_telegram(msg):
         logger.warning(f"Telegram alert failed: {e}")
 
 
-def run_step(desc, cmd, allow_fail=False, timeout=1800):
-    """Run a subprocess step, log output, return success."""
+def run_step(desc, cmd, allow_fail=False, timeout=1800, healable=False):
+    """Run a subprocess step, log output, return success.
+
+    healable=True: si falla y AUTO_HEAL está activo, invoca Claude Code para
+    intentar arreglar el código (causa raíz), y reintenta el paso UNA vez.
+    """
     logger.info(f"{'='*60}")
     logger.info(f"STEP: {desc}")
     logger.info(f"CMD: {' '.join(cmd)}")
@@ -64,31 +86,60 @@ def run_step(desc, cmd, allow_fail=False, timeout=1800):
 
     log_file = os.path.join(LOG_DIR, f"scrape_{datetime.date.today()}.log")
 
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout,
-            env={**os.environ, 'PYTHONUNBUFFERED': '1'},
-        )
-    except subprocess.TimeoutExpired:
-        msg = f"TIMEOUT ({timeout}s): {desc}"
-        logger.error(msg)
+    def _run_once():
+        try:
+            r = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout,
+                env={**os.environ, 'PYTHONUNBUFFERED': '1'},
+            )
+        except subprocess.TimeoutExpired:
+            return None
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(f"\n{'='*60}\n{desc} [{datetime.datetime.now()}]\n{'='*60}\n")
+            f.write(r.stdout or '')
+            if r.stderr:
+                f.write(f"\n--- STDERR ---\n{r.stderr}")
+        return r
+
+    result = _run_once()
+    if result is None:
+        logger.error(f"TIMEOUT ({timeout}s): {desc}")
         notify_telegram(f"TIMEOUT: {desc}")
         return False
 
-    with open(log_file, 'a', encoding='utf-8') as f:
-        f.write(f"\n{'='*60}\n{desc} [{datetime.datetime.now()}]\n{'='*60}\n")
-        f.write(result.stdout)
-        if result.stderr:
-            f.write(f"\n--- STDERR ---\n{result.stderr}")
+    if result.returncode == 0:
+        logger.info(f"OK: {desc}")
+        return True
 
-    if result.returncode != 0:
-        logger.warning(f"FAILED (rc={result.returncode}): {desc}")
-        if not allow_fail:
-            notify_telegram(f"ERROR: {desc}\n{result.stderr[:500]}")
-        return False
+    logger.warning(f"FAILED (rc={result.returncode}): {desc}")
 
-    logger.info(f"OK: {desc}")
-    return True
+    # --- Auto-reparación (opt-in) ---
+    if healable:
+        try:
+            from auto_heal import heal, is_enabled
+        except Exception:
+            try:
+                from scripts.auto_heal import heal, is_enabled
+            except Exception:
+                heal = None
+        if heal and is_enabled():
+            err_log = ((result.stdout or '') + "\n" + (result.stderr or ''))
+            logger.info(f"AUTO_HEAL: intentando reparar '{desc}' con Claude...")
+            notify_telegram(f"🛠️ AUTO_HEAL intentando reparar: {desc}")
+            attempted, summary = heal(desc, err_log, PROJECT_ROOT)
+            if attempted:
+                notify_telegram(f"🛠️ AUTO_HEAL {desc}:\n{summary[:600]}")
+                # Reintento único con el código ya potencialmente arreglado
+                retry = _run_once()
+                if retry is not None and retry.returncode == 0:
+                    logger.info(f"OK tras auto-heal: {desc}")
+                    notify_telegram(f"✅ Reparado y reejecutado OK: {desc}")
+                    return True
+                logger.warning(f"Sigue fallando tras auto-heal: {desc}")
+
+    if not allow_fail:
+        notify_telegram(f"ERROR: {desc}\n{(result.stderr or '')[:500]}")
+    return False
 
 
 def main():
@@ -157,11 +208,13 @@ def main():
         "dbt staging",
         [DBT_EXE, "run", "--select", "staging",
          "--project-dir", DBT_DIR, "--profiles-dir", DBT_DIR],
+        healable=True,
     )
     results['dbt_marts'] = run_step(
         "dbt marts",
         [DBT_EXE, "run", "--select", "marts",
          "--project-dir", DBT_DIR, "--profiles-dir", DBT_DIR],
+        healable=True,
     )
 
     # 3. Auto-queue new leads for contact
