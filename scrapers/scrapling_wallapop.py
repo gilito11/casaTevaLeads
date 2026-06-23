@@ -57,13 +57,14 @@ class ScraplingWallapop(ScraplingBaseScraper):
     DETAIL_DELAY_RANGE = (2.0, 4.0)
     SEARCH_DELAY_RANGE = (4.0, 7.0)
 
-    # SSR: el HTML inicial ya trae __NEXT_DATA__. Desactivamos los controles de
-    # ancho de banda (como fotocasa) para no interferir con la hidratación/render.
+    # SSR: el HTML inicial ya trae __NEXT_DATA__ con TODAS las URLs de fotos (texto).
+    # No necesitamos que el navegador descargue los bytes de imagen/css/fuentes, que
+    # es el grueso del ancho de banda del proxy. Bloqueándolos el coste de cada ficha
+    # cae ~10x y seguimos extrayendo las 10 fotos del JSON.
     SESSION_KWARGS = {
         **ScraplingBaseScraper.SESSION_KWARGS,
-        "disable_resources": False,
-        "block_ads": False,
-        "blocked_domains": set(),
+        "disable_resources": True,
+        "block_ads": True,
     }
 
     def __init__(self, *args, **kwargs):
