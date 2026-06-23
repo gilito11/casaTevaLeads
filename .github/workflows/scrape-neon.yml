@@ -1,13 +1,12 @@
 # Scraper workflow - Runs on GitHub Actions, saves to Neon PostgreSQL
-# Zone rotation: Mon-Fri, core zones (salou,cambrils) every day + rotating secondary zones
-# Free tier: 2000 min/month
+# Cron L-V (Mon-Fri): SOLO Wallapop sobre toda la provincia de Lleida.
+# El resto de portales (habitaclia/fotocasa/milanuncios/idealista) solo por
+# disparo manual (workflow_dispatch). Free tier: 2000 min/month.
 name: Run Scrapers (Neon)
 
 on:
   schedule:
-    - cron: '0 12 * * 1'  # Monday
-    - cron: '0 12 * * 3'  # Wednesday
-    - cron: '0 12 * * 5'  # Friday
+    - cron: '0 12 * * 1-5'  # Lunes a Viernes 12:00 UTC — solo Wallapop / Lleida
   workflow_dispatch:
     inputs:
       portals:
@@ -27,6 +26,8 @@ on:
 env:
   DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
   TENANT_ID: 1
+  # Portales que corren en el cron programado (sin inputs). Manual los sobreescribe.
+  SCHEDULE_PORTALS: 'wallapop'
 
 jobs:
   scrape:
@@ -47,18 +48,12 @@ jobs:
             echo "zones=$MANUAL_ZONES" >> $GITHUB_OUTPUT
             echo "Using manual zones: $MANUAL_ZONES"
           else
-            DAY=$(date -u +%u)
-            # Zone rotation: 18 zones across 3 days L-X-V (~6 zones/day)
-            # Saves proxy bandwidth vs 5 days
-            case $DAY in
-              1) ZONES="salou,cambrils,tarragona,reus,lleida,ametlla_mar" ;;
-              3) ZONES="salou,cambrils,vendrell,calafell,balaguer,miami_platja" ;;
-              5) ZONES="tarragona,reus,torredembarra,altafulla,mollerussa,valls" ;;
-              *) ZONES="salou,cambrils,tarragona" ;;
-            esac
-            # Remaining zones (la_pineda,vila_seca,tarrega,tremp) via manual dispatch
+            # Cron L-V: toda la provincia de Lleida (solo Wallapop). Con el bloqueo
+            # de bytes de imagen el coste de proxy es bajo, así que cubrimos todos
+            # los municipios cada día en vez de rotar.
+            ZONES="lleida,balaguer,mollerussa,mollerussa_rural,tarrega,les_borges_blanques,alpicat,alcarras,torrefarrera,tremp,cervera,agramunt,bellpuig,guissona,juneda,almacelles,almenar,bell_lloc,linyola,termens,ponts,artesa_segre,seu_urgell,solsona,pobla_segur,sort,vielha"
             echo "zones=$ZONES" >> $GITHUB_OUTPUT
-            echo "Day $DAY rotation: $ZONES"
+            echo "Lleida (cron): $ZONES"
           fi
 
       - name: Install dependencies
@@ -77,7 +72,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Habitaclia scraper (Scrapling)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'habitaclia')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'habitaclia')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
@@ -91,7 +86,7 @@ jobs:
       # geo-bloquean tráfico no-ES. Inyectamos el proxy IPRoyal (ES residential)
       # SOLO para esos 3 portales. Habitaclia no geo-bloquea US — ahorra bandwidth.
       - name: Run Fotocasa scraper (Scrapling + IPRoyal ES)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'fotocasa')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'fotocasa')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
@@ -104,7 +99,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Run Milanuncios scraper (Scrapling + IPRoyal ES)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'milanuncios')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'milanuncios')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
@@ -117,7 +112,7 @@ jobs:
 
       # Wallapop geo-bloquea tráfico no-ES desde runners US -> proxy IPRoyal ES.
       - name: Run Wallapop scraper (Scrapling + IPRoyal ES)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios,wallapop', 'wallapop')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'wallapop')
         continue-on-error: true
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
@@ -129,7 +124,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Run Idealista scraper (Bright Data Web Unlocker — DataDome bypass managed)
-        if: contains(github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios', 'idealista')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'idealista')
         continue-on-error: true
         timeout-minutes: 20  # hard cap: a slow idealista must never starve dbt of the 60-min job budget
         run: |
@@ -223,7 +218,7 @@ jobs:
       - name: Summary
         run: |
           echo "## Scraping Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Portals: ${{ github.event.inputs.portals || 'habitaclia,fotocasa,milanuncios' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Portals: ${{ github.event.inputs.portals || env.SCHEDULE_PORTALS }}" >> $GITHUB_STEP_SUMMARY
           echo "- Zones: ${{ steps.zones.outputs.zones }}" >> $GITHUB_STEP_SUMMARY
           echo "- dbt: Transformations applied" >> $GITHUB_STEP_SUMMARY
 
