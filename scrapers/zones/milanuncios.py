@@ -5,8 +5,7 @@ Módulo neutro: NO depende de camoufox/botasaurus/scrapling.
 """
 
 ZONAS_GEOGRAFICAS = {
-    'lleida': {'nombre': 'Lleida', 'url_path': 'pisos-en-lleida-lleida/'},
-    'lleida_ciudad': {'nombre': 'Lleida Ciudad', 'url_path': 'pisos-en-lleida-lleida/'},
+    'lleida': {'nombre': 'Lleida Ciudad', 'url_path': 'pisos-en-lleida-lleida/'},
     'balaguer': {'nombre': 'Balaguer', 'url_path': 'pisos-en-balaguer-lleida/'},
     'mollerussa': {'nombre': 'Mollerussa', 'url_path': 'pisos-en-mollerussa-lleida/'},
     'les_borges_blanques': {'nombre': 'Les Borges Blanques', 'url_path': 'pisos-en-les-borges-blanques-lleida/'},

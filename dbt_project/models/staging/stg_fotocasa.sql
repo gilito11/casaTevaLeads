@@ -168,7 +168,7 @@ classified AS (
             WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tarragona', 'tarragona ciudad') THEN 'Tarragona Ciudad'
             WHEN LOWER(COALESCE(zona_geografica, '')) IN ('reus', 'tarragona - reus', 'tarragona/reus') THEN 'Tarragona - Reus'
             WHEN LOWER(COALESCE(zona_geografica, '')) IN ('mollerussa', 'lleida - mollerussa') THEN 'Lleida - Mollerussa'
-            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('lleida', 'lleida ciudad') THEN 'Lleida Ciudad'
+            WHEN LOWER(COALESCE(zona_geografica, '')) IN ('lleida', 'lleida ciudad', 'lleida capital') THEN 'Lleida Ciudad'
             WHEN LOWER(COALESCE(zona_geografica, '')) IN ('balaguer', 'lleida - balaguer') THEN 'Lleida - Balaguer'
             WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tarrega', 'tàrrega', 'lleida - tarrega') THEN 'Lleida - Tarrega'
             WHEN LOWER(COALESCE(zona_geografica, '')) IN ('tremp', 'lleida - tremp') THEN 'Lleida - Tremp'

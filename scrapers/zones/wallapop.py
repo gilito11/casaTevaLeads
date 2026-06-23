@@ -17,8 +17,7 @@ Las coords son aproximadas (centro del municipio); el radio cubre el área.
 
 ZONAS_GEOGRAFICAS = {
     # ---- Lleida (incluye foco obra nueva: Copa d'Or, Bordeta, Cappont) ----
-    'lleida': {'nombre': 'Lleida', 'slug': 'lleida', 'lat': 41.6176, 'lng': 0.6200, 'radius_km': 12},
-    'lleida_ciudad': {'nombre': 'Lleida Ciudad', 'slug': 'lleida', 'lat': 41.6176, 'lng': 0.6200, 'radius_km': 8},
+    'lleida': {'nombre': 'Lleida Ciudad', 'slug': 'lleida', 'lat': 41.6176, 'lng': 0.6200, 'radius_km': 12},
     'balaguer': {'nombre': 'Balaguer', 'slug': 'balaguer', 'lat': 41.7906, 'lng': 0.8060, 'radius_km': 8},
     'mollerussa': {'nombre': 'Mollerussa', 'slug': 'mollerussa', 'lat': 41.6300, 'lng': 0.8950, 'radius_km': 8},
     'tarrega': {'nombre': 'Tàrrega', 'slug': 'tarrega', 'lat': 41.6470, 'lng': 1.1410, 'radius_km': 8},
@@ -47,8 +46,7 @@ ZONAS_GEOGRAFICAS = {
     'mollerussa_rural': {'nombre': 'Mollerussa Rural', 'slug': 'el-palau-danglesola', 'lat': 41.6510, 'lng': 0.8800, 'radius_km': 6},
 
     # ---- Tarragona / Costa Dorada ----
-    'tarragona': {'nombre': 'Tarragona', 'slug': 'tarragona', 'lat': 41.1189, 'lng': 1.2445, 'radius_km': 12},
-    'tarragona_ciudad': {'nombre': 'Tarragona Ciudad', 'slug': 'tarragona', 'lat': 41.1189, 'lng': 1.2445, 'radius_km': 8},
+    'tarragona': {'nombre': 'Tarragona Ciudad', 'slug': 'tarragona', 'lat': 41.1189, 'lng': 1.2445, 'radius_km': 12},
     'salou': {'nombre': 'Salou', 'slug': 'salou', 'lat': 41.0772, 'lng': 1.1417, 'radius_km': 6},
     'cambrils': {'nombre': 'Cambrils', 'slug': 'cambrils', 'lat': 41.0658, 'lng': 1.0556, 'radius_km': 6},
     'reus': {'nombre': 'Reus', 'slug': 'reus', 'lat': 41.1561, 'lng': 1.1069, 'radius_km': 8},
