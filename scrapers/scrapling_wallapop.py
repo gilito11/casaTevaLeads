@@ -287,6 +287,10 @@ class ScraplingWallapop(ScraplingBaseScraper):
             return None
 
     def _extract_photos(self, item: Dict[str, Any]) -> List[str]:
+        # Wallapop: NO guardamos fotos. Los bytes estan protegidos (hotlink) y se
+        # bloquean a proposito en el navegador, asi que en el CRM salen en blanco.
+        # No aportan nada util, asi que ni las almacenamos (sin badge "N fotos").
+        return []
         fotos: List[str] = []
         images = item.get("images") or []
         if isinstance(images, dict):
