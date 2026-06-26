@@ -38,6 +38,9 @@ urlpatterns = [
     path('contacts/<int:contact_id>/add-interaction/', views.add_interaction_view, name='add_interaction'),
     path('interactions/<int:interaction_id>/delete/', views.delete_interaction_view, name='delete_interaction'),
 
+    # Revisión rápida (modo swipe) — antes del catch-all del detalle
+    path('revision/', views.triage_view, name='triage'),
+
     # Lead detail (must be last due to catch-all pattern)
     path('<str:lead_id>/', views.lead_detail_view, name='detail'),
     path('<str:lead_id>/change-status/', views.change_status_view, name='change_status'),

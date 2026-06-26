@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block title %}Revisión rápida · FincaRadar{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto px-3 py-4">
+
+  <!-- Cabecera -->
+  <div class="flex items-center justify-between mb-3">
+    <a href="{% url 'leads:list' %}" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">&larr; Lista</a>
+    <h1 class="text-base font-bold text-gray-800 dark:text-gray-100">Revisión rápida</h1>
+    <span class="text-xs font-semibold px-2 py-1 rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-200">
+      {{ total_restantes }} nuevo{{ total_restantes|pluralize:"s" }}
+    </span>
+  </div>
+
+{% if lead %}
+  <!-- Tarjeta -->
+  <div id="card" class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+
+    <!-- Foto -->
+    <div class="relative bg-gray-100 dark:bg-gray-900 h-56 flex items-center justify-center">
+      {% with fotos=lead.fotos_proxied %}
+        {% if fotos %}
+          <img src="{{ fotos.0 }}" alt="" class="w-full h-56 object-cover" referrerpolicy="no-referrer">
+        {% else %}
+          <span class="text-gray-400 text-sm">Sin foto · <a href="{{ lead.url_anuncio }}" target="_blank" class="underline">ver anuncio</a></span>
+        {% endif %}
+      {% endwith %}
+      <div class="absolute top-2 right-2">
+        {% include 'components/score_badge.html' with score=lead.lead_score %}
+      </div>
+      <span class="absolute top-2 left-2 text-[10px] uppercase font-bold tracking-wide px-2 py-1 rounded bg-black/60 text-white">{{ lead.portal }}</span>
+    </div>
+
+    <!-- Datos -->
+    <div class="p-4 space-y-2">
+      <div class="flex items-baseline justify-between gap-2">
+        <span class="text-2xl font-extrabold text-gray-900 dark:text-white">
+          {% if lead.precio %}{{ lead.precio|floatformat:0 }} €{% else %}—{% endif %}
+        </span>
+        {% if lead.precio_cambio_pct and lead.precio_cambio_pct < 0 %}
+          <span class="text-sm font-bold text-green-600">▼ {{ lead.precio_cambio_pct }}%</span>
+        {% endif %}
+      </div>
+
+      <p class="text-sm font-semibold text-gray-700 dark:text-gray-200 line-clamp-2">{{ lead.titulo|default:"(sin título)" }}</p>
+
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+        {% if lead.zona_geografica %}<span>📍 {{ lead.zona_geografica }}</span>{% endif %}
+        {% if lead.tipo_inmueble %}<span>🏠 {{ lead.tipo_inmueble }}</span>{% endif %}
+        {% if lead.habitaciones %}<span>🛏 {{ lead.habitaciones }} hab</span>{% endif %}
+        {% if lead.metros %}<span>📐 {{ lead.metros|floatformat:0 }} m²</span>{% endif %}
+        {% if lead.dias_en_mercado %}<span>📅 {{ lead.dias_en_mercado }} días</span>{% endif %}
+      </div>
+
+      <div class="flex items-center justify-between pt-1">
+        {% if lead.telefono_norm %}
+          <a href="tel:{{ lead.telefono_norm }}" class="inline-flex items-center gap-1 text-sm font-bold text-primary-700 dark:text-primary-300">
+            📞 {{ lead.telefono_norm }}
+          </a>
+        {% else %}
+          <span class="text-xs text-gray-400">Sin teléfono</span>
+        {% endif %}
+        <a href="{% url 'leads:detail' lead.lead_id %}" target="_blank" class="text-xs text-gray-500 underline hover:text-gray-700">Ficha completa ↗</a>
+      </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="grid grid-cols-3 border-t border-gray-200 dark:border-gray-700 divide-x divide-gray-200 dark:divide-gray-700">
+      <form method="post" class="contents">
+        {% csrf_token %}
+        <input type="hidden" name="lead_id" value="{{ lead.lead_id }}">
+        <button name="action" value="descartar" class="py-4 flex flex-col items-center gap-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 active:bg-red-100 transition">
+          <span class="text-2xl">❌</span><span class="text-xs font-semibold">Descartar</span>
+        </button>
+      </form>
+      <form method="post" class="contents">
+        {% csrf_token %}
+        <input type="hidden" name="lead_id" value="{{ lead.lead_id }}">
+        <button name="action" value="saltar" class="py-4 flex flex-col items-center gap-1 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 transition">
+          <span class="text-2xl">⏭️</span><span class="text-xs font-semibold">Saltar</span>
+        </button>
+      </form>
+      <form method="post" class="contents">
+        {% csrf_token %}
+        <input type="hidden" name="lead_id" value="{{ lead.lead_id }}">
+        <button name="action" value="interesado" class="py-4 flex flex-col items-center gap-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 active:bg-green-100 transition">
+          <span class="text-2xl">✅</span><span class="text-xs font-semibold">Interesado</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <p class="text-center text-[11px] text-gray-400 mt-3">
+    Atajos: ← Descartar · ↓ Saltar · → Interesado
+    {% if num_saltados %}
+      · <form method="post" class="inline"><input type="hidden" name="action" value="reiniciar">{% csrf_token %}<button class="underline hover:text-gray-600">reiniciar {{ num_saltados }} saltado{{ num_saltados|pluralize:"s" }}</button></form>
+    {% endif %}
+  </p>
+
+{% else %}
+  <!-- Vacío -->
+  <div class="text-center py-16">
+    <div class="text-5xl mb-4">🎉</div>
+    <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100">¡No quedan leads nuevos!</h2>
+    <p class="text-sm text-gray-500 mt-1">Has triado todos los nuevos.</p>
+    {% if num_saltados %}
+      <form method="post" class="mt-4 inline-block">
+        {% csrf_token %}
+        <button name="action" value="reiniciar" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-sm font-semibold hover:bg-gray-300">
+          Volver a ver los {{ num_saltados }} saltados
+        </button>
+      </form>
+    {% endif %}
+    <div class="mt-4">
+      <a href="{% url 'leads:list' %}" class="text-primary-600 hover:underline text-sm">Ir a la lista completa</a>
+    </div>
+  </div>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if lead %}
+<script>
+(function () {
+  function click(val) {
+    var b = document.querySelector('button[name="action"][value="' + val + '"]');
+    if (b) b.click();
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); click('descartar'); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); click('interesado'); }
+    else if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); click('saltar'); }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

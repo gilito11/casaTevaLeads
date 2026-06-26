@@ -273,6 +273,80 @@ def lead_detail_view(request, lead_id):
 
 
 @login_required
+def triage_view(request):
+    """Revisión rápida (modo swipe): tría leads NUEVOS de uno en uno.
+
+    GET  -> muestra el siguiente lead NUEVO (mayor score primero).
+    POST -> action: descartar (NO_INTERESADO) | interesado (INTERESADO) |
+            saltar (lo oculta esta sesión) | reiniciar (limpia saltados).
+            Tras la acción redirige a sí misma para cargar el siguiente.
+    """
+    tenant_id = get_user_tenant(request)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        lead_id = request.POST.get('lead_id')
+
+        if action == 'reiniciar':
+            request.session['triage_skipped'] = []
+            return redirect('leads:triage')
+
+        if lead_id and action == 'saltar':
+            skipped = request.session.get('triage_skipped', [])
+            if lead_id not in skipped:
+                skipped.append(lead_id)
+                request.session['triage_skipped'] = skipped
+
+        elif lead_id and action in ('descartar', 'interesado'):
+            nuevo_estado = 'NO_INTERESADO' if action == 'descartar' else 'INTERESADO'
+            lead = Lead.objects.filter(lead_id=lead_id).first()
+            if lead and (not tenant_id or lead.tenant_id == tenant_id):
+                lead_estado, _ = LeadEstado.objects.get_or_create(
+                    lead_id=str(lead.lead_id),
+                    defaults={
+                        'tenant_id': lead.tenant_id,
+                        'telefono_norm': lead.telefono_norm,
+                        'estado': nuevo_estado,
+                    },
+                )
+                lead_estado.estado = nuevo_estado
+                lead_estado.fecha_cambio_estado = timezone.now()
+                if not lead_estado.fecha_primer_contacto:
+                    lead_estado.fecha_primer_contacto = timezone.now()
+                lead_estado.fecha_ultimo_contacto = timezone.now()
+                lead_estado.numero_intentos = (lead_estado.numero_intentos or 0) + 1
+                lead_estado.save()
+
+        return redirect('leads:triage')
+
+    # --- GET: siguiente lead NUEVO ---
+    leads_qs = Lead.objects.exclude(es_particular=False).exclude(permite_inmobiliarias=False)
+    if tenant_id:
+        leads_qs = leads_qs.filter(tenant_id=tenant_id)
+
+    # NUEVO = sin registro en LeadEstado o con estado NUEVO -> excluimos los que
+    # ya tienen un estado distinto de NUEVO.
+    ya_triados = LeadEstado.objects.filter(tenant_id=tenant_id).exclude(
+        estado='NUEVO'
+    ).values_list('lead_id', flat=True)
+    leads_qs = leads_qs.exclude(lead_id__in=ya_triados)
+
+    skipped = request.session.get('triage_skipped', [])
+    if skipped:
+        leads_qs = leads_qs.exclude(lead_id__in=skipped)
+
+    leads_qs = leads_qs.order_by('-lead_score', '-fecha_scraping')
+    total_restantes = leads_qs.count()
+    lead = leads_qs.first()
+
+    return render(request, 'leads/triage.html', {
+        'lead': lead,
+        'total_restantes': total_restantes,
+        'num_saltados': len(skipped),
+    })
+
+
+@login_required
 def change_status_view(request, lead_id):
     """Vista para cambiar el estado de un lead (HTMX)"""
     if request.method != 'POST':
