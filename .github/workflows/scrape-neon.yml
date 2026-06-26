@@ -48,12 +48,13 @@ jobs:
             echo "zones=$MANUAL_ZONES" >> $GITHUB_OUTPUT
             echo "Using manual zones: $MANUAL_ZONES"
           else
-            # Cron L-V: toda la provincia de Lleida (solo Wallapop). Con el bloqueo
-            # de bytes de imagen el coste de proxy es bajo, así que cubrimos todos
-            # los municipios cada día en vez de rotar.
-            ZONES="lleida,balaguer,mollerussa,mollerussa_rural,tarrega,les_borges_blanques,alpicat,alcarras,torrefarrera,tremp,cervera,agramunt,bellpuig,guissona,juneda,almacelles,almenar,bell_lloc,linyola,termens,ponts,artesa_segre,seu_urgell,solsona,pobla_segur,sort,vielha"
+            # Cron L-V: SOLO Wallapop, acotado a ~20km de Lleida ciudad (referencia
+            # de lejanía máxima = Mollerussa, 22.9km). Casa Teva solo trabaja esta
+            # área; municipios más lejanos (Balaguer, Tàrrega, Tremp, Cervera, Seu
+            # d'Urgell...) quedan fuera de cobertura por decisión de negocio.
+            ZONES="lleida,alpicat,alcarras,torrefarrera,bell_lloc,termens,juneda,almacelles,almenar,mollerussa,mollerussa_rural,les_borges_blanques"
             echo "zones=$ZONES" >> $GITHUB_OUTPUT
-            echo "Lleida (cron): $ZONES"
+            echo "Lleida <=20km (cron): $ZONES"
           fi
 
       - name: Install dependencies
