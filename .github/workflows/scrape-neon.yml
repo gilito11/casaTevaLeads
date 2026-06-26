@@ -1,12 +1,12 @@
 # Scraper workflow - Runs on GitHub Actions, saves to Neon PostgreSQL
-# Cron L-V (Mon-Fri): SOLO Wallapop sobre toda la provincia de Lleida.
-# El resto de portales (habitaclia/fotocasa/milanuncios/idealista) solo por
-# disparo manual (workflow_dispatch). Free tier: 2000 min/month.
+# Cron D-V (Sun-Fri): Wallapop + Habitaclia sobre Lleida ciudad + pueblos <=20km.
+# El domingo corre para llegar el lunes con novedades. El resto de portales
+# (fotocasa/milanuncios/idealista) solo por disparo manual. Free tier: 2000 min/mes.
 name: Run Scrapers (Neon)
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'  # Lunes a Viernes 12:00 UTC — solo Wallapop / Lleida
+    - cron: '0 12 * * 0-5'  # Domingo a Viernes 12:00 UTC (14:00 Madrid)
   workflow_dispatch:
     inputs:
       portals:
