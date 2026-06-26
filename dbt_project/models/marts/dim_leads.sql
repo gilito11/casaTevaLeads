@@ -319,7 +319,15 @@ final AS (
         e.descripcion,
         e.listing_url,
         e.ubicacion,
-        e.zona_clasificada,
+        -- Nombre de zona UNIFICADO entre portales: cada municipio con un unico
+        -- nombre. Quita prefijos de comarca/costa ("Lleida - ", "Costa Dorada - "...)
+        -- y fusiona variantes de capital ("Tarragona Ciudad/Capital" -> "Tarragona").
+        CASE
+            WHEN e.zona_clasificada IN ('Lleida Ciudad', 'Lleida Capital') THEN 'Lleida'
+            WHEN e.zona_clasificada IN ('Tarragona Ciudad', 'Tarragona Capital') THEN 'Tarragona'
+            WHEN e.zona_clasificada IS NULL OR e.zona_clasificada = '' THEN e.zona_clasificada
+            ELSE REGEXP_REPLACE(e.zona_clasificada, '^(Lleida|Costa Dorada|Tarragona|Terres Ebre|Madrid) - ', '')
+        END AS zona_clasificada,
         e.latitud,
         e.longitud,
         e.tipo_propiedad,
