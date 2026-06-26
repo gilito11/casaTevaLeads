@@ -27,7 +27,9 @@ env:
   DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
   TENANT_ID: 1
   # Portales que corren en el cron programado (sin inputs). Manual los sobreescribe.
-  SCHEDULE_PORTALS: 'wallapop'
+  # habitaclia funciona GRATIS desde runners US (no geo-bloquea, sin proxy) y es
+  # el mejor productor -> lo añadimos para cubrir los pueblos de Lleida a diario.
+  SCHEDULE_PORTALS: 'wallapop,habitaclia'
 
 jobs:
   scrape:
@@ -52,7 +54,7 @@ jobs:
             # de lejanía máxima = Mollerussa, 22.9km). Casa Teva solo trabaja esta
             # área; municipios más lejanos (Balaguer, Tàrrega, Tremp, Cervera, Seu
             # d'Urgell...) quedan fuera de cobertura por decisión de negocio.
-            ZONES="lleida,alpicat,alcarras,torrefarrera,bell_lloc,termens,juneda,almacelles,almenar,mollerussa,mollerussa_rural"
+            ZONES="lleida,alpicat,alcarras,torrefarrera,bell_lloc,termens,juneda,almacelles,almenar,mollerussa,mollerussa_rural,albatarrec,torre_serona,montoliu_de_lleida,alcoletge,sudanell,benavent_de_segria,rossello,artesa_de_lleida,corbins,vilanova_de_segria,alfes,sunyer,vilanova_de_la_barca,puigverd_de_lleida,torres_de_segre,alguaire,aspa,soses,menarguens,bellvis,sidamon,sarroca_de_lleida,aitona,fondarella,torrebesses,miralcamp,vallfogona_balaguer,gimenells"
             echo "zones=$ZONES" >> $GITHUB_OUTPUT
             echo "Lleida <=20km (cron): $ZONES"
           fi
