@@ -110,6 +110,9 @@ classified AS (
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('cambrils') THEN 'Costa Dorada - Cambrils'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('tarragona') THEN 'Tarragona Ciudad'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('reus') THEN 'Tarragona - Reus'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('vila_seca', 'vila-seca') THEN 'Vila-seca'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('la_pineda', 'la-pineda') THEN 'La Pineda'
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('miami_platja', 'miami-platja') THEN 'Miami Platja'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('mollerussa') THEN 'Lleida - Mollerussa'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('lleida') THEN 'Lleida Ciudad'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('balaguer') THEN 'Lleida - Balaguer'
@@ -139,7 +142,10 @@ classified AS (
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('mollerussa_rural') THEN 'Lleida - Mollerussa'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('chamartin', 'chamartín') THEN 'Madrid - Chamartin'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('hortaleza') THEN 'Madrid - Hortaleza'
-            WHEN zona_busqueda IS NOT NULL THEN zona_busqueda
+            -- Fallback: zona sin caso explícito -> formatea bonito (sin guiones bajos
+            -- ni minúsculas crudas tipo "vila_seca"). INITCAP capitaliza cada palabra.
+            WHEN zona_busqueda IS NOT NULL AND zona_busqueda <> ''
+                THEN INITCAP(REPLACE(REPLACE(zona_busqueda, '_', ' '), '-', ' '))
 
             ELSE 'Otros'
         END AS zona_clasificada,
