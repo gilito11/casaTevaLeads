@@ -52,7 +52,7 @@ jobs:
             # de lejanía máxima = Mollerussa, 22.9km). Casa Teva solo trabaja esta
             # área; municipios más lejanos (Balaguer, Tàrrega, Tremp, Cervera, Seu
             # d'Urgell...) quedan fuera de cobertura por decisión de negocio.
-            ZONES="lleida,alpicat,alcarras,torrefarrera,bell_lloc,termens,juneda,almacelles,almenar,mollerussa,mollerussa_rural,les_borges_blanques"
+            ZONES="lleida,alpicat,alcarras,torrefarrera,bell_lloc,termens,juneda,almacelles,almenar,mollerussa,mollerussa_rural"
             echo "zones=$ZONES" >> $GITHUB_OUTPUT
             echo "Lleida <=20km (cron): $ZONES"
           fi
