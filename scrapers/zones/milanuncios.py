@@ -65,6 +65,7 @@ ZONAS_GEOGRAFICAS = {
     'miralcamp': {'nombre': 'Miralcamp', 'url_path': 'pisos-en-miralcamp-lleida/'},
     'palau_anglesola': {'nombre': 'El Palau d\'Anglesola', 'url_path': 'pisos-en-el-palau-d-anglesola-lleida/'},
     'vallfogona_balaguer': {'nombre': 'Vallfogona de Balaguer', 'url_path': 'pisos-en-vallfogona-de-balaguer-lleida/'},
+    'la_canonja': {'nombre': 'La Canonja', 'url_path': 'pisos-en-la-canonja-tarragona/'},
 
     'chamartin': {'nombre': 'Chamartín', 'url_path': 'pisos-en-madrid-madrid/'},
     'hortaleza': {'nombre': 'Hortaleza', 'url_path': 'pisos-en-madrid-madrid/'},

@@ -132,6 +132,7 @@ ZONAS_GEOGRAFICAS = {
     'miralcamp': {'nombre': 'Miralcamp', 'url_path': 'miralcamp/todas-las-zonas'},
     'palau_anglesola': {'nombre': 'El Palau d\'Anglesola', 'url_path': 'el-palau-d-anglesola/todas-las-zonas'},
     'vallfogona_balaguer': {'nombre': 'Vallfogona de Balaguer', 'url_path': 'vallfogona-de-balaguer/todas-las-zonas'},
+    'la_canonja': {'nombre': 'La Canonja', 'url_path': 'la-canonja/todas-las-zonas'},
 
     'chamartin': {'nombre': 'Chamartín', 'url_path': 'madrid-capital/chamartin'},
     'hortaleza': {'nombre': 'Hortaleza', 'url_path': 'madrid-capital/hortaleza'},

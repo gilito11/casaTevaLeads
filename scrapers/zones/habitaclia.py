@@ -103,6 +103,7 @@ ZONAS_GEOGRAFICAS = {
     'torrebesses': {'nombre': 'Torrebesses', 'url_slug': 'torrebesses'},
     'miralcamp': {'nombre': 'Miralcamp', 'url_slug': 'miralcamp'},
     'vallfogona_balaguer': {'nombre': 'Vallfogona de Balaguer', 'url_slug': 'vallfogona_de_balaguer'},
+    'la_canonja': {'nombre': 'La Canonja', 'url_slug': 'la_canonja'},
 
     'chamartin': {'nombre': 'Chamartín', 'url_slug': 'distrito_chamartin-madrid'},
     'hortaleza': {'nombre': 'Hortaleza', 'url_slug': 'distrito_hortaleza-madrid'},
