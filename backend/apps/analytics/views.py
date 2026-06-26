@@ -537,7 +537,11 @@ def map_view(request):
                     COALESCE(le.estado, l.estado, 'NUEVO') AS estado,
                     d.latitud  AS dir_lat,
                     d.longitud AS dir_lon,
-                    d.direccion_exacta
+                    d.direccion_exacta,
+                    EXISTS (
+                        SELECT 1 FROM leads_contact_propiedad cp
+                        WHERE cp.lead_id = l.lead_id AND cp.tipo = 'vendida'
+                    ) AS prop_vendida
                 FROM public_marts.dim_leads l
                 LEFT JOIN leads_lead_estado le ON le.lead_id = l.lead_id
                 LEFT JOIN leads_lead_direccion d ON d.lead_id = l.lead_id
@@ -567,13 +571,17 @@ def map_view(request):
                 if exact:
                     exact_count += 1
 
+                # Vendido = estado YA_VENDIDO o propiedad marcada como vendida
+                # por un comercial (ContactPropiedad), sin tocar el estado del lead.
+                vendido = estado == 'YA_VENDIDO' or bool(row.get('prop_vendida'))
+
                 points.append({
                     'id': row['lead_id'],
                     'lat': lat,
                     'lon': lon,
                     'exact': exact,
                     'estado': estado,
-                    'vendido': estado == 'YA_VENDIDO',
+                    'vendido': vendido,
                     'titulo': (row.get('titulo') or '')[:120],
                     'precio': float(row['precio']) if row.get('precio') else 0,
                     'tipo': row.get('tipo_propiedad') or '',
