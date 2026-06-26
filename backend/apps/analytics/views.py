@@ -508,113 +508,102 @@ def analytics_dashboard_view(request):
 
 @login_required
 def map_view(request):
-    """Vista del mapa de leads por zona geográfica."""
+    """Mapa de leads con un pin por inmueble + clustering.
+
+    Coordenadas por prioridad: direccion exacta escrita por el comercial
+    (leads_lead_direccion) > coords del portal (dim_leads.lat/lng) > centroide
+    del municipio. Los inmuebles sin direccion exacta caen en el centro del
+    pueblo y se agrupan en cluster; al hacer zoom se separan / "spiderfy".
+    """
     tenant_id = request.session.get('tenant_id', 1)
 
-    # Get leads grouped by zona_clasificada
-    zones_data = []
+    points = []
+    estado_counts = {}
+    exact_count = 0
+    zone_coord_cache = {}
 
     with connection.cursor() as cursor:
         try:
             cursor.execute("""
                 SELECT
-                    zona_clasificada,
-                    COUNT(*) as total_leads,
-                    COUNT(*) FILTER (WHERE precio > 0) as con_precio,
-                    COALESCE(AVG(precio) FILTER (WHERE precio > 0), 0) as precio_medio,
-                    COALESCE(MIN(precio) FILTER (WHERE precio > 0), 0) as precio_min,
-                    COALESCE(MAX(precio) FILTER (WHERE precio > 0), 0) as precio_max,
-                    AVG(latitud) FILTER (WHERE latitud IS NOT NULL) as lat_avg,
-                    AVG(longitud) FILTER (WHERE longitud IS NOT NULL) as lon_avg
-                FROM public_marts.dim_leads
-                WHERE tenant_id = %s
-                  AND zona_clasificada IS NOT NULL
-                  AND zona_clasificada != ''
-                GROUP BY zona_clasificada
-                ORDER BY total_leads DESC
+                    l.lead_id,
+                    l.zona_clasificada,
+                    l.latitud,
+                    l.longitud,
+                    l.precio,
+                    l.titulo,
+                    l.tipo_propiedad,
+                    l.source_portal,
+                    COALESCE(le.estado, l.estado, 'NUEVO') AS estado,
+                    d.latitud  AS dir_lat,
+                    d.longitud AS dir_lon,
+                    d.direccion_exacta
+                FROM public_marts.dim_leads l
+                LEFT JOIN leads_lead_estado le ON le.lead_id = l.lead_id
+                LEFT JOIN leads_lead_direccion d ON d.lead_id = l.lead_id
+                WHERE l.tenant_id = %s
             """, [tenant_id])
             rows = dict_fetchall(cursor)
 
-            # Merge zonas that resolve to the same municipio so "Valls" and
-            # "Tarragona - Valls" (or "Altafulla" and "Costa Dorada - Altafulla")
-            # show as a single marker instead of overlapping duplicates.
-            merged = {}
             for row in rows:
-                zona_nombre = row['zona_clasificada']
-                # Exact per-listing coordinates (Fotocasa JSON) win over zone
-                # geocoding — a flat in Torà pins on Torà, not a preset centroid.
-                if row.get('lat_avg') is not None and row.get('lon_avg') is not None:
-                    coords = {
-                        'lat': float(row['lat_avg']),
-                        'lon': float(row['lon_avg']),
-                        'nombre': zona_nombre,
-                        'region': '',
-                    }
+                # Resolver coordenadas por prioridad
+                exact = False
+                if row.get('dir_lat') is not None and row.get('dir_lon') is not None:
+                    lat, lon = float(row['dir_lat']), float(row['dir_lon'])
+                    exact = True
+                elif row.get('latitud') is not None and row.get('longitud') is not None:
+                    lat, lon = float(row['latitud']), float(row['longitud'])
                 else:
-                    coords = find_zone_coords(zona_nombre)
-                if not coords:
-                    logger.debug(f"Map: Could not find coords for zone '{zona_nombre}'")
-                    continue
+                    zona = row.get('zona_clasificada') or ''
+                    if zona not in zone_coord_cache:
+                        zone_coord_cache[zona] = find_zone_coords(zona)
+                    coords = zone_coord_cache[zona]
+                    if not coords:
+                        continue
+                    lat, lon = coords['lat'], coords['lon']
 
-                key = coords['nombre']
-                n = row['total_leads']
-                if key not in merged:
-                    merged[key] = {
-                        'nombre': coords['nombre'],
-                        'lat': coords['lat'],
-                        'lon': coords['lon'],
-                        'region': coords['region'],
-                        'total_leads': 0,
-                        '_precio_sum': 0.0,
-                        '_precio_n': 0,
-                        'precio_min': None,
-                        'precio_max': None,
-                    }
-                z = merged[key]
-                z['total_leads'] += n
-                pmed = float(row['precio_medio'])
-                pmin = float(row['precio_min'])
-                pmax = float(row['precio_max'])
-                if pmed > 0:
-                    z['_precio_sum'] += pmed * n
-                    z['_precio_n'] += n
-                if pmin > 0:
-                    z['precio_min'] = pmin if z['precio_min'] is None else min(z['precio_min'], pmin)
-                if pmax > 0:
-                    z['precio_max'] = pmax if z['precio_max'] is None else max(z['precio_max'], pmax)
+                estado = row['estado'] or 'NUEVO'
+                estado_counts[estado] = estado_counts.get(estado, 0) + 1
+                if exact:
+                    exact_count += 1
 
-            for z in merged.values():
-                z['precio_medio'] = round(z['_precio_sum'] / z['_precio_n'], 0) if z['_precio_n'] else 0
-                z['precio_min'] = round(z['precio_min'], 0) if z['precio_min'] else 0
-                z['precio_max'] = round(z['precio_max'], 0) if z['precio_max'] else 0
-                del z['_precio_sum'], z['_precio_n']
-                zones_data.append(z)
-
-            zones_data.sort(key=lambda x: x['total_leads'], reverse=True)
+                points.append({
+                    'id': row['lead_id'],
+                    'lat': lat,
+                    'lon': lon,
+                    'exact': exact,
+                    'estado': estado,
+                    'vendido': estado == 'YA_VENDIDO',
+                    'titulo': (row.get('titulo') or '')[:120],
+                    'precio': float(row['precio']) if row.get('precio') else 0,
+                    'tipo': row.get('tipo_propiedad') or '',
+                    'zona': row.get('zona_clasificada') or '',
+                    'portal': row.get('source_portal') or '',
+                    'direccion': row.get('direccion_exacta') or '',
+                })
 
         except Exception as e:
             logger.error(f"Error fetching map data: {e}")
 
-    # Calculate map center (average of all points)
-    if zones_data:
-        center_lat = sum(z['lat'] for z in zones_data) / len(zones_data)
-        center_lon = sum(z['lon'] for z in zones_data) / len(zones_data)
+    # Centro del mapa: media de los puntos no vendidos (los activos)
+    activos = [p for p in points if not p['vendido']] or points
+    if activos:
+        center_lat = sum(p['lat'] for p in activos) / len(activos)
+        center_lon = sum(p['lon'] for p in activos) / len(activos)
     else:
-        # Default to Tarragona area
-        center_lat = 41.1189
-        center_lon = 1.2445
+        center_lat, center_lon = 41.1189, 1.2445  # Tarragona por defecto
 
-    # Create map config as JSON to avoid locale issues with decimals
     map_config = {
         'center': [float(center_lat), float(center_lon)],
-        'zones': zones_data,
+        'points': points,
     }
 
     context = {
-        'zones_data': zones_data,
         'map_config_json': map_config,
-        'total_leads': sum(z['total_leads'] for z in zones_data),
-        'total_zones': len(zones_data),
+        'total_leads': len([p for p in points if not p['vendido']]),
+        'total_vendidos': len([p for p in points if p['vendido']]),
+        'total_exactos': exact_count,
+        'total_puntos': len(points),
     }
 
     return render(request, 'analytics/map.html', context)

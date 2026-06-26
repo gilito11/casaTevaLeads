@@ -36,6 +36,8 @@ urlpatterns = [
     path('contacts/<int:contact_id>/', views.contact_detail_view, name='contact_detail'),
     path('contacts/<int:contact_id>/update/', views.contact_update_view, name='contact_update'),
     path('contacts/<int:contact_id>/add-interaction/', views.add_interaction_view, name='add_interaction'),
+    path('contacts/<int:contact_id>/add-propiedad/', views.add_contact_propiedad_view, name='add_propiedad'),
+    path('contacts/<int:contact_id>/propiedad/<int:prop_id>/delete/', views.delete_contact_propiedad_view, name='delete_propiedad'),
     path('interactions/<int:interaction_id>/delete/', views.delete_interaction_view, name='delete_interaction'),
 
     # Revisión rápida (modo swipe) — antes del catch-all del detalle
@@ -47,6 +49,7 @@ urlpatterns = [
     path('<str:lead_id>/add-note/', views.add_note_view, name='add_note'),
     path('<str:lead_id>/delete/', views.delete_lead_view, name='delete'),
     path('<str:lead_id>/mark-agency/', views.mark_as_agency_view, name='mark_agency'),
+    path('<str:lead_id>/save-address/', views.save_lead_address_view, name='save_address'),
     path('<str:lead_id>/contact/', views.contact_from_lead_view, name='contact_from_lead'),
     path('<str:lead_id>/assign/', views.assign_lead_view, name='assign'),
     path('<str:lead_id>/enqueue/', views.enqueue_contact_view, name='enqueue_contact'),

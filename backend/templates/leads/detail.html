@@ -559,11 +559,22 @@
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Contacto</h2>
-                    <a href="{% url 'leads:contact_from_lead' lead.lead_id %}"
+                    {% if contact %}
+                    <a href="{% url 'leads:contact_detail' contact.id %}"
                        class="text-sm text-primary-600 dark:text-primary-400 hover:underline">
                         Ver Ficha Completa
                     </a>
+                    {% endif %}
                 </div>
+
+                <!-- Crear / abrir contacto desde el lead (auto-rellena telefono/nombre/email) -->
+                <a href="{% url 'leads:contact_from_lead' lead.lead_id %}"
+                   class="w-full inline-flex items-center justify-center px-4 py-2 mb-4 {% if contact %}bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200{% else %}bg-primary-600 hover:bg-primary-700 text-white{% endif %} rounded-lg transition-colors text-sm font-medium">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                    {% if contact %}Ver ficha del contacto{% else %}Crear contacto desde este lead{% endif %}
+                </a>
 
                 <div class="space-y-4">
                     <div>
@@ -585,6 +596,39 @@
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Intentos de contacto</p>
                         <p class="font-medium text-gray-900 dark:text-white">{{ lead_estado.numero_intentos|default:lead.numero_intentos }}</p>
+                    </div>
+
+                    <!-- Direccion exacta (editable -> geocoding -> pin exacto en el mapa) -->
+                    <div class="pt-4 border-t border-gray-200 dark:border-gray-700" x-data="{ edit: {% if lead_direccion %}false{% else %}false{% endif %} }">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Dirección exacta</p>
+                            <button @click="edit = !edit" type="button" class="text-xs text-primary-600 dark:text-primary-400 hover:underline">
+                                {% if lead_direccion %}Editar{% else %}Añadir{% endif %}
+                            </button>
+                        </div>
+                        {% if lead_direccion %}
+                            <p class="font-medium text-gray-900 dark:text-white text-sm mt-1" x-show="!edit">
+                                📍 {{ lead_direccion.direccion_exacta }}
+                                {% if lead_direccion.geocoded %}
+                                    <span class="ml-1 text-xs text-emerald-600">✓ en el mapa</span>
+                                {% else %}
+                                    <span class="ml-1 text-xs text-amber-600">no localizada</span>
+                                {% endif %}
+                            </p>
+                        {% else %}
+                            <p class="text-sm text-gray-400 mt-1" x-show="!edit">Sin dirección. Los portales solo dan el pueblo.</p>
+                        {% endif %}
+                        <form method="post" action="{% url 'leads:save_address' lead.lead_id %}" x-show="edit" x-transition class="mt-2 space-y-2">
+                            {% csrf_token %}
+                            <input type="text" name="direccion_exacta" value="{{ lead_direccion.direccion_exacta|default:'' }}"
+                                   placeholder="Ej: Carrer Major 12, {{ lead.zona_geografica }}"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500">
+                            <p class="text-xs text-gray-400">Se buscará en el mapa automáticamente. Deja vacío para borrar.</p>
+                            <div class="flex gap-2">
+                                <button type="submit" class="flex-1 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium">Guardar</button>
+                                <button type="button" @click="edit = false" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg text-sm">Cancelar</button>
+                            </div>
+                        </form>
                     </div>
 
                     <!-- Auto-contact button (solo Fotocasa/Habitaclia) -->

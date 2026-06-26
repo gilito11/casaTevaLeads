@@ -16,7 +16,11 @@ from django.db.models import Q, Case, When, IntegerField
 from django.db import connection, models, IntegrityError
 from django.views.decorators.http import require_POST
 
-from leads.models import Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction, Task
+from leads.models import (
+    Lead, Nota, LeadEstado, AnuncioBlacklist, Contact, Interaction, Task,
+    LeadDireccion, ContactPropiedad,
+)
+from leads.geocoding import geocode_address
 from core.models import TenantUser, Tenant
 from notifications.utils import create_notification
 
@@ -257,6 +261,9 @@ def lead_detail_view(request, lead_id):
         lead_id=str(lead.lead_id)
     ).order_by('completada', 'fecha_vencimiento')
 
+    # Direccion exacta (editable por el comercial) si existe
+    lead_direccion = LeadDireccion.objects.filter(lead_id=str(lead.lead_id)).first()
+
     context = {
         'lead': lead,
         'notas': notas,
@@ -267,6 +274,8 @@ def lead_detail_view(request, lead_id):
         'duplicate_info': duplicate_info,
         'duplicate_leads': duplicate_leads,
         'lead_tasks': lead_tasks,
+        'lead_direccion': lead_direccion,
+        'contact': contact,
     }
 
     return render(request, 'leads/detail.html', context)
@@ -752,12 +761,24 @@ def contact_detail_view(request, contact_id):
     # Interacciones
     interactions = contact.interactions.select_related('usuario').all()
 
+    # Propiedades asignadas explicitamente (con info de venta) + datos del Lead
+    propiedades = list(contact.propiedades.all())
+    prop_lead_ids = [p.lead_id for p in propiedades]
+    prop_leads = {
+        str(l.lead_id): l
+        for l in Lead.objects.filter(lead_id__in=prop_lead_ids)
+    }
+    for p in propiedades:
+        p.lead_obj = prop_leads.get(p.lead_id)
+
     context = {
         'contact': contact,
         'leads': leads,
         'interactions': interactions,
         'interaction_tipos': Interaction.TIPO_CHOICES,
         'estados': Lead.ESTADO_CHOICES,
+        'propiedades': propiedades,
+        'propiedad_tipos': ContactPropiedad.TIPO_CHOICES,
     }
 
     return render(request, 'contacts/detail.html', context)
@@ -774,16 +795,130 @@ def contact_from_lead_view(request, lead_id):
 
     tenant = get_object_or_404(Tenant, tenant_id=tenant_id)
 
-    # Buscar o crear contacto
+    # Clave del contacto: telefono real si lo hay; si no, una clave sintetica
+    # basada en el lead_id (los leads sin telefono no se pueden deduplicar).
+    telefono = (lead.telefono_norm or '').strip()
+    clave = telefono or f"lead:{lead.lead_id[:14]}"
+
+    # Buscar o crear contacto recopilando el maximo de info del lead
     contact, created = Contact.objects.get_or_create(
         tenant=tenant,
-        telefono=lead.telefono_norm,
+        telefono=clave,
         defaults={
             'nombre': lead.nombre,
             'email': lead.email,
         }
     )
+    # Completar datos que falten en un contacto ya existente
+    if not created:
+        changed = False
+        if not contact.nombre and lead.nombre:
+            contact.nombre = lead.nombre
+            changed = True
+        if not contact.email and lead.email:
+            contact.email = lead.email
+            changed = True
+        if changed:
+            contact.save()
 
+    # Auto-asociar este lead como propiedad del contacto
+    tipo = 'vendida' if str(lead.estado).upper() == 'YA_VENDIDO' else 'en_venta'
+    ContactPropiedad.objects.get_or_create(
+        contact=contact,
+        lead_id=str(lead.lead_id),
+        defaults={
+            'tenant': tenant,
+            'tipo': tipo,
+            'precio_venta': lead.precio if tipo == 'vendida' else None,
+            'created_by': request.user if request.user.is_authenticated else None,
+        }
+    )
+
+    return redirect('leads:contact_detail', contact_id=contact.id)
+
+
+@login_required
+@require_POST
+def save_lead_address_view(request, lead_id):
+    """Guarda/actualiza la direccion exacta de un lead y la geocodifica.
+
+    Lead es una vista dbt (solo lectura) -> la direccion va a LeadDireccion.
+    """
+    tenant_id = get_user_tenant(request)
+    lead = get_object_or_404(Lead, lead_id=lead_id)
+    if tenant_id and lead.tenant_id != tenant_id:
+        return redirect('leads:list')
+
+    direccion = (request.POST.get('direccion_exacta') or '').strip()
+
+    if not direccion:
+        # Vacio -> borrar la direccion exacta existente
+        LeadDireccion.objects.filter(lead_id=str(lead.lead_id)).delete()
+        return redirect('leads:detail', lead_id=lead.lead_id)
+
+    # Geocodificar usando el municipio (zona) como pista
+    coords = geocode_address(direccion, municipio=lead.zona_geografica)
+
+    obj, _ = LeadDireccion.objects.update_or_create(
+        lead_id=str(lead.lead_id),
+        defaults={
+            'tenant_id': lead.tenant_id,
+            'direccion_exacta': direccion,
+            'latitud': coords[0] if coords else None,
+            'longitud': coords[1] if coords else None,
+            'geocoded': bool(coords),
+            'created_by': request.user if request.user.is_authenticated else None,
+        }
+    )
+
+    return redirect('leads:detail', lead_id=lead.lead_id)
+
+
+@login_required
+@require_POST
+def add_contact_propiedad_view(request, contact_id):
+    """Asigna una propiedad (lead) a un contacto con tipo/precio/fecha de venta."""
+    tenant_id = get_user_tenant(request)
+    contact = get_object_or_404(Contact, id=contact_id, tenant_id=tenant_id)
+
+    lead_id = (request.POST.get('lead_id') or '').strip()
+    if not lead_id:
+        return redirect('leads:contact_detail', contact_id=contact.id)
+
+    tipo = request.POST.get('tipo', 'en_venta')
+    if tipo not in dict(ContactPropiedad.TIPO_CHOICES):
+        tipo = 'en_venta'
+
+    precio_venta = request.POST.get('precio_venta') or None
+    fecha_venta = request.POST.get('fecha_venta') or None
+    try:
+        precio_venta = float(precio_venta) if precio_venta else None
+    except (TypeError, ValueError):
+        precio_venta = None
+
+    ContactPropiedad.objects.update_or_create(
+        contact=contact,
+        lead_id=lead_id,
+        defaults={
+            'tenant_id': tenant_id,
+            'tipo': tipo,
+            'precio_venta': precio_venta,
+            'fecha_venta': fecha_venta or None,
+            'notas': (request.POST.get('notas') or '').strip() or None,
+            'created_by': request.user if request.user.is_authenticated else None,
+        }
+    )
+
+    return redirect('leads:contact_detail', contact_id=contact.id)
+
+
+@login_required
+@require_POST
+def delete_contact_propiedad_view(request, contact_id, prop_id):
+    """Quita una propiedad asignada a un contacto."""
+    tenant_id = get_user_tenant(request)
+    contact = get_object_or_404(Contact, id=contact_id, tenant_id=tenant_id)
+    ContactPropiedad.objects.filter(id=prop_id, contact=contact).delete()
     return redirect('leads:contact_detail', contact_id=contact.id)
 
 

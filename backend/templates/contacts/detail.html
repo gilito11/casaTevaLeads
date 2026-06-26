@@ -105,6 +105,77 @@
                 </div>
             </div>
 
+            <!-- Propiedades asignadas (en venta / vendidas) -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        Propiedades asignadas ({{ propiedades|length }})
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Marca cada una como en venta o vendida (con precio y fecha).</p>
+                </div>
+
+                <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for p in propiedades %}
+                    <div class="p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex-1 min-w-0">
+                                {% if p.lead_obj %}
+                                <a href="{% url 'leads:detail' p.lead_obj.lead_id %}" class="font-medium text-gray-900 dark:text-white hover:text-primary-600 truncate block">
+                                    {{ p.lead_obj.titulo|default:p.lead_obj.zona_geografica|default:"Propiedad" }}
+                                </a>
+                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {% if p.lead_obj.precio %}Anuncio: {{ p.lead_obj.precio|floatformat:0 }}&euro;{% endif %}
+                                    {% if p.lead_obj.zona_geografica %} · {{ p.lead_obj.zona_geografica }}{% endif %}
+                                    {% if p.lead_obj.portal %} · {{ p.lead_obj.portal|title }}{% endif %}
+                                </div>
+                                {% else %}
+                                <span class="font-medium text-gray-500">Lead {{ p.lead_id }} (ya no disponible)</span>
+                                {% endif %}
+                            </div>
+                            <span class="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if p.tipo == 'vendida' %}bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300{% endif %}">
+                                {{ p.get_tipo_display }}
+                            </span>
+                        </div>
+                        <form method="post" action="{% url 'leads:add_propiedad' contact.id %}" class="mt-3 flex flex-wrap items-end gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="lead_id" value="{{ p.lead_id }}">
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-0.5">Estado</label>
+                                <select name="tipo" class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    {% for c, n in propiedad_tipos %}
+                                    <option value="{{ c }}" {% if p.tipo == c %}selected{% endif %}>{{ n }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-0.5">Precio venta (&euro;)</label>
+                                <input type="number" name="precio_venta" value="{{ p.precio_venta|default:'' }}" step="1000"
+                                       class="w-32 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-0.5">Fecha venta</label>
+                                <input type="date" name="fecha_venta" value="{{ p.fecha_venta|date:'Y-m-d' }}"
+                                       class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            </div>
+                            <button type="submit" class="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded">Guardar</button>
+                        </form>
+                        <form method="post" action="{% url 'leads:delete_propiedad' contact.id p.id %}" class="mt-1"
+                              onsubmit="return confirm('¿Quitar esta propiedad del contacto?');">
+                            {% csrf_token %}
+                            <button type="submit" class="text-xs text-red-600 hover:underline">Quitar propiedad</button>
+                        </form>
+                    </div>
+                    {% empty %}
+                    <div class="p-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+                        <p>Sin propiedades asignadas. Crea el contacto desde la ficha de un lead y se asignará automáticamente.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
             <!-- Interaction Timeline -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700">

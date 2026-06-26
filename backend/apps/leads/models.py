@@ -665,3 +665,71 @@ class AutoContactConfig(models.Model):
             return None
         weights = [t.peso for t in templates]
         return random.choices(templates, weights=weights, k=1)[0]
+
+
+class LeadDireccion(models.Model):
+    """
+    Direccion exacta de un lead, escrita manualmente por el comercial.
+    Lead es una vista dbt (solo lectura), asi que la direccion precisa y sus
+    coordenadas geocodificadas se guardan aqui (tabla writable).
+    """
+    lead_id = models.CharField(max_length=100, primary_key=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='lead_direcciones')
+    direccion_exacta = models.CharField(max_length=500)
+    latitud = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitud = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    geocoded = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lead_direcciones_creadas'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'leads_lead_direccion'
+        verbose_name = 'Direccion de Lead'
+        verbose_name_plural = 'Direcciones de Leads'
+
+    def __str__(self):
+        return f"{self.lead_id}: {self.direccion_exacta}"
+
+
+class ContactPropiedad(models.Model):
+    """
+    Relacion explicita Contacto <-> propiedad (lead), con info de venta.
+    Permite asignar a un contacto las propiedades que tiene en venta o que
+    ya ha vendido, guardando precio y fecha de venta.
+    """
+    TIPO_CHOICES = [
+        ('en_venta', 'En venta'),
+        ('vendida', 'Vendida'),
+    ]
+
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='propiedades')
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='contact_propiedades')
+    lead_id = models.CharField(max_length=100, db_index=True)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='en_venta')
+    precio_venta = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    fecha_venta = models.DateField(null=True, blank=True)
+    notas = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='contact_propiedades_creadas'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'leads_contact_propiedad'
+        verbose_name = 'Propiedad de Contacto'
+        verbose_name_plural = 'Propiedades de Contactos'
+        unique_together = ['contact', 'lead_id']
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.contact} - {self.lead_id} ({self.tipo})"
+
+    @property
+    def lead(self):
+        """Resuelve el Lead asociado (puede no existir si ya no esta en dim_leads)."""
+        return Lead.objects.filter(lead_id=self.lead_id, tenant_id=self.tenant_id).first()
