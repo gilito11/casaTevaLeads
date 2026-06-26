@@ -372,6 +372,21 @@ final AS (
     LEFT JOIN price_changes pc ON e.tenant_id = pc.tenant_id
         AND e.source_portal = pc.portal
         AND e.source_listing_id::TEXT = pc.anuncio_id
+    -- Filtro ALQUILER: Casa Teva solo trabaja COMPRA/VENTA. Excluimos los anuncios
+    -- que son ofertas o demandas de alquiler ("se alquila", "llogar", "se busca
+    -- alquiler"...). Para evitar tumbar VENTAS que solo mencionan alquiler como
+    -- reclamo de inversion ("ideal alquiler vacacional", "actualmente alquilado"),
+    -- solo disparamos con frases de transaccion explicitas, y SIEMPRE conservamos
+    -- el anuncio si menciona venta (incluye los "se vende o se alquila").
+    WHERE NOT (
+        (
+            LOWER(COALESCE(e.titulo, '')) ~ '(en alquiler|alquiler de|^alquiler|\malquilo\M|se alquila|en lloguer|de lloguer|^lloguer|es lloga|per llogar)'
+            OR LOWER(COALESCE(e.descripcion, '')) ~ '(se alquila|se alquilan|se busca alquiler|busco alquiler|busco piso de alquiler|busca piso de alquiler|busco para alquilar|es lloga|es lloguen|es busca lloguer|busco lloguer|cerco lloguer)'
+        )
+        AND NOT (
+            LOWER(COALESCE(e.titulo, '') || ' ' || COALESCE(e.descripcion, '')) ~ '(\mventa\M|\mventas\M|\mvende\M|\mvenden\M|\mvendo\M|\mvendemos\M|en venta|se vende|\mvenc\M|\mvenda\M|es ven )'
+        )
+    )
 )
 
 SELECT * FROM final
