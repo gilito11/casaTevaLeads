@@ -120,6 +120,9 @@ classified AS (
 
         -- Classify zone based on ubicacion or zona_busqueda
         CASE
+            -- La zona BUSCADA (nombre propio con mayúscula) manda sobre el texto
+            -- de ubicación, que a veces trae el pueblo grande vecino.
+            WHEN zona_busqueda ~ '[A-Z]' THEN zona_busqueda
             -- Lleida zones
             WHEN LOWER(ubicacion) LIKE '%bordeta%' THEN 'Lleida - La Bordeta'
             WHEN LOWER(ubicacion) LIKE '%lleida%' OR LOWER(ubicacion) LIKE '%lerida%' THEN 'Lleida Ciudad'

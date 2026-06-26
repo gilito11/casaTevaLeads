@@ -110,6 +110,11 @@ classified AS (
 
         -- Classify zone based on ubicacion or zona_busqueda
         CASE
+            -- La zona BUSCADA manda: si el scraper guardó un nombre propio (con
+            -- mayúscula, p.ej. "Vallfogona de Balaguer"), úsalo y NO lo pises con
+            -- el texto de ubicación (que a veces trae el pueblo grande vecino,
+            -- p.ej. "Balaguer" para un piso de Vallfogona/Térmens).
+            WHEN zona_busqueda ~ '[A-Z]' THEN zona_busqueda
             -- Lleida zones
             WHEN LOWER(ubicacion) LIKE '%lleida%' OR LOWER(ubicacion) LIKE '%lerida%' THEN 'Lleida Ciudad'
             WHEN LOWER(ubicacion) LIKE '%balaguer%' THEN 'Lleida - Balaguer'

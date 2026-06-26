@@ -131,6 +131,9 @@ classified AS (
             -- Precise municipality from the listing JSON wins (e.g. Torà, Alpicat)
             -- so small towns aren't lumped into Lleida by the province substring.
             WHEN municipio IS NOT NULL THEN municipio
+            -- Zona BUSCADA (nombre propio con mayúscula) manda sobre el texto de
+            -- ubicación, que a veces trae el pueblo grande vecino.
+            WHEN zona_geografica ~ '[A-Z]' THEN zona_geografica
 
             -- Lleida zones
             WHEN LOWER(COALESCE(ubicacion, '')) LIKE '%lleida%' OR LOWER(COALESCE(ubicacion, '')) LIKE '%lerida%' THEN 'Lleida Ciudad'

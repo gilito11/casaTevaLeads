@@ -103,6 +103,36 @@ ZONAS_GEOGRAFICAS = {
     # =============================================================
     # MADRID DISTRICTS (Tenant 2: Look and Find)
     # =============================================================
+
+    # === Pueblos <=20km de Lleida (radio Segrià) ===
+    'albatarrec': {'nombre': 'Albatàrrec', 'url_path': 'albatarrec/todas-las-zonas'},
+    'torre_serona': {'nombre': 'Torre-serona', 'url_path': 'torre-serona/todas-las-zonas'},
+    'montoliu_de_lleida': {'nombre': 'Montoliu de Lleida', 'url_path': 'montoliu-de-lleida/todas-las-zonas'},
+    'sudanell': {'nombre': 'Sudanell', 'url_path': 'sudanell/todas-las-zonas'},
+    'benavent_de_segria': {'nombre': 'Benavent de Segrià', 'url_path': 'benavent-de-segria/todas-las-zonas'},
+    'artesa_de_lleida': {'nombre': 'Artesa de Lleida', 'url_path': 'artesa-de-lleida/todas-las-zonas'},
+    'corbins': {'nombre': 'Corbins', 'url_path': 'corbins/todas-las-zonas'},
+    'vilanova_de_segria': {'nombre': 'Vilanova de Segrià', 'url_path': 'vilanova-de-segria/todas-las-zonas'},
+    'alfes': {'nombre': 'Alfés', 'url_path': 'alfes/todas-las-zonas'},
+    'sunyer': {'nombre': 'Sunyer', 'url_path': 'sunyer/todas-las-zonas'},
+    'vilanova_de_la_barca': {'nombre': 'Vilanova de la Barca', 'url_path': 'vilanova-de-la-barca/todas-las-zonas'},
+    'puigverd_de_lleida': {'nombre': 'Puigverd de Lleida', 'url_path': 'puigverd-de-lleida/todas-las-zonas'},
+    'torres_de_segre': {'nombre': 'Torres de Segre', 'url_path': 'torres-de-segre/todas-las-zonas'},
+    'alguaire': {'nombre': 'Alguaire', 'url_path': 'alguaire/todas-las-zonas'},
+    'la_portella': {'nombre': 'La Portella', 'url_path': 'la-portella/todas-las-zonas'},
+    'aspa': {'nombre': 'Aspa', 'url_path': 'aspa/todas-las-zonas'},
+    'soses': {'nombre': 'Soses', 'url_path': 'soses/todas-las-zonas'},
+    'menarguens': {'nombre': 'Menàrguens', 'url_path': 'menarguens/todas-las-zonas'},
+    'bellvis': {'nombre': 'Bellvís', 'url_path': 'bellvis/todas-las-zonas'},
+    'sidamon': {'nombre': 'Sidamon', 'url_path': 'sidamon/todas-las-zonas'},
+    'sarroca_de_lleida': {'nombre': 'Sarroca de Lleida', 'url_path': 'sarroca-de-lleida/todas-las-zonas'},
+    'aitona': {'nombre': 'Aitona', 'url_path': 'aitona/todas-las-zonas'},
+    'fondarella': {'nombre': 'Fondarella', 'url_path': 'fondarella/todas-las-zonas'},
+    'torrebesses': {'nombre': 'Torrebesses', 'url_path': 'torrebesses/todas-las-zonas'},
+    'miralcamp': {'nombre': 'Miralcamp', 'url_path': 'miralcamp/todas-las-zonas'},
+    'palau_anglesola': {'nombre': 'El Palau d\'Anglesola', 'url_path': 'el-palau-d-anglesola/todas-las-zonas'},
+    'vallfogona_balaguer': {'nombre': 'Vallfogona de Balaguer', 'url_path': 'vallfogona-de-balaguer/todas-las-zonas'},
+
     'chamartin': {'nombre': 'Chamartín', 'url_path': 'madrid-capital/chamartin'},
     'hortaleza': {'nombre': 'Hortaleza', 'url_path': 'madrid-capital/hortaleza'},
 }
