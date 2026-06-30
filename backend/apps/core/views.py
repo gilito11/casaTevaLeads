@@ -16,7 +16,7 @@ from django.http import JsonResponse
 from datetime import timedelta
 
 from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS, ZONAS_POR_REGION, ScrapingJob
-from leads.models import Lead
+from leads.models import Lead, LeadEstado
 
 
 def login_view(request):
@@ -74,19 +74,29 @@ def dashboard_view(request):
     start_of_day = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time()))
     start_of_yesterday = timezone.make_aware(timezone.datetime.combine(yesterday, timezone.datetime.min.time()))
 
-    # Conteos por estado
-    estados_count = leads_qs.aggregate(
-        total=Count('lead_id'),
-        nuevos=Count('lead_id', filter=Q(estado='NUEVO')),
-        en_proceso=Count('lead_id', filter=Q(estado='EN_PROCESO')),
-        contactados=Count('lead_id', filter=Q(estado='CONTACTADO_SIN_RESPUESTA')),
-        interesados=Count('lead_id', filter=Q(estado='INTERESADO')),
-        no_interesados=Count('lead_id', filter=Q(estado='NO_INTERESADO')),
-        en_espera=Count('lead_id', filter=Q(estado='EN_ESPERA')),
-        clientes=Count('lead_id', filter=Q(estado='CLIENTE')),
-        ya_vendidos=Count('lead_id', filter=Q(estado='YA_VENDIDO')),
-        no_contactar=Count('lead_id', filter=Q(estado='NO_CONTACTAR')),
-    )
+    # Conteos por estado — el estado real del CRM vive en LeadEstado.
+    # dim_leads.estado siempre es 'NUEVO', igual que en lead_list_view:
+    # estado efectivo = LeadEstado.estado si existe, si no 'NUEVO'.
+    total_leads_count = leads_qs.count()
+    valid_ids = set(str(x) for x in leads_qs.values_list('lead_id', flat=True))
+    le_rows = (LeadEstado.objects
+               .filter(lead_id__in=valid_ids)
+               .values('estado')
+               .annotate(c=Count('lead_id')))
+    estado_map = {row['estado']: row['c'] for row in le_rows}
+    con_estado = sum(estado_map.values())
+    estados_count = {
+        'total': total_leads_count,
+        'nuevos': estado_map.get('NUEVO', 0) + (total_leads_count - con_estado),
+        'en_proceso': estado_map.get('EN_PROCESO', 0),
+        'contactados': estado_map.get('CONTACTADO_SIN_RESPUESTA', 0),
+        'interesados': estado_map.get('INTERESADO', 0),
+        'no_interesados': estado_map.get('NO_INTERESADO', 0),
+        'en_espera': estado_map.get('EN_ESPERA', 0),
+        'clientes': estado_map.get('CLIENTE', 0),
+        'ya_vendidos': estado_map.get('YA_VENDIDO', 0),
+        'no_contactar': estado_map.get('NO_CONTACTAR', 0),
+    }
 
     # Leads nuevos hoy y ayer (para comparar)
     leads_hoy = leads_qs.filter(fecha_scraping__gte=start_of_day).count()
