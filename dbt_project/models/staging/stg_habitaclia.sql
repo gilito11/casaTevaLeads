@@ -99,7 +99,17 @@ normalized AS (
         ) AS banos,
 
         es_particular_raw AS es_particular,
-        TRUE AS permite_inmobiliarias
+        TRUE AS permite_inmobiliarias,
+
+        -- Municipio REAL desde la URL de habitaclia (.../-<municipio>-i<id>.htm).
+        -- Es la fuente más fiable de ubicación: la zona buscada a veces "sangra"
+        -- anuncios de la ciudad grande vecina (p.ej. buscar Corbins devuelve pisos
+        -- de Lleida capital).
+        CASE
+            WHEN url ~ '-i[0-9]+\.htm'
+            THEN LOWER(REGEXP_REPLACE(url, '^.*-([a-z0-9_]+)-i[0-9]+\.htm.*$', '\1'))
+            ELSE NULL
+        END AS url_municipio
 
     FROM extracted
 ),
@@ -110,6 +120,19 @@ classified AS (
 
         -- Classify zone based on ubicacion or zona_busqueda
         CASE
+            -- PRIORIDAD MÁXIMA: ciudades grandes "imán" detectadas por el municipio
+            -- REAL de la URL. La búsqueda de un pueblo pequeño a veces devuelve
+            -- pisos de la capital vecina; el municipio de la URL es la verdad y
+            -- debe imponerse sobre la zona buscada.
+            WHEN url_municipio = 'lleida' THEN 'Lleida Ciudad'
+            WHEN url_municipio = 'balaguer' THEN 'Lleida - Balaguer'
+            WHEN url_municipio = 'mollerussa' THEN 'Lleida - Mollerussa'
+            WHEN url_municipio IN ('tarrega') THEN 'Lleida - Tarrega'
+            WHEN url_municipio = 'tarragona' THEN 'Tarragona Ciudad'
+            WHEN url_municipio = 'reus' THEN 'Tarragona - Reus'
+            WHEN url_municipio = 'salou' THEN 'Costa Dorada - Salou'
+            WHEN url_municipio = 'cambrils' THEN 'Costa Dorada - Cambrils'
+
             -- La zona BUSCADA manda: si el scraper guardó un nombre propio (con
             -- mayúscula, p.ej. "Vallfogona de Balaguer"), úsalo y NO lo pises con
             -- el texto de ubicación (que a veces trae el pueblo grande vecino,

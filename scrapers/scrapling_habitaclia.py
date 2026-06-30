@@ -114,19 +114,29 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
         if m:
             listing["titulo"] = m.group(1).strip()[:200]
 
-        # Price — feature-container, then class="price", then "por X €"
+        # Price — el <title> ("Piso por 165.000 € de ...") es la fuente más fiable
+        # del precio DEL anuncio. OJO: la página incluye anuncios similares con
+        # class="sim-price" (otro piso, otro precio); hay que excluirlos.
         precio = None
-        fc = re.search(
-            r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</(?:ul|div)>',
-            html, re.DOTALL | re.IGNORECASE,
+        tt = re.search(
+            r"<title>[^<]*?\bpor\s+(\d{1,3}(?:\.\d{3})*)\b",
+            html, re.IGNORECASE,
         )
-        if fc:
-            pm = re.search(r"(\d{1,3}(?:\.\d{3})*)\s*€(?!/)", fc.group(1))
-            if pm:
-                precio = float(pm.group(1).replace(".", ""))
+        if tt:
+            precio = float(tt.group(1).replace(".", ""))
         if precio is None:
+            fc = re.search(
+                r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</(?:ul|div)>',
+                html, re.DOTALL | re.IGNORECASE,
+            )
+            if fc:
+                pm = re.search(r"(\d{1,3}(?:\.\d{3})*)\s*€(?!/)", fc.group(1))
+                if pm:
+                    precio = float(pm.group(1).replace(".", ""))
+        if precio is None:
+            # class que contenga "price" pero NO "sim" (sim-price = anuncio similar)
             ph = re.search(
-                r'class="[^"]*price[^"]*"[^>]*>[\s]*(\d{1,3}(?:\.\d{3})*)\s*€',
+                r'class="(?![^"]*sim)[^"]*price[^"]*"[^>]*>[\s]*(\d{1,3}(?:\.\d{3})*)\s*€',
                 html, re.IGNORECASE,
             )
             if ph:
