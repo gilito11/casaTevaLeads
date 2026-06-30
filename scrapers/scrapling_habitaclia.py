@@ -109,6 +109,17 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
         if not html or len(html) < 5000:
             return listing
 
+        # Guard anti-redirección: un anuncio retirado redirige a una página de
+        # buscador ("Viviendas en Tarragona") que contiene OTROS anuncios
+        # destacados. Su <title> NO tiene el patrón "... por <precio> €". Si no
+        # lo tiene, no es la ficha real → no enriquecer (evita coger precio/datos
+        # de un anuncio ajeno, p.ej. el bug del "sim-price" a 850.000 €).
+        title_guard = re.search(r"<title>(.*?)</title>", html, re.DOTALL | re.IGNORECASE)
+        if not title_guard or not re.search(
+            r"\bpor\s+\d{1,3}(?:\.\d{3})*", title_guard.group(1), re.IGNORECASE
+        ):
+            return listing
+
         # Title
         m = re.search(r"<h1[^>]*>([^<]+)</h1>", html)
         if m:
