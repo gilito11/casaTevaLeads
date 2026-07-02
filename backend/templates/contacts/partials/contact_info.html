@@ -16,9 +16,13 @@
         </div>
         <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Telefono Principal</p>
-            <a href="tel:{{ contact.telefono }}" class="font-medium text-primary-600 dark:text-primary-400 hover:underline">
-                {{ contact.telefono }}
+            {% if contact.telefono_display %}
+            <a href="tel:{{ contact.telefono_display }}" class="font-medium text-primary-600 dark:text-primary-400 hover:underline">
+                {{ contact.telefono_display }}
             </a>
+            {% else %}
+            <p class="text-gray-400 dark:text-gray-500">No especificado</p>
+            {% endif %}
         </div>
         {% if contact.telefono2 %}
         <div>

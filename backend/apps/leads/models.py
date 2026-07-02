@@ -178,8 +178,20 @@ class Contact(models.Model):
     def __str__(self):
         return f"{self.nombre or 'Sin nombre'} ({self.telefono})"
 
+    @property
+    def has_phone(self):
+        """True solo si el telefono es real (no vacio ni clave sintetica 'lead:')."""
+        return bool(self.telefono) and not self.telefono.startswith('lead:')
+
+    @property
+    def telefono_display(self):
+        """Telefono para mostrar en UI; vacio si es sintetico o inexistente."""
+        return self.telefono if self.has_phone else ''
+
     def get_leads(self):
         """Obtiene todos los leads asociados a este contacto por telefono."""
+        if not self.has_phone:
+            return Lead.objects.none()
         return Lead.objects.filter(
             tenant_id=self.tenant_id,
             telefono_norm=self.telefono
@@ -187,8 +199,9 @@ class Contact(models.Model):
 
     @property
     def leads_count(self):
-        """Numero de propiedades/leads asociados."""
-        return self.get_leads().count()
+        """Numero de propiedades/leads asociados (por telefono o asignadas)."""
+        n = self.get_leads().count()
+        return n if n else self.propiedades.count()
 
 
 class Interaction(models.Model):

@@ -710,8 +710,10 @@ def contact_list_view(request):
     """Vista de lista de contactos con sus propiedades agrupadas"""
     tenant_id = get_user_tenant(request)
 
-    # Base queryset
-    contacts_qs = Contact.objects.filter(tenant_id=tenant_id).order_by('-updated_at')
+    # Base queryset (excluye contactos basura sin telefono real ni nombre)
+    contacts_qs = Contact.objects.filter(tenant_id=tenant_id).exclude(
+        Q(telefono='') & (Q(nombre__isnull=True) | Q(nombre=''))
+    ).order_by('-updated_at')
 
     # Filtros
     q = request.GET.get('q', '').strip()

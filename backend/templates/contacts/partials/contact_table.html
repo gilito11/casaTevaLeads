@@ -44,9 +44,13 @@
                     </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <a href="tel:{{ contact.telefono }}" class="text-primary-600 dark:text-primary-400 hover:underline">
-                        {{ contact.telefono }}
+                    {% if contact.telefono_display %}
+                    <a href="tel:{{ contact.telefono_display }}" class="text-primary-600 dark:text-primary-400 hover:underline">
+                        {{ contact.telefono_display }}
                     </a>
+                    {% else %}
+                    <span class="text-gray-400 dark:text-gray-500">Sin telefono</span>
+                    {% endif %}
                     {% if contact.telefono2 %}
                     <br>
                     <a href="tel:{{ contact.telefono2 }}" class="text-sm text-gray-500 dark:text-gray-400 hover:underline">
