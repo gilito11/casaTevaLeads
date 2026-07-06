@@ -48,19 +48,13 @@ class ScraplingMilanunciosBD(ScraplingMilanuncios):
     SERVICE_LABEL = "brightdata"
 
     BD_CATEGORIES = ("venta-de-pisos", "venta-de-casas")
-    # slug de localizacion por zona. lleida_provincia cubre todos los pueblos.
+    # Busquedas a nivel PROVINCIA (validado 6 Jul 2026): `venta-de-pisos-en-lleida/`
+    # cubre la provincia entera (pueblos incluidos) y con ?vendedor=part son 1-2
+    # paginas por categoria. Los slugs de pueblo invalidos caen al resultado
+    # provincial (duplicando fetches), asi que NO usar slugs town-level.
     BD_ZONES = {
-        "lleida_provincia": "lleida-lleida",
-        "tarragona": "tarragona-tarragona",
-        "salou": "salou-tarragona",
-        "cambrils": "cambrils-tarragona",
-        "reus": "reus-tarragona",
-        "vila_seca": "vila-seca-tarragona",
-        "la_pineda": "la-pineda-tarragona",
-        "miami_platja": "miami-platja-tarragona",
-        "torredembarra": "torredembarra-tarragona",
-        "altafulla": "altafulla-tarragona",
-        "la_canonja": "la-canonja-tarragona",
+        "lleida": "lleida",
+        "tarragona": "tarragona",
     }
 
     def __init__(self, *args, brightdata_api_key: Optional[str] = None,
@@ -81,6 +75,10 @@ class ScraplingMilanunciosBD(ScraplingMilanuncios):
     # Bright Data fetch
     # ------------------------------------------------------------------
     def _bd_request(self, url: str) -> Optional[str]:
+        # milanuncios genera URLs de anuncio con caracteres invalidos (p.ej. `|`)
+        # que el API de BD rechaza ("url must be a valid uri") -> percent-encode.
+        from urllib.parse import quote
+        url = quote(url, safe=":/?&=%")
         payload = {"zone": self.bd_zone, "url": url, "format": "raw", "country": self.BD_COUNTRY}
         try:
             r = self.bd_session.post(self.BD_API_URL, json=payload, timeout=150)
@@ -198,10 +196,12 @@ class ScraplingMilanunciosBD(ScraplingMilanuncios):
                                 logger.debug(f"  detail parse failed: {e}")
                         if self.should_skip(listing):
                             # el detalle lo degrado a profesional
+                            self._known_ids.add(listing["anuncio_id"])
                             self.stats["listings_skipped"] += 1
                             continue
 
                     self.save_listing(listing)
+                    self._known_ids.add(listing["anuncio_id"])
 
     def _postprocess(self, listing: Dict[str, Any], cat: str) -> Optional[Dict[str, Any]]:
         # Anuncios de demanda ("Compro casa...") no son leads de venta
