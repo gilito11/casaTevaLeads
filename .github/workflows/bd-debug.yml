@@ -56,21 +56,20 @@ jobs:
           echo "--- primeros ids p1 ---"
           grep -o '"id":[0-9]\{7,\}' /tmp/p1.html | head -5
 
-          echo "===== Estructura del API propertysearch ====="
+          echo "===== API con sortOrderDesc ====="
           LOC="724,9,25,249,446,25120,0,0,0"
-          API="https://web.gw.fotocasa.es/v2/propertysearch/search?combinedLocationIds=$LOC&transactionTypeId=1&pageNumber=1&sortType=publicationDate&pageSize=30"
+          API="https://web.gw.fotocasa.es/v2/propertysearch/search?combinedLocationIds=$LOC&transactionTypeId=1&pageNumber=1&sortType=publicationDate&sortOrderDesc=true&pageSize=30"
           fetch_body "$API" > /tmp/api1.json
           echo "api1 bytes: $(wc -c < /tmp/api1.json)"
-          echo "--- top-level keys ---"
-          jq -r 'keys | join(", ")' /tmp/api1.json 2>/dev/null || head -c 300 /tmp/api1.json
-          echo "--- count + array key ---"
-          jq -r '.count // .totalResults // "n/a"' /tmp/api1.json 2>/dev/null
-          jq -r 'to_entries[] | select(.value | type == "array") | "\(.key): \(.value | length) items"' /tmp/api1.json 2>/dev/null
-          echo "--- keys del primer item ---"
-          jq -r '.realEstates[0] // .items[0] // .results[0] | keys | join(", ")' /tmp/api1.json 2>/dev/null
-          echo "--- primer item resumido ---"
-          jq -r '.realEstates[0] // .items[0] // .results[0] | {id, clientTypeId, clientType, clientAlias, rawPrice, date, publicationDate, timeAgo, isNewConstruction, phone} ' /tmp/api1.json 2>/dev/null
-          echo "--- clientTypeId distribucion p1 (sort fecha) ---"
-          jq -r '[.realEstates[]?.clientTypeId] | group_by(.) | map("\(.[0]): \(length)") | join(" | ")' /tmp/api1.json 2>/dev/null
-          echo "--- fechas primeros 5 (verificar sort) ---"
-          jq -r '.realEstates[0:5][]? | "\(.id) \(.date // .publicationDate // "?") clientType=\(.clientTypeId)"' /tmp/api1.json 2>/dev/null
+          echo "--- fechas primeros 5 (debe ser DESC, 2026) ---"
+          jq -r '.realEstates[0:5][]? | "\(.id) \(.date)"' /tmp/api1.json 2>/dev/null
+          echo "--- advertiser completo item 0 ---"
+          jq -c '.realEstates[0].advertiser' /tmp/api1.json 2>/dev/null
+          echo "--- advertiser typeIds distribucion ---"
+          jq -r '[.realEstates[]?.advertiser | (.clientTypeId // .typeId // "null") | tostring] | group_by(.) | map("\(.[0]): \(length)") | join(" | ")' /tmp/api1.json 2>/dev/null
+          echo "--- address + features + transactions item 0 ---"
+          jq -c '.realEstates[0] | {address: .address, features: .features[0:6], transactions: .transactions, detail: .detail}' /tmp/api1.json 2>/dev/null | head -c 900
+          echo ""
+          echo "--- description + multimedia sample ---"
+          jq -r '.realEstates[0].description // "" | .[0:150]' /tmp/api1.json 2>/dev/null
+          jq -r '[.realEstates[0].multimedias[]? | .url // .src][0:2] | join(" ")' /tmp/api1.json 2>/dev/null
