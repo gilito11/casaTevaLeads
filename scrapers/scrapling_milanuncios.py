@@ -252,6 +252,10 @@ class ScraplingMilanuncios(ScraplingBaseScraper):
                         img_url = "https:" + img_url
                     elif not img_url.startswith("http"):
                         img_url = "https://" + img_url
+                    # Sin ?rule= el CDN devuelve 404; images-re da 403.
+                    img_url = img_url.replace("//images-re.milanuncios.com", "//images.milanuncios.com")
+                    if "/ma-ad-media-pro/images/" in img_url and "rule=" not in img_url:
+                        img_url += "?rule=detail_640x480"
                     fotos.append(img_url)
 
                 description = (ad.get("description", "") or "")[:2000]
@@ -557,8 +561,9 @@ class ScraplingMilanuncios(ScraplingBaseScraper):
                     re.IGNORECASE,
                 )))
                 if photo_ids:
+                    # images-re devuelve 403; el dominio bueno es images.milanuncios.com
                     listing["fotos"] = [
-                        f"https://images-re.milanuncios.com/api/v1/ma-ad-media-pro/images/{pid}?rule=detail_640x480"
+                        f"https://images.milanuncios.com/api/v1/ma-ad-media-pro/images/{pid}?rule=detail_640x480"
                         for pid in photo_ids[:10]
                     ]
             except Exception:

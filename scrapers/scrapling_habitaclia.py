@@ -224,8 +224,10 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
                 ph = "https:" + ph
             if "logo" in ph.lower():
                 continue
+            # El sufijo de tamano va PEGADO al uuid sin guion bajo (...971dXL.jpg).
+            # La URL base sin sufijo devuelve 200; anadir _XXL da 404.
             idm = re.search(
-                r"/(?:imgh|thumb)/(\d+-\d+)/([^/]+?)(?:_(?:XXL|XL|L|M|S|T))?\.(?:jpg|jpeg|png|webp)$",
+                r"/(?:imgh|thumb)/(\d+-\d+)/([^/]+?)(?:_?(?:XXL|XL|L|M|S|T))?\.(?:jpg|jpeg|png|webp)$",
                 ph, re.IGNORECASE,
             )
             if idm:
@@ -233,7 +235,7 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
                 if uid not in seen:
                     seen.add(uid)
                     unique.append(
-                        f"https://images.habimg.com/imgh/{idm.group(1)}/{idm.group(2)}_XXL.jpg"
+                        f"https://images.habimg.com/imgh/{idm.group(1)}/{idm.group(2)}.jpg"
                     )
         if unique:
             listing["fotos"] = unique[:10]
