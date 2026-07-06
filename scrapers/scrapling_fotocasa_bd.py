@@ -1,28 +1,35 @@
 """
-Fotocasa scraper que fetchea vía Bright Data Web Unlocker API.
+Fotocasa scraper vía Bright Data Web Unlocker + API interna propertysearch.
 
-Motivación: fotocasa geo-bloquea los runners de GH Actions (Azure US) y el
-VPS (Alemania); la alternativa IPRoyal cobra por GB de navegador (~$20-60/mes
-en cron diario). BD Web Unlocker cobra por request (~$0.0015) -> ~78 req/día
-con las zonas de Lleida = ~$3.5/mes.
+Motivación: fotocasa geo-bloquea GH Actions (Azure US) y el VPS (Alemania);
+IPRoyal cobra por GB de navegador. BD Web Unlocker cobra por request
+(~$0.0015) y atraviesa Imperva sin navegador.
 
-Reusa el parser de ScraplingFotocasa: `_parse_embedded_listings` ancla en el
-JSON embebido (`clientTypeId`) del HTML crudo, así que NO necesita ejecutar
-JS ni el scroll de hidratación (eso era solo para serializar el DOM con
-Scrapling). El fallback JS-stash no aplica aquí (no hay navegador).
+Descubierto 6 Jul 2026 (workflow bd-debug):
+- La URL /particulares/.../pl devuelve 502 vía BD (solo funciona con browser real).
+- La búsqueda genérica /l funciona vía BD y su HTML trae combinedLocationIds.
+- El API interno `web.gw.fotocasa.es/v2/propertysearch/search` responde 200
+  vía BD SIN API key, con paginación real (pageNumber), orden por fecha
+  (sortType=publicationDate&sortOrderDesc=true) y pageSize capado a 30.
+- `advertiser.typeId`: 1 = particular, 3 = agencia. En Lleida capital p1
+  ordenada por fecha: 6/30 particulares.
+
+Flujo por zona: 1 fetch del /l HTML para extraer combinedLocationIds
+(cacheado en memoria) + max_pages fetches del API. ~4 req/zona/run.
 
 Env vars requeridas:
 - BRIGHTDATA_API_KEY
 - BRIGHTDATA_ZONE (default: web_unlocker1)
-- BRIGHTDATA_RENDER=true (opcional: fuerza render JS si el JSON no viene en el HTML)
 """
+import json
 import logging
 import os
+import re
+import time
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
-from scrapling.parser import Adaptor
 
 from scrapers.scrapling_fotocasa import ScraplingFotocasa
 
@@ -33,13 +40,13 @@ class ScraplingFotocasaBD(ScraplingFotocasa):
     BD_API_URL = "https://api.brightdata.com/request"
     BD_COUNTRY = "es"
     SERVICE_LABEL = "brightdata"
+    FC_SEARCH_API = "https://web.gw.fotocasa.es/v2/propertysearch/search"
 
     def __init__(self, *args, brightdata_api_key: Optional[str] = None,
                  brightdata_zone: str = "web_unlocker1", **kwargs):
         super().__init__(*args, **kwargs)
         self.bd_api_key = brightdata_api_key or os.environ.get("BRIGHTDATA_API_KEY")
         self.bd_zone = brightdata_zone or os.environ.get("BRIGHTDATA_ZONE", "web_unlocker1")
-        self.bd_render = os.environ.get("BRIGHTDATA_RENDER", "").lower() == "true"
         if not self.bd_api_key:
             raise RuntimeError("BRIGHTDATA_API_KEY env var or --brightdata-api-key arg required")
         self.bd_session = requests.Session()
@@ -47,55 +54,145 @@ class ScraplingFotocasaBD(ScraplingFotocasa):
             "Authorization": f"Bearer {self.bd_api_key}",
             "Content-Type": "application/json",
         })
+        self._location_ids: Dict[str, str] = {}  # zona_key -> combinedLocationIds
 
-    def _bd_request(self, url: str, render: bool) -> Optional[str]:
+    # ------------------------------------------------------------------
+    # Bright Data fetch
+    # ------------------------------------------------------------------
+    def _bd_request(self, url: str) -> Optional[str]:
         payload = {"zone": self.bd_zone, "url": url, "format": "raw", "country": self.BD_COUNTRY}
-        if render:
-            payload["render"] = "true"  # fuerza browser rendering (doc BD)
         try:
-            r = self.bd_session.post(self.BD_API_URL, json=payload, timeout=180)
+            r = self.bd_session.post(self.BD_API_URL, json=payload, timeout=150)
         except requests.RequestException as e:
             logger.warning(f"  BD fetch failed for {url}: {e}")
+            self.stats["errors"] += 1
             return None
         if r.status_code != 200:
             logger.warning(f"  BD HTTP {r.status_code} for {url}: {r.text[:200]}")
+            self.stats["errors"] += 1
             return None
         r.encoding = "utf-8"
         return r.text
 
-    def _bd_fetch(self, url: str) -> Optional[Adaptor]:
-        # 1º intento sin render (barato). El /pl de fotocasa suele necesitar JS:
-        # si el HTML no trae el JSON embebido (clientTypeId), retry con render.
-        html = None
-        if not self.bd_render:
-            html = self._bd_request(url, render=False)
-            if html is not None and "clientTypeId" not in html:
-                snippet = ", body=" + repr(html[:120]) if len(html) < 2000 else ""
-                logger.info(f"  body sin clientTypeId ({len(html)} bytes{snippet}) -> retry con render")
-                html = None
-        if html is None:
-            html = self._bd_request(url, render=True)
-            if html is not None and "clientTypeId" not in html:
-                snippet = ", body=" + repr(html[:120]) if len(html) < 2000 else ""
-                logger.warning(f"  render tampoco trae clientTypeId ({len(html)} bytes{snippet})")
-        if html is None:
-            self.stats["errors"] += 1
+    # ------------------------------------------------------------------
+    # combinedLocationIds discovery (1 request por zona, cacheado)
+    # ------------------------------------------------------------------
+    def _get_location_ids(self, zona_key: str) -> Optional[str]:
+        if zona_key in self._location_ids:
+            return self._location_ids[zona_key]
+        zona = self.ZONAS.get(zona_key, {})
+        url_path = zona.get("url_path", f"{zona_key}/todas-las-zonas")
+        url = f"{self.BASE_URL}/es/comprar/viviendas/{url_path}/l"
+        html = self._bd_request(url)
+        if not html:
             return None
-        adaptor = Adaptor(content=html, url=url)
-        try:
-            adaptor.status = 200  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        return adaptor
+        m = re.search(r'combinedLocationIds=([0-9,]+)', html)
+        if not m:
+            m = re.search(r'"combinedLocationIds":"([0-9,]+)"', html)
+        if not m:
+            logger.warning(f"[fotocasa-bd] {zona_key}: combinedLocationIds no encontrado (html={len(html)} bytes)")
+            return None
+        self._location_ids[zona_key] = m.group(1)
+        logger.info(f"[fotocasa-bd] {zona_key}: combinedLocationIds={m.group(1)}")
+        return m.group(1)
 
+    # ------------------------------------------------------------------
+    # API item -> listing dict
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _api_features(features) -> Dict[str, int]:
+        out: Dict[str, int] = {}
+        if isinstance(features, list):
+            for f in features:
+                if isinstance(f, dict) and f.get("key"):
+                    val = f.get("value")
+                    if isinstance(val, list) and val:
+                        val = val[0]
+                    try:
+                        out[f["key"]] = int(val)
+                    except (TypeError, ValueError):
+                        pass
+        return out
+
+    def _listing_from_api_item(self, d: dict, zona_key: str, zona_info: dict) -> Optional[Dict[str, Any]]:
+        anuncio_id = str(d.get("id") or "")
+        if not anuncio_id:
+            return None
+        # Promociones de obra nueva nunca son particulares
+        if d.get("promotionId") or d.get("promotionTypeId"):
+            return None
+
+        adv = d.get("advertiser") or {}
+        es_particular = adv.get("typeId") == 1
+        vendedor = (adv.get("clientAlias") or "").strip() or ("Particular" if es_particular else "Agencia")
+
+        precio = None
+        for t in (d.get("transactions") or []):
+            vals = t.get("value") or []
+            if vals and isinstance(vals, list):
+                try:
+                    v = float(vals[0])
+                    if v > 0:
+                        precio = v
+                        break
+                except (TypeError, ValueError):
+                    pass
+
+        feats = self._api_features(d.get("features"))
+
+        detail = d.get("detail") or {}
+        href = (detail.get("es") or "").split("?", 1)[0]
+        url_anuncio = href if href.startswith("http") else f"{self.BASE_URL}{href}"
+
+        addr = d.get("address") or {}
+        loc = addr.get("location") or {}
+        municipio = (loc.get("level5") or loc.get("level4") or "").strip()
+        coords = addr.get("coordinates") or {}
+
+        phone = adv.get("phone") or ""
+        phone_digits = re.sub(r"\D", "", phone)[-9:] if phone else ""
+
+        photos = []
+        for mm in (d.get("multimedias") or []):
+            if isinstance(mm, dict):
+                u = mm.get("url") or mm.get("src") or ""
+                if "/images/ads/" in u:
+                    photos.append(u)
+
+        descripcion = d.get("description") or ""
+
+        return {
+            "anuncio_id": anuncio_id,
+            "titulo": descripcion[:200] if descripcion else f"Vivienda en {municipio or zona_info.get('nombre', zona_key)}",
+            "precio": precio,
+            "habitaciones": feats.get("rooms") or None,
+            "metros": feats.get("surface") or None,
+            "banos": feats.get("bathrooms") or None,
+            "descripcion": descripcion,
+            "telefono": phone_digits or None,
+            "telefono_norm": self.normalize_phone(phone_digits) if phone_digits else None,
+            "fotos": photos[:10] or None,
+            "url_anuncio": url_anuncio,
+            "direccion": (addr.get("ubication") or municipio or None),
+            "municipio": municipio or None,
+            "latitud": coords.get("latitude"),
+            "longitud": coords.get("longitude"),
+            "zona_geografica": municipio or zona_info.get("nombre", zona_key),
+            "zona_busqueda": zona_key,
+            "es_particular": es_particular,
+            "vendedor": vendedor,
+            "tipo_inmueble": "piso",
+        }
+
+    # ------------------------------------------------------------------
+    # Main loop
+    # ------------------------------------------------------------------
     def run(self) -> Dict[str, Any]:
-        import time
-
         if not self.zones:
             self.zones = list(self.ZONAS.keys())
 
         # Expand composite zones (mismo comportamiento que ScraplingFotocasa.run)
-        expanded = []
+        expanded: List[str] = []
         for z in self.zones:
             info = self.ZONAS.get(z, {})
             if "composite" in info:
@@ -103,14 +200,13 @@ class ScraplingFotocasaBD(ScraplingFotocasa):
             elif z in self.ZONAS:
                 expanded.append(z)
             else:
-                logger.warning(f"[{self.PORTAL_NAME}-bd] Zone not found: {z}")
+                logger.warning(f"[fotocasa-bd] Zone not found: {z}")
                 self.stats["zones_failed"] += 1
         self.zones = expanded
 
         logger.info(
-            f"[{self.PORTAL_NAME}-bd] Starting scrape | tenant={self.tenant_id} "
-            f"zones={self.zones} max_pages={self.max_pages} zone={self.bd_zone} "
-            f"render={self.bd_render}"
+            f"[fotocasa-bd] Starting scrape | tenant={self.tenant_id} "
+            f"zones={self.zones} max_pages={self.max_pages} zone={self.bd_zone}"
         )
         start = datetime.now()
 
@@ -121,7 +217,7 @@ class ScraplingFotocasaBD(ScraplingFotocasa):
                 self._scrape_zone_bd(zona_key)
                 self.stats["zones_completed"] += 1
             except Exception as e:
-                logger.exception(f"[{self.PORTAL_NAME}-bd] zone={zona_key} failed: {e}")
+                logger.exception(f"[fotocasa-bd] zone={zona_key} failed: {e}")
                 self.stats["zones_failed"] += 1
                 self.stats["errors"] += 1
             finally:
@@ -130,23 +226,53 @@ class ScraplingFotocasaBD(ScraplingFotocasa):
         elapsed = (datetime.now() - start).total_seconds()
         self.stats["elapsed_seconds"] = round(elapsed, 1)
         logger.info(
-            f"[{self.PORTAL_NAME}-bd] DONE in {elapsed:.0f}s | "
+            f"[fotocasa-bd] DONE in {elapsed:.0f}s | "
             f"found={self.stats['listings_found']} saved={self.stats['listings_saved']} "
             f"errors={self.stats['errors']}"
         )
         return self.stats
 
     def _scrape_zone_bd(self, zona_key: str):
+        loc_ids = self._get_location_ids(zona_key)
+        if not loc_ids:
+            self.stats["zones_failed"] += 1
+            return
+        zona_info = self.ZONAS.get(zona_key, {})
+
         for page_num in range(1, self.max_pages + 1):
-            url = self.build_search_url(zona_key, page_num)
-            logger.info(f"[{self.PORTAL_NAME}-bd] {zona_key} p{page_num}: {url}")
-            page = self._bd_fetch(url)
-            if page is None:
+            api_url = (
+                f"{self.FC_SEARCH_API}?combinedLocationIds={loc_ids}"
+                f"&transactionTypeId=1&pageNumber={page_num}"
+                f"&sortType=publicationDate&sortOrderDesc=true&pageSize=30"
+            )
+            logger.info(f"[fotocasa-bd] {zona_key} p{page_num} (API)")
+            body = self._bd_request(api_url)
+            if body is None:
+                break
+            try:
+                data = json.loads(body)
+            except ValueError:
+                logger.warning(f"  respuesta API no-JSON ({len(body)} bytes): {body[:150]!r}")
+                self.stats["errors"] += 1
                 break
 
-            listings = self.parse_search_page(page, zona_key) or []
+            items = data.get("realEstates") or []
+            listings = []
+            for item in items:
+                try:
+                    listing = self._listing_from_api_item(item, zona_key, zona_info)
+                except Exception as e:
+                    logger.debug(f"  item parse error: {e}")
+                    continue
+                if listing:
+                    listings.append(listing)
+
+            n_part = sum(1 for x in listings if x["es_particular"])
             self.stats["listings_found"] += len(listings)
-            logger.info(f"  parsed {len(listings)} listings")
+            logger.info(
+                f"  {len(listings)} listings ({n_part} particulares, "
+                f"{len(listings) - n_part} agencias) | total zona: {data.get('count')}"
+            )
             if not listings:
                 break  # página vacía = fin de paginación
 
