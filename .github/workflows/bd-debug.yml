@@ -32,13 +32,13 @@ jobs:
             echo "$body" | jq -r '"target status: \(.status_code // "n/a") | body bytes: \((.body // "") | length)"' 2>/dev/null || echo "no-json resp: $(echo "$body" | head -c 300)"
             echo "$body" | jq -r '.body // ""' 2>/dev/null | head -c 400 | tr -d '\0' || true
             echo ""
-            n=$(echo "$body" | jq -r '.body // ""' 2>/dev/null | grep -c clientTypeId || true)
-            echo "clientTypeId hits: $n"
+            total=$(echo "$body" | jq -r '.body // ""' 2>/dev/null | grep -o '"clientTypeId":[0-9]*' | wc -l)
+            partic=$(echo "$body" | jq -r '.body // ""' 2>/dev/null | grep -o '"clientTypeId":1[,}]' | wc -l)
+            echo "clientTypeId total: $total | particulares (==1): $partic"
             echo ""
           }
-          probe "PL particulares"        "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl" no
-          probe "PL particulares"        "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl" yes
-          probe "L generica"             "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l" no
-          probe "L generica"             "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l" yes
-          probe "Home fotocasa"          "https://www.fotocasa.es/es/" no
-          probe "Idealista control (OK)" "https://www.idealista.com/venta-viviendas/lleida-lleida/" no
+          probe "L lleida p1"     "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l" no
+          probe "L lleida p2"     "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l/2" no
+          probe "L lleida p3"     "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l/3" no
+          probe "L mollerussa p1" "https://www.fotocasa.es/es/comprar/viviendas/mollerussa/todas-las-zonas/l" no
+          probe "L alpicat p1"    "https://www.fotocasa.es/es/comprar/viviendas/alpicat/todas-las-zonas/l" no
