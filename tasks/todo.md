@@ -54,6 +54,31 @@
 - [x] bd-debug.yml eliminado. Deploy VPS del codigo de auditoria hecho.
 - Resultado: cron diario (sabado incl.) wallapop+habitaclia+fotocasa(BD).
 
+# Plan: Milanuncios via Bright Data (6 Jul 2026, tarde)
+
+## Diagnostico
+- [x] VPS scrapeaba zonas equivocadas (default salou/cambrils/tarragona/reus — nunca Lleida).
+- [x] Slug viejo `pisos-en-X` mezcla ALQUILER; el bueno es `venta-de-pisos-en-X`.
+- [x] Faltaba categoria CASAS (el stock real de los pueblos).
+- [x] Probes BD (3 iteraciones): GeeTest no aparece; INITIAL_PROPS extraible;
+      `?vendedor=part` filtra particulares server-side; `lleida-lleida` = provincia.
+      Inventario actual: 32 pisos + 40 casas part. en Lleida prov, 9+7 Tarragona.
+
+## Implementacion
+- [x] `scrapling_milanuncios_bd.py`: BD + vendedor=part + zona por city del anuncio
+      + detalle solo anuncios nuevos + filtro demanda (Compro/Busco). Commit 23b7571.
+- [x] Workflow: milanuncios al cron diario via BD (SCHEDULE_PORTALS).
+- [x] Test 1 (run 28803813019): 185 raw guardados pero timeout 20min — slugs de
+      pueblo caian al fallback provincial (duplicaban todo) + URLs con `|` rechazadas.
+- [x] Fix (1ff7ec9): 2 provincias x 2 categorias, percent-encode, dedupe intra-run.
+- [x] Test 2 (run 28805933529): DONE en 234s, found=201 saved=185 details=7.
+- [x] Verificado dim_leads: milanuncios 12 -> 177 leads (169 nuevos hoy),
+      zonas por municipio real (Lleida 13, Tarragona 9, Reus 7, Salou 6...).
+- [x] bd-debug.yml borrado. Memoria actualizada.
+- Nota: 7 errors en detalles (transitorios); esos anuncios quedan sin tel/fotos.
+- Nota: VPS scheduled_scrape sigue con milanuncios viejo (zonas Tarragona) — redundante
+      pero inofensivo (upsert); candidato a limpiar otro dia.
+
 ## Extra (petición usuario)
 - [x] Wallapop: dejar de almacenar fotos (`_extract_photos` -> []). No gastaba anti-bot
       igualmente; el coste es la visita al detalle (por el teléfono).
