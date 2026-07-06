@@ -79,6 +79,14 @@
 - Nota: VPS scheduled_scrape sigue con milanuncios viejo (zonas Tarragona) — redundante
       pero inofensivo (upsert); candidato a limpiar otro dia.
 
+# Fix: fotos rotas habitaclia + milanuncios (6 Jul 2026, noche)
+
+- [x] Diagnostico: fotos SI se guardan (88-100%) pero habitaclia (sufijo XL_XXL
+      concatenado -> 404) y milanuncios (sin ?rule= -> 404; images-re -> 403) no cargan.
+- [x] Scrapers corregidos (URL base habitaclia; rule+dominio milanuncios).
+- [x] Datos reparados: 405 raw + 342 dim_leads. Muestra 8/8 URLs -> HTTP 200.
+- Wallapop 40% sin fotos: decision previa (no se guardan) — no tocado.
+
 ## Extra (petición usuario)
 - [x] Wallapop: dejar de almacenar fotos (`_extract_photos` -> []). No gastaba anti-bot
       igualmente; el coste es la visita al detalle (por el teléfono).
