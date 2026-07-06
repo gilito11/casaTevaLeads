@@ -1,0 +1,44 @@
+# TEMPORAL: diagnostico Bright Data vs fotocasa. Borrar cuando fotocasa-bd funcione.
+name: BD Debug (temporal)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Probe fotocasa URLs via Bright Data
+        env:
+          BD_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+        run: |
+          probe () {
+            local label="$1"; local url="$2"; local render="$3"
+            local payload
+            if [ "$render" = "yes" ]; then
+              payload=$(jq -n --arg u "$url" '{zone:"web_unlocker1", url:$u, format:"json", country:"es", render:"true"}')
+            else
+              payload=$(jq -n --arg u "$url" '{zone:"web_unlocker1", url:$u, format:"json", country:"es"}')
+            fi
+            echo "===== $label (render=$render) ====="
+            resp=$(curl -s -w '\nCURL_HTTP:%{http_code}' -X POST https://api.brightdata.com/request \
+              -H "Authorization: Bearer $BD_KEY" -H "Content-Type: application/json" \
+              -d "$payload" --max-time 150)
+            code=$(echo "$resp" | grep -o 'CURL_HTTP:[0-9]*' | cut -d: -f2)
+            body=$(echo "$resp" | sed 's/CURL_HTTP:[0-9]*$//')
+            echo "BD API HTTP: $code | resp bytes: ${#body}"
+            # format=json -> {status_code, headers, body}
+            echo "$body" | jq -r '"target status: \(.status_code // "n/a") | body bytes: \((.body // "") | length)"' 2>/dev/null || echo "no-json resp: $(echo "$body" | head -c 300)"
+            echo "$body" | jq -r '.body // ""' 2>/dev/null | head -c 400 | tr -d '\0' || true
+            echo ""
+            n=$(echo "$body" | jq -r '.body // ""' 2>/dev/null | grep -c clientTypeId || true)
+            echo "clientTypeId hits: $n"
+            echo ""
+          }
+          probe "PL particulares"        "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl" no
+          probe "PL particulares"        "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl" yes
+          probe "L generica"             "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l" no
+          probe "L generica"             "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l" yes
+          probe "Home fotocasa"          "https://www.fotocasa.es/es/" no
+          probe "Idealista control (OK)" "https://www.idealista.com/venta-viviendas/lleida-lleida/" no
