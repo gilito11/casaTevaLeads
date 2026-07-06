@@ -1,0 +1,48 @@
+# TEMPORAL: diagnostico Bright Data vs milanuncios. Borrar cuando milanuncios-bd funcione.
+name: BD Debug (temporal)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Probe milanuncios URLs via Bright Data
+        env:
+          BD_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+        run: |
+          fetch_body () {
+            local url="$1"
+            local payload=$(jq -n --arg u "$url" '{zone:"web_unlocker1", url:$u, format:"json", country:"es"}')
+            curl -s -X POST https://api.brightdata.com/request \
+              -H "Authorization: Bearer $BD_KEY" -H "Content-Type: application/json" \
+              -d "$payload" --max-time 150 > /tmp/resp.json
+            jq -r '"target status: \(.status_code // "n/a") | body bytes: \((.body // "") | length)"' /tmp/resp.json
+            jq -r '.body // ""' /tmp/resp.json > /tmp/body.html
+          }
+          analyze () {
+            local label="$1"; local url="$2"
+            echo "===== $label ====="
+            echo "URL: $url"
+            fetch_body "$url"
+            # INITIAL_PROPS presente?
+            if grep -q '__INITIAL_PROPS__' /tmp/body.html; then echo "INITIAL_PROPS: SI"; else echo "INITIAL_PROPS: NO"; fi
+            # GeeTest / captcha?
+            if grep -qi 'geetest\|captcha' /tmp/body.html; then echo "GEETEST/CAPTCHA: presente"; fi
+            # ads en el JSON
+            n_ids=$(grep -o '"adId"\|"sellerType"' /tmp/body.html | wc -l)
+            echo "menciones adId/sellerType: $n_ids"
+            grep -o '"sellerType":{"value":"[a-z]*"' /tmp/body.html | sort | uniq -c | head -5 || true
+            grep -o '"sellerType":"[a-z]*"' /tmp/body.html | sort | uniq -c | head -5 || true
+            # primeros titulos
+            grep -o '"title":"[^"]\{10,60\}"' /tmp/body.html | head -3 || true
+            echo ""
+          }
+          analyze "pisos (slug actual)"        "https://www.milanuncios.com/pisos-en-lleida-lleida/"
+          analyze "venta-de-pisos"             "https://www.milanuncios.com/venta-de-pisos-en-lleida-lleida/"
+          analyze "venta-de-casas"             "https://www.milanuncios.com/venta-de-casas-en-lleida-lleida/"
+          analyze "casas-en-venta"             "https://www.milanuncios.com/casas-en-venta-en-lleida-lleida/"
+          analyze "venta-de-pisos pag2"        "https://www.milanuncios.com/venta-de-pisos-en-lleida-lleida/?pagina=2"
+          analyze "venta-de-casas mollerussa"  "https://www.milanuncios.com/venta-de-casas-en-mollerussa-lleida/"
