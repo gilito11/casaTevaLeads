@@ -56,10 +56,14 @@ jobs:
           echo "--- primeros ids p1 ---"
           grep -o '"id":[0-9]\{7,\}' /tmp/p1.html | head -5
 
-          echo "===== pagIndex=2 de verdad pagina? ====="
-          fetch_body "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l?pagIndex=2" > /tmp/p2.html
-          echo "p2 bytes: $(wc -c < /tmp/p2.html)"
-          echo "--- primeros ids p2 ---"
-          grep -o '"id":[0-9]\{7,\}' /tmp/p2.html | head -5
-          echo "--- paginacion interna ---"
-          grep -o '"pag[A-Za-z]*"[^,}]*' /tmp/p2.html | sort -u | head -8
+          echo "===== /l/2 con render ====="
+          probe "L p2 path render" "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l/2" yes
+          echo "===== /l sort fecha con render ====="
+          probe "L sort render" "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l?sortType=publicationDate" yes
+
+          echo "===== API interna en HTML p1 ====="
+          grep -io 'gw\.fotocasa[a-z./-]*' /tmp/p1.html | sort -u | head -5
+          grep -io 'propertysearch[a-z/]*' /tmp/p1.html | sort -u | head -5
+          grep -io 'api[-_]key[^,}]\{0,50\}' /tmp/p1.html | sort -u | head -5
+          grep -io '"apiUrl[^,}]\{0,80\}' /tmp/p1.html | sort -u | head -5
+          echo "--- pageNumber en p2 render (si aplica) ---"
