@@ -66,12 +66,16 @@ jobs:
                   v = st.get("value") if isinstance(st, dict) else st
                   dist[str(v)] = dist.get(str(v), 0) + 1
               print(f"  sellerType dist: {dist}")
-              for ad in ads[:3]:
+              for ad in ads[:4]:
                   price = ad.get("price")
                   if isinstance(price, dict):
                       cp = price.get("cashPrice") or {}
                       price = cp.get("value") if isinstance(cp, dict) else price.get("value")
-                  print(f"    - id={ad.get('id')} {str(ad.get('title'))[:55]!r} precio={price}")
+                  city = ad.get("city")
+                  city = city.get("name") if isinstance(city, dict) else (city or ad.get("location"))
+                  st = ad.get("sellerType")
+                  st = st.get("value") if isinstance(st, dict) else st
+                  print(f"    - id={ad.get('id')} city={city!r} seller={st} precio={price} {str(ad.get('title'))[:40]!r}")
               first_id = ads[0].get("id") if ads else None
               print(f"  first_id: {first_id}")
               # info de paginacion total
@@ -81,13 +85,12 @@ jobs:
                           print(f"  pag.{k}: {pag[k]}")
               print()
 
-          analyze("venta-de-pisos lleida p1", "https://www.milanuncios.com/venta-de-pisos-en-lleida-lleida/")
-          analyze("venta-de-pisos lleida p2", "https://www.milanuncios.com/venta-de-pisos-en-lleida-lleida/?pagina=2")
-          analyze("venta-de-casas lleida",    "https://www.milanuncios.com/venta-de-casas-en-lleida-lleida/")
-          analyze("casas-en-venta lleida",    "https://www.milanuncios.com/casas-en-venta-en-lleida-lleida/")
-          analyze("pisos (slug actual)",      "https://www.milanuncios.com/pisos-en-lleida-lleida/")
-          analyze("venta-de-casas mollerussa","https://www.milanuncios.com/venta-de-casas-en-mollerussa-lleida/")
-          analyze("venta-de-casas alpicat",   "https://www.milanuncios.com/venta-de-casas-en-alpicat-lleida/")
-          analyze("terrenos lleida",          "https://www.milanuncios.com/terrenos-en-venta-en-lleida-lleida/")
+          analyze("pisos lleida PART",        "https://www.milanuncios.com/venta-de-pisos-en-lleida-lleida/?vendedor=part")
+          analyze("pisos lleida PART p2",     "https://www.milanuncios.com/venta-de-pisos-en-lleida-lleida/?vendedor=part&pagina=2")
+          analyze("casas lleida PART",        "https://www.milanuncios.com/venta-de-casas-en-lleida-lleida/?vendedor=part")
+          analyze("terrenos v2 lleida",       "https://www.milanuncios.com/venta-de-terrenos-en-lleida-lleida/")
+          analyze("terrenos v2 lleida PART",  "https://www.milanuncios.com/venta-de-terrenos-en-lleida-lleida/?vendedor=part")
+          analyze("pisos tarragona PART",     "https://www.milanuncios.com/venta-de-pisos-en-tarragona-tarragona/?vendedor=part")
+          analyze("casas tarragona PART",     "https://www.milanuncios.com/venta-de-casas-en-tarragona-tarragona/?vendedor=part")
           EOF
           python3 /tmp/probe.py
