@@ -37,9 +37,29 @@ jobs:
             echo "clientTypeId total: $total | particulares (==1): $partic"
             echo ""
           }
-          probe "PL con sortType"   "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl?sortType=publicationDate" no
-          probe "PL trailing slash" "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl/" no
-          probe "L sort fecha"      "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l?sortType=publicationDate" no
-          probe "L p2 query"        "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l?pagIndex=2" no
-          probe "L p2 sort+path"    "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l/2?sortType=publicationDate" no
-          probe "PL lleida render2" "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl" yes
+          fetch_body () {
+            local url="$1"
+            local payload=$(jq -n --arg u "$url" '{zone:"web_unlocker1", url:$u, format:"json", country:"es"}')
+            curl -s -X POST https://api.brightdata.com/request \
+              -H "Authorization: Bearer $BD_KEY" -H "Content-Type: application/json" \
+              -d "$payload" --max-time 150 | jq -r '.body // ""'
+          }
+
+          echo "===== Inspeccion SPA config en /l lleida ====="
+          fetch_body "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l" > /tmp/p1.html
+          echo "p1 bytes: $(wc -c < /tmp/p1.html)"
+          echo "--- endpoints api ---"
+          grep -o 'https://[a-z.]*fotocasa[a-z./-]*' /tmp/p1.html | sort -u | head -15
+          echo "--- sort hints ---"
+          grep -o '"sort[A-Za-z]*"[^,}]*' /tmp/p1.html | sort -u | head -10
+          grep -o 'sortType=[a-zA-Z]*' /tmp/p1.html | sort -u | head -10
+          echo "--- primeros ids p1 ---"
+          grep -o '"id":[0-9]\{7,\}' /tmp/p1.html | head -5
+
+          echo "===== pagIndex=2 de verdad pagina? ====="
+          fetch_body "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l?pagIndex=2" > /tmp/p2.html
+          echo "p2 bytes: $(wc -c < /tmp/p2.html)"
+          echo "--- primeros ids p2 ---"
+          grep -o '"id":[0-9]\{7,\}' /tmp/p2.html | head -5
+          echo "--- paginacion interna ---"
+          grep -o '"pag[A-Za-z]*"[^,}]*' /tmp/p2.html | sort -u | head -8
