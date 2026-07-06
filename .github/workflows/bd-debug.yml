@@ -37,8 +37,9 @@ jobs:
             echo "clientTypeId total: $total | particulares (==1): $partic"
             echo ""
           }
-          probe "L lleida p1"     "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l" no
-          probe "L lleida p2"     "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l/2" no
-          probe "L lleida p3"     "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l/3" no
-          probe "L mollerussa p1" "https://www.fotocasa.es/es/comprar/viviendas/mollerussa/todas-las-zonas/l" no
-          probe "L alpicat p1"    "https://www.fotocasa.es/es/comprar/viviendas/alpicat/todas-las-zonas/l" no
+          probe "PL con sortType"   "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl?sortType=publicationDate" no
+          probe "PL trailing slash" "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl/" no
+          probe "L sort fecha"      "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l?sortType=publicationDate" no
+          probe "L p2 query"        "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l?pagIndex=2" no
+          probe "L p2 sort+path"    "https://www.fotocasa.es/es/comprar/viviendas/lleida-capital/todas-las-zonas/l/2?sortType=publicationDate" no
+          probe "PL lleida render2" "https://www.fotocasa.es/es/comprar/viviendas/particulares/lleida-capital/todas-las-zonas/pl" yes
