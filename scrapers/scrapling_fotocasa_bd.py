@@ -48,22 +48,40 @@ class ScraplingFotocasaBD(ScraplingFotocasa):
             "Content-Type": "application/json",
         })
 
-    def _bd_fetch(self, url: str) -> Optional[Adaptor]:
+    def _bd_request(self, url: str, render: bool) -> Optional[str]:
         payload = {"zone": self.bd_zone, "url": url, "format": "raw", "country": self.BD_COUNTRY}
-        if self.bd_render:
-            payload["render"] = True
+        if render:
+            payload["render"] = "true"  # fuerza browser rendering (doc BD)
         try:
-            r = self.bd_session.post(self.BD_API_URL, json=payload, timeout=120)
+            r = self.bd_session.post(self.BD_API_URL, json=payload, timeout=180)
         except requests.RequestException as e:
             logger.warning(f"  BD fetch failed for {url}: {e}")
-            self.stats["errors"] += 1
             return None
         if r.status_code != 200:
             logger.warning(f"  BD HTTP {r.status_code} for {url}: {r.text[:200]}")
-            self.stats["errors"] += 1
             return None
         r.encoding = "utf-8"
-        adaptor = Adaptor(content=r.text, url=url)
+        return r.text
+
+    def _bd_fetch(self, url: str) -> Optional[Adaptor]:
+        # 1º intento sin render (barato). El /pl de fotocasa suele necesitar JS:
+        # si el HTML no trae el JSON embebido (clientTypeId), retry con render.
+        html = None
+        if not self.bd_render:
+            html = self._bd_request(url, render=False)
+            if html is not None and "clientTypeId" not in html:
+                snippet = ", body=" + repr(html[:120]) if len(html) < 2000 else ""
+                logger.info(f"  body sin clientTypeId ({len(html)} bytes{snippet}) -> retry con render")
+                html = None
+        if html is None:
+            html = self._bd_request(url, render=True)
+            if html is not None and "clientTypeId" not in html:
+                snippet = ", body=" + repr(html[:120]) if len(html) < 2000 else ""
+                logger.warning(f"  render tampoco trae clientTypeId ({len(html)} bytes{snippet})")
+        if html is None:
+            self.stats["errors"] += 1
+            return None
+        adaptor = Adaptor(content=html, url=url)
         try:
             adaptor.status = 200  # type: ignore[attr-defined]
         except Exception:
