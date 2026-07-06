@@ -1,11 +1,12 @@
 # Scraper workflow for Tenant 2 (Look and Find - Madrid)
 # Runs fotocasa + idealista for Chamartín + Hortaleza
-# Staggered 30 min after main workflow to avoid dbt conflicts
+# CRON DESACTIVADO (6 Jul 2026): Find&Look parado, no se va a vender.
+# Producia ~0 leads (8 en total desde Feb). Reactivar descomentando schedule.
 name: Run Scrapers - Madrid (Neon)
 
 on:
-  schedule:
-    - cron: '30 12 * * 1,3,5'
+  # schedule:
+  #   - cron: '30 12 * * 1,3,5'
   workflow_dispatch:
     inputs:
       portals:
