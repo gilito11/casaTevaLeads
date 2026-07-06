@@ -37,6 +37,23 @@
 - [x] Verificado end-to-end en shell: 4/4 registros correctos, save sin cambio no registra.
 - [ ] Deploy VPS pendiente (tabla ya existe en Neon; falta git pull + restart).
 
+# Plan: Fotocasa via Bright Data + cron con sabado (6 Jul 2026)
+
+- [x] Diagnostico: cron solo wallapop+habitaclia (fotocasa/milanuncios manual-only);
+      sabado sin scrape; VPS geo-bloqueado (solo milanuncios); habitaclia intermitente.
+- [x] `scrapling_fotocasa_bd.py`: subclass BD Web Unlocker (por request), reusa
+      parser JSON embebido clientTypeId — sin navegador.
+- [x] Workflow: cron diario `0 12 * * *` + fotocasa en SCHEDULE_PORTALS via BD.
+- [x] Commit bafd5b3 + push.
+- [x] Descubrimiento (workflow bd-debug, 8 iteraciones): /pl da 502 via BD;
+      API interna web.gw.fotocasa.es/v2/propertysearch/search responde JSON sin key,
+      paginacion real + sortOrderDesc; advertiser.typeId 1=particular.
+- [x] Scraper reescrito contra el API (commit 6fe952d). Test 3 zonas:
+      180 anuncios -> 15 particulares guardados, 0 errores, 77s (~$0.01/run).
+- [x] Verificado en dim_leads: 8 Lleida + 4 Alpicat + 3 Mollerussa con precio/vendedor.
+- [x] bd-debug.yml eliminado. Deploy VPS del codigo de auditoria hecho.
+- Resultado: cron diario (sabado incl.) wallapop+habitaclia+fotocasa(BD).
+
 ## Extra (petición usuario)
 - [x] Wallapop: dejar de almacenar fotos (`_extract_photos` -> []). No gastaba anti-bot
       igualmente; el coste es la visita al detalle (por el teléfono).
