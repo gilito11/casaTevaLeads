@@ -67,9 +67,16 @@ jobs:
           jq -c '.realEstates[0].advertiser' /tmp/api1.json 2>/dev/null
           echo "--- advertiser typeIds distribucion ---"
           jq -r '[.realEstates[]?.advertiser | (.clientTypeId // .typeId // "null") | tostring] | group_by(.) | map("\(.[0]): \(length)") | join(" | ")' /tmp/api1.json 2>/dev/null
-          echo "--- address + features + transactions item 0 ---"
-          jq -c '.realEstates[0] | {address: .address, features: .features[0:6], transactions: .transactions, detail: .detail}' /tmp/api1.json 2>/dev/null | head -c 900
-          echo ""
-          echo "--- description + multimedia sample ---"
-          jq -r '.realEstates[0].description // "" | .[0:150]' /tmp/api1.json 2>/dev/null
-          jq -r '[.realEstates[0].multimedias[]? | .url // .src][0:2] | join(" ")' /tmp/api1.json 2>/dev/null
+          echo "--- transactions item 0 ---"
+          jq -c '.realEstates[0].transactions' /tmp/api1.json 2>/dev/null
+          echo "--- detail item 0 ---"
+          jq -c '.realEstates[0].detail' /tmp/api1.json 2>/dev/null
+          echo "--- primer PARTICULAR (typeId==1): advertiser + id + date ---"
+          jq -c '[.realEstates[] | select(.advertiser.typeId == 1)][0] | {id, date, advertiser, detail}' /tmp/api1.json 2>/dev/null
+          echo "--- features keys posibles ---"
+          jq -r '[.realEstates[].features[].key] | unique | join(", ")' /tmp/api1.json 2>/dev/null
+          echo "--- surface/rooms item 0 ---"
+          jq -c '.realEstates[0].features | map(select(.key == "surface" or .key == "rooms"))' /tmp/api1.json 2>/dev/null
+          echo "===== pageSize=100? ====="
+          API2="https://web.gw.fotocasa.es/v2/propertysearch/search?combinedLocationIds=$LOC&transactionTypeId=1&pageNumber=1&sortType=publicationDate&sortOrderDesc=true&pageSize=100"
+          fetch_body "$API2" | jq -r '"items: \(.realEstates | length) | count: \(.count)"' 2>/dev/null
