@@ -21,6 +21,7 @@ from leads.models import (
     LeadDireccion, ContactPropiedad,
 )
 from leads.geocoding import geocode_address
+from leads.audit import log_audit
 from core.models import TenantUser, Tenant
 from notifications.utils import create_notification
 
@@ -485,6 +486,14 @@ def mark_as_agency_view(request, lead_id):
 
     motivo = f"Marcado como agencia por {request.user.username} desde CRM"
 
+    log_audit(
+        'lead_agencia', lead_id,
+        tenant_id=lead.tenant_id, user=request.user,
+        telefono=lead.telefono_norm, portal=lead.portal,
+        titulo=lead.titulo or lead.direccion or '',
+        detalle=f"anuncio_id={lead.anuncio_id}, precio={lead.precio}",
+    )
+
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -525,6 +534,14 @@ def delete_lead_view(request, lead_id):
     # Verificar que el lead pertenece al tenant del usuario
     if tenant_id and lead.tenant_id != tenant_id:
         return HttpResponse(status=403)
+
+    log_audit(
+        'lead_borrado', lead_id,
+        tenant_id=lead.tenant_id, user=request.user,
+        telefono=lead.telefono_norm, portal=lead.portal,
+        titulo=lead.titulo or lead.direccion or '',
+        detalle=f"anuncio_id={lead.anuncio_id}, precio={lead.precio}",
+    )
 
     # Eliminar el estado del lead si existe
     LeadEstado.objects.filter(lead_id=str(lead.lead_id)).delete()
@@ -664,6 +681,14 @@ def bulk_delete_view(request):
                         blacklisted_count += 1
                     except (Tenant.DoesNotExist, IntegrityError) as e:
                         logger.warning(f"Could not add lead {lead_id} to blacklist: {e}")
+
+                log_audit(
+                    'lead_borrado', lead_id,
+                    tenant_id=lead.tenant_id, user=request.user,
+                    telefono=lead.telefono_norm, portal=lead.portal,
+                    titulo=lead.titulo or lead.direccion or '',
+                    detalle=f"bulk_delete, anuncio_id={lead.anuncio_id}, precio={lead.precio}, blacklist={add_to_blacklist}",
+                )
 
                 # Eliminar estado del lead
                 LeadEstado.objects.filter(lead_id=str(lead_id)).delete()

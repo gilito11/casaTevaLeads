@@ -25,7 +25,17 @@
 ## 5. Verificación ✅
 - [x] check OK; /analytics/mapa 200, /leads/<id>/ 200, contacto 200; save_address 302
       (guarda + geocode); add_propiedad 302 (vendida/precio/fecha guardados).
-- [ ] Commit + push + deploy VPS (git pull + migrate + collectstatic + restart).
+- [x] Commit + push (8a31c74) + deploy VPS OK (tablas ya en Neon; collectstatic + restart).
+      Producción /analytics/mapa y / responden 302 (login). Live en fincaradar.com.
+
+# Plan: Auditoría silenciosa de cambios de estado (Jul 2026)
+
+- [x] Modelo `AuditLog` (`leads_audit_log`), migración 0011 aplicada en Neon.
+- [x] Signals en LeadEstado (creado/cambiado/borrado) + middleware thread-local para usuario.
+- [x] log explícito en delete_lead, bulk_delete y mark_as_agency (borran vía SQL crudo).
+- [x] Admin solo superuser, solo lectura. Sin UI para comerciales.
+- [x] Verificado end-to-end en shell: 4/4 registros correctos, save sin cambio no registra.
+- [ ] Deploy VPS pendiente (tabla ya existe en Neon; falta git pull + restart).
 
 ## Extra (petición usuario)
 - [x] Wallapop: dejar de almacenar fotos (`_extract_photos` -> []). No gastaba anti-bot

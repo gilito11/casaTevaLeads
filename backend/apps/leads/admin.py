@@ -2,7 +2,7 @@ from django.contrib import admin
 from django import forms
 from .models import (
     Lead, Nota, LeadEstado, PortalCredential, ContactQueue,
-    MessageTemplate, AutoContactConfig,
+    MessageTemplate, AutoContactConfig, AuditLog,
 )
 
 
@@ -155,3 +155,32 @@ class MessageTemplateAdmin(admin.ModelAdmin):
 class AutoContactConfigAdmin(admin.ModelAdmin):
     list_display = ['tenant', 'habilitado', 'solo_particulares', 'max_contactos_dia', 'max_contactos_portal_dia']
     list_filter = ['habilitado']
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    """Auditoria interna: visible solo para superuser y de solo lectura."""
+    list_display = ['created_at', 'username', 'accion', 'lead_id', 'telefono',
+                    'estado_anterior', 'estado_nuevo', 'portal', 'titulo_corto']
+    list_filter = ['accion', 'username', 'tenant_id', 'created_at']
+    search_fields = ['lead_id', 'telefono', 'titulo', 'detalle', 'username']
+    date_hierarchy = 'created_at'
+
+    def titulo_corto(self, obj):
+        return (obj.titulo[:60] + '...') if len(obj.titulo) > 60 else obj.titulo
+    titulo_corto.short_description = 'Titulo'
+
+    def has_module_permission(self, request):
+        return request.user.is_active and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_active and request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

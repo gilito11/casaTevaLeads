@@ -746,3 +746,43 @@ class ContactPropiedad(models.Model):
     def lead(self):
         """Resuelve el Lead asociado (puede no existir si ya no esta en dim_leads)."""
         return Lead.objects.filter(lead_id=self.lead_id, tenant_id=self.tenant_id).first()
+
+
+class AuditLog(models.Model):
+    """
+    Registro de auditoria interno (solo superuser via admin).
+    Guarda cambios de estado y borrados de leads con snapshot de datos,
+    de forma que el rastro sobrevive aunque el lead se elimine despues.
+    """
+    ACCION_CHOICES = [
+        ('estado_creado', 'Estado creado'),
+        ('estado_cambiado', 'Estado cambiado'),
+        ('estado_borrado', 'Estado borrado'),
+        ('lead_borrado', 'Lead borrado'),
+        ('lead_agencia', 'Marcado como agencia (borrado)'),
+    ]
+
+    tenant_id = models.IntegerField(null=True, blank=True, db_index=True)
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='audit_logs'
+    )
+    username = models.CharField(max_length=150, blank=True, default='')
+    accion = models.CharField(max_length=30, choices=ACCION_CHOICES, db_index=True)
+    lead_id = models.CharField(max_length=100, db_index=True)
+    telefono = models.CharField(max_length=20, blank=True, default='')
+    portal = models.CharField(max_length=50, blank=True, default='')
+    titulo = models.TextField(blank=True, default='')
+    estado_anterior = models.CharField(max_length=30, blank=True, default='')
+    estado_nuevo = models.CharField(max_length=30, blank=True, default='')
+    detalle = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'leads_audit_log'
+        verbose_name = 'Registro de Auditoria'
+        verbose_name_plural = 'Registros de Auditoria'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.username or 'sistema'}: {self.accion} {self.lead_id}"
