@@ -29,9 +29,9 @@ env:
   TENANT_ID: 1
   # Portales que corren en el cron programado (sin inputs). Manual los sobreescribe.
   # habitaclia funciona GRATIS desde runners US (no geo-bloquea, sin proxy) y es
-  # el mejor productor. fotocasa va via Bright Data (pago por request, credito
-  # disponible) -> ambos a diario junto a wallapop.
-  SCHEDULE_PORTALS: 'wallapop,habitaclia,fotocasa'
+  # el mejor productor. fotocasa y milanuncios van via Bright Data (pago por
+  # request, credito disponible) -> todos a diario junto a wallapop.
+  SCHEDULE_PORTALS: 'wallapop,habitaclia,fotocasa,milanuncios'
 
 jobs:
   scrape:
@@ -105,15 +105,20 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Run Milanuncios scraper (Scrapling + IPRoyal ES)
+      # Milanuncios via Bright Data + filtro ?vendedor=part (solo particulares
+      # server-side). Zonas propias del scraper: lleida-lleida cubre la
+      # PROVINCIA entera + pueblos; costa de Tarragona por municipio.
+      # Detalle solo para anuncios nuevos -> ~$1-2/mes.
+      - name: Run Milanuncios scraper (Bright Data Web Unlocker)
         if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'milanuncios')
         continue-on-error: true
+        timeout-minutes: 20
         run: |
-          ZONES="${{ steps.zones.outputs.zones }}"
-          python -m scrapers.scrapling_milanuncios --zones ${ZONES//,/ } --max-pages 2 --postgres --proxy "$DATADOME_PROXY"
+          python -m scrapers.scrapling_milanuncios_bd --max-pages 3 --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          BRIGHTDATA_ZONE: web_unlocker1
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
