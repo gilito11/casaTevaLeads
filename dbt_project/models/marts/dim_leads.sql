@@ -32,31 +32,78 @@
 */
 
 {#
-    ZONAS ACTIVAS (tenant 1 - Casa Teva). Todo municipio que NO este aqui queda
-    DESCARTADO de dim_leads (las busquedas provinciales de milanuncios/fotocasa
-    arrastran pueblos de toda la provincia). Los datos raw se conservan: para
-    reactivar una zona basta con anadirla a esta lista (nombre normalizado:
-    minusculas, sin acentos, apostrofes/guiones como espacio).
+    ZONAS ACTIVAS (tenant 1 - Casa Teva). Mapa {variante normalizada -> nombre
+    canonico}: filtra Y unifica el nombre mostrado (evita duplicados tipo
+    "Bellvis"/"Bellvís" o "Mont Roig"/"Mont-roig"). Todo municipio que NO este
+    aqui queda DESCARTADO de dim_leads (las busquedas provinciales de
+    milanuncios/fotocasa arrastran pueblos de toda la provincia). Los datos raw
+    se conservan: para reactivar una zona basta con anadirla aqui (clave
+    normalizada: minusculas, sin acentos, apostrofes/guiones como espacio).
     Excepcion: leads con fila en leads_lead_estado (trabajados por el equipo)
     nunca se filtran, esten donde esten.
     Alcance decidido 26 Jun 2026: Lleida <=20km + costa Tarragona y cinturon
     inmediato de Tarragona/Reus/Cambrils.
 #}
-{% set zonas_activas_tenant1 = [
-    'lleida', 'partida balafia', 'alpicat', 'alcarras', 'torrefarrera',
-    'bell lloc', 'bell lloc d urgell', 'termens', 'juneda', 'almacelles',
-    'almenar', 'mollerussa', 'albatarrec', 'torre serona', 'montoliu de lleida',
-    'alcoletge', 'sudanell', 'benavent de segria', 'rossello', 'artesa de lleida',
-    'corbins', 'vilanova de segria', 'alfes', 'sunyer', 'vilanova de la barca',
-    'puigverd de lleida', 'torres de segre', 'alguaire', 'aspa', 'soses',
-    'menarguens', 'bellvis', 'sidamon', 'sarroca de lleida', 'aitona',
-    'fondarella', 'torrebesses', 'miralcamp', 'vallfogona de balaguer',
-    'gimenells', 'gimenells i el pla de la font',
-    'tarragona', 'bonavista', 'la canonja', 'reus', 'salou', 'cambrils',
-    'la pineda', 'vila seca', 'vilaseca', 'miami platja', 'miami playa',
-    'mont roig del camp', 'montroig del camp', 'vinyols i els arcs',
-    'montbrio del camp', 'riudoms', 'constanti',
-] %}
+{% set zonas_activas_tenant1 = {
+    'lleida': 'Lleida',
+    'partida balafia': 'Lleida',
+    'alpicat': 'Alpicat',
+    'alcarras': 'Alcarràs',
+    'torrefarrera': 'Torrefarrera',
+    'bell lloc': "Bell-lloc d'Urgell",
+    'bell lloc d urgell': "Bell-lloc d'Urgell",
+    'termens': 'Térmens',
+    'juneda': 'Juneda',
+    'almacelles': 'Almacelles',
+    'almenar': 'Almenar',
+    'mollerussa': 'Mollerussa',
+    'albatarrec': 'Albatàrrec',
+    'torre serona': 'Torre-serona',
+    'montoliu de lleida': 'Montoliu de Lleida',
+    'alcoletge': 'Alcoletge',
+    'sudanell': 'Sudanell',
+    'benavent de segria': 'Benavent de Segrià',
+    'rossello': 'Rosselló',
+    'artesa de lleida': 'Artesa de Lleida',
+    'corbins': 'Corbins',
+    'vilanova de segria': 'Vilanova de Segrià',
+    'alfes': 'Alfés',
+    'sunyer': 'Sunyer',
+    'vilanova de la barca': 'Vilanova de la Barca',
+    'puigverd de lleida': 'Puigverd de Lleida',
+    'torres de segre': 'Torres de Segre',
+    'alguaire': 'Alguaire',
+    'aspa': 'Aspa',
+    'soses': 'Soses',
+    'menarguens': 'Menàrguens',
+    'bellvis': 'Bellvís',
+    'sidamon': 'Sidamon',
+    'sarroca de lleida': 'Sarroca de Lleida',
+    'aitona': 'Aitona',
+    'fondarella': 'Fondarella',
+    'torrebesses': 'Torrebesses',
+    'miralcamp': 'Miralcamp',
+    'vallfogona de balaguer': 'Vallfogona de Balaguer',
+    'gimenells': 'Gimenells',
+    'gimenells i el pla de la font': 'Gimenells',
+    'tarragona': 'Tarragona',
+    'bonavista': 'Bonavista',
+    'la canonja': 'La Canonja',
+    'reus': 'Reus',
+    'salou': 'Salou',
+    'cambrils': 'Cambrils',
+    'la pineda': 'La Pineda',
+    'vila seca': 'Vila-seca',
+    'vilaseca': 'Vila-seca',
+    'miami platja': 'Miami Platja',
+    'miami playa': 'Miami Platja',
+    'mont roig del camp': 'Mont-roig del Camp',
+    'montroig del camp': 'Mont-roig del Camp',
+    'vinyols i els arcs': 'Vinyols i els Arcs',
+    'montbrio del camp': 'Montbrió del Camp',
+    'riudoms': 'Riudoms',
+    'constanti': 'Constantí',
+} %}
 
 WITH all_staging_sources AS (
     -- Fotocasa listings
@@ -171,7 +218,14 @@ enriched AS (
         descripcion,
         url AS listing_url,
         ubicacion,
-        zona_clasificada,
+        -- Quita prefijos de comarca/costa ("Lleida - ", "Costa Dorada - "...)
+        -- y fusiona variantes de capital ("Tarragona Ciudad/Capital" -> "Tarragona").
+        CASE
+            WHEN zona_clasificada IN ('Lleida Ciudad', 'Lleida Capital') THEN 'Lleida'
+            WHEN zona_clasificada IN ('Tarragona Ciudad', 'Tarragona Capital') THEN 'Tarragona'
+            WHEN zona_clasificada IS NULL OR zona_clasificada = '' THEN zona_clasificada
+            ELSE REGEXP_REPLACE(zona_clasificada, '^(Lleida|Costa Dorada|Tarragona|Terres Ebre|Madrid) - ', '')
+        END AS zona_clasificada,
         latitud,
         longitud,
         -- Normalize tipo_propiedad to Title Case and merge variants
@@ -346,14 +400,19 @@ final AS (
         e.descripcion,
         e.listing_url,
         e.ubicacion,
-        -- Nombre de zona UNIFICADO entre portales: cada municipio con un unico
-        -- nombre. Quita prefijos de comarca/costa ("Lleida - ", "Costa Dorada - "...)
-        -- y fusiona variantes de capital ("Tarragona Ciudad/Capital" -> "Tarragona").
-        CASE
-            WHEN e.zona_clasificada IN ('Lleida Ciudad', 'Lleida Capital') THEN 'Lleida'
-            WHEN e.zona_clasificada IN ('Tarragona Ciudad', 'Tarragona Capital') THEN 'Tarragona'
-            WHEN e.zona_clasificada IS NULL OR e.zona_clasificada = '' THEN e.zona_clasificada
-            ELSE REGEXP_REPLACE(e.zona_clasificada, '^(Lleida|Costa Dorada|Tarragona|Terres Ebre|Madrid) - ', '')
+        -- Nombre CANONICO por municipio (mapa zonas_activas_tenant1): unifica
+        -- variantes de grafia entre portales ("Bellvis"/"Bellvís",
+        -- "Mont Roig"/"Mont-roig del Camp", "Vilaseca"/"Vila-seca"...).
+        -- Zonas fuera del mapa (Madrid, etc.) conservan su nombre tal cual.
+        CASE TRIM(REGEXP_REPLACE(
+            TRANSLATE(LOWER(e.zona_clasificada),
+                      'àáâäèéêëìíîïòóôöùúûüçñ''-·',
+                      'aaaaeeeeiiiioooouuuucn   '),
+            '\s+', ' ', 'g'))
+        {% for k, v in zonas_activas_tenant1.items() %}
+            WHEN '{{ k }}' THEN '{{ v | replace("'", "''") }}'
+        {%- endfor %}
+            ELSE e.zona_clasificada
         END AS zona_clasificada,
         e.latitud,
         e.longitud,
