@@ -1039,11 +1039,11 @@ def delete_interaction_view(request, interaction_id):
 # ============================================================
 
 def get_tenant_users(tenant_id):
-    """Obtiene los usuarios del tenant para asignacion (excluye admins)"""
+    """Obtiene los usuarios del tenant para asignacion (excluye admins y viewers)"""
     from django.contrib.auth.models import User
     user_ids = TenantUser.objects.filter(
         tenant_id=tenant_id
-    ).values_list('user_id', flat=True)
+    ).exclude(rol='viewer').values_list('user_id', flat=True)
     return User.objects.filter(id__in=user_ids).exclude(
         is_superuser=True
     ).exclude(
