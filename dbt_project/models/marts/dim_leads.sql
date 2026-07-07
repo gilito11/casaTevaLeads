@@ -31,6 +31,33 @@
     - ScrapingBee scrapers: Milanuncios, Idealista (paid API - stealth proxy)
 */
 
+{#
+    ZONAS ACTIVAS (tenant 1 - Casa Teva). Todo municipio que NO este aqui queda
+    DESCARTADO de dim_leads (las busquedas provinciales de milanuncios/fotocasa
+    arrastran pueblos de toda la provincia). Los datos raw se conservan: para
+    reactivar una zona basta con anadirla a esta lista (nombre normalizado:
+    minusculas, sin acentos, apostrofes/guiones como espacio).
+    Excepcion: leads con fila en leads_lead_estado (trabajados por el equipo)
+    nunca se filtran, esten donde esten.
+    Alcance decidido 26 Jun 2026: Lleida <=20km + costa Tarragona y cinturon
+    inmediato de Tarragona/Reus/Cambrils.
+#}
+{% set zonas_activas_tenant1 = [
+    'lleida', 'partida balafia', 'alpicat', 'alcarras', 'torrefarrera',
+    'bell lloc', 'bell lloc d urgell', 'termens', 'juneda', 'almacelles',
+    'almenar', 'mollerussa', 'albatarrec', 'torre serona', 'montoliu de lleida',
+    'alcoletge', 'sudanell', 'benavent de segria', 'rossello', 'artesa de lleida',
+    'corbins', 'vilanova de segria', 'alfes', 'sunyer', 'vilanova de la barca',
+    'puigverd de lleida', 'torres de segre', 'alguaire', 'aspa', 'soses',
+    'menarguens', 'bellvis', 'sidamon', 'sarroca de lleida', 'aitona',
+    'fondarella', 'torrebesses', 'miralcamp', 'vallfogona de balaguer',
+    'gimenells', 'gimenells i el pla de la font',
+    'tarragona', 'bonavista', 'la canonja', 'reus', 'salou', 'cambrils',
+    'la pineda', 'vila seca', 'vilaseca', 'miami platja', 'miami playa',
+    'mont roig del camp', 'montroig del camp', 'vinyols i els arcs',
+    'montbrio del camp', 'riudoms', 'constanti',
+] %}
+
 WITH all_staging_sources AS (
     -- Fotocasa listings
     SELECT
@@ -398,6 +425,20 @@ final AS (
 )
 
 SELECT * FROM final
+-- Filtro ZONAS ACTIVAS (solo tenant 1): descarta municipios fuera del area de
+-- trabajo (lista al inicio del fichero). Leads sin zona se conservan.
+-- Leads ya trabajados por el equipo (fila en leads_lead_estado) se conservan
+-- siempre, aunque su zona este descartada.
+WHERE
+    tenant_id::TEXT <> '1'
+    OR zona_clasificada IS NULL OR zona_clasificada = ''
+    OR TRIM(REGEXP_REPLACE(
+        TRANSLATE(LOWER(zona_clasificada),
+                  'àáâäèéêëìíîïòóôöùúûüçñ''-·',
+                  'aaaaeeeeiiiioooouuuucn   '),
+        '\s+', ' ', 'g'
+    )) IN ({% for z in zonas_activas_tenant1 %}'{{ z }}'{% if not loop.last %}, {% endif %}{% endfor %})
+    OR lead_id IN (SELECT lead_id FROM public.leads_lead_estado)
 
 {% if is_incremental() %}
     -- On incremental runs, update existing records or insert new ones
