@@ -236,13 +236,13 @@ def lead_detail_view(request, lead_id):
                 }
                 # Obtener otros leads del mismo grupo
                 cursor.execute("""
-                    SELECT d.lead_id, l.portal, l.precio, l.superficie_m2, l.titulo, l.url_anuncio
+                    SELECT d.lead_id, l.source_portal, l.precio, l.superficie_m2, l.titulo, l.listing_url
                     FROM public_marts.dim_lead_duplicates d
                     JOIN public_marts.dim_leads l ON d.lead_id = l.lead_id AND d.tenant_id = l.tenant_id
                     WHERE d.duplicate_group_id = %s
                       AND d.tenant_id = %s
                       AND d.lead_id != %s
-                    ORDER BY l.portal
+                    ORDER BY l.source_portal
                 """, [row[0], tenant_id, str(lead.lead_id)])
                 for dup_row in cursor.fetchall():
                     duplicate_leads.append({
