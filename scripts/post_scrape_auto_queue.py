@@ -50,8 +50,11 @@ def get_new_listings(conn, tenant_id, hours_back=4):
                 l.precio,
                 l.es_particular,
                 l.lead_score,
-                l.telefono_norm
+                l.telefono_norm,
+                d.duplicate_group_id
             FROM public_marts.dim_leads l
+            LEFT JOIN public_marts.dim_lead_duplicates d
+                ON d.lead_id = l.lead_id AND d.tenant_id = l.tenant_id
             WHERE l.tenant_id = %s
               AND l.fecha_primera_captura >= NOW() - INTERVAL '%s hours'
               AND l.listing_url IS NOT NULL
@@ -60,7 +63,20 @@ def get_new_listings(conn, tenant_id, hours_back=4):
                   SELECT 1 FROM leads_contact_queue cq
                   WHERE cq.lead_id = l.lead_id AND cq.tenant_id::TEXT = %s::TEXT
               )
-        """, (tenant_id, hours_back, tenant_id))
+              -- Mismo inmueble ya encolado via OTRO portal (duplicado cross-portal):
+              -- no contactar dos veces al mismo vendedor.
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM public_marts.dim_lead_duplicates d1
+                  JOIN public_marts.dim_lead_duplicates d2
+                      ON d2.duplicate_group_id = d1.duplicate_group_id
+                     AND d2.tenant_id = d1.tenant_id
+                     AND d2.lead_id <> d1.lead_id
+                  JOIN leads_contact_queue cq2
+                      ON cq2.lead_id = d2.lead_id AND cq2.tenant_id::TEXT = %s::TEXT
+                  WHERE d1.lead_id = l.lead_id AND d1.tenant_id = l.tenant_id
+              )
+        """, (tenant_id, hours_back, tenant_id, tenant_id))
         return cur.fetchall()
 
 
@@ -191,11 +207,17 @@ def main():
             continue
 
         queued = 0
+        seen_groups = set()
         for listing in new_listings:
             if queued >= remaining:
                 break
 
             portal = listing['source_portal']
+
+            # Duplicado cross-portal dentro del mismo batch: encolar solo uno
+            grupo = listing.get('duplicate_group_id')
+            if grupo and grupo in seen_groups:
+                continue
 
             # Check portal enabled
             portal_flag = f"contactar_{portal}"
@@ -241,6 +263,8 @@ def main():
             priority = listing.get('lead_score') or 0
             enqueue_lead(conn, tenant_id, listing, message, template_id, priority)
             queued += 1
+            if grupo:
+                seen_groups.add(grupo)
 
             # Track by portal
             by_portal[portal] = by_portal.get(portal, 0) + 1
