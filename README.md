@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>CRM inmobiliario con captación automática de leads</strong><br>
-  Scraping de 4 portales españoles · Contacto automatizado · Valoraciones ACM · Analytics
+  Scraping de 5 portales españoles · Contacto automatizado · Valoraciones ACM · Analytics
 </p>
 
 <p align="center">
@@ -14,8 +14,8 @@
   <img src="https://img.shields.io/badge/Django-5.x-092e20?style=flat-square&logo=django&logoColor=white" alt="Django" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169e1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/dbt-Core-ff694b?style=flat-square&logo=dbt&logoColor=white" alt="dbt" />
-  <img src="https://img.shields.io/badge/Cloudflare-Tunnel-f38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare" />
-  <img src="https://img.shields.io/badge/Coste-~€4/mes-00c853?style=flat-square" alt="Coste" />
+  <img src="https://img.shields.io/badge/Scrapling-0.4.7-6c47ff?style=flat-square" alt="Scrapling" />
+  <img src="https://img.shields.io/badge/Coste-~€10/mes-00c853?style=flat-square" alt="Coste" />
 </p>
 
 <p align="center">
@@ -31,16 +31,18 @@
 ## ✨ Features
 
 ### Captación
-- **Scraping multi-portal** — Habitaclia, Fotocasa, Milanuncios, Idealista
-- **Anti-bot bypass** — Botasaurus (Chrome), Camoufox (Firefox anti-detect) con proxy residencial
-- **Deduplicación cross-portal** — Por teléfono + ubicación + precio + metros
+- **Scraping multi-portal** — Habitaclia, Fotocasa, Milanuncios, Idealista y Wallapop
+- **Anti-bot bypass** — Scrapling + Patchright (DataDome, Imperva, GeeTest sin proxy) y Bright Data Web Unlocker para los portales geo-bloqueados
+- **Detección particular vs agencia** — Señales por portal (URLs, JSON del vendedor, watermarks, guarda global por nombre de anunciante)
+- **Filtro de zonas activas** — Solo el área de trabajo (Lleida ≤20km + costa de Tarragona) con nombres de municipio canónicos; el resto queda descartado pero recuperable
 - **Detección de bajadas de precio** — Histórico de precios con alertas (>5%)
 
 ### CRM
-- **Lead scoring** — 0-90 pts: días en mercado, teléfono, fotos, precio relativo
-- **Gestión de estados** — NUEVO → EN_PROCESO → CONTACTADO → INTERESADO → CLIENTE
+- **Lead scoring** — 0-100 pts: días en mercado, teléfono, fotos, precio
+- **Duplicados cross-portal** — Mismo inmueble en varios portales detectado (zona + precio exacto + m²), badge "En N portales" y desplegable para abrir cada anuncio
+- **Gestión de estados** — NUEVO → EN_PROCESO → CONTACTADO → INTERESADO → CLIENTE, con registro de auditoría interno
 - **Agenda de tareas** — Seguimiento por comercial con calendario
-- **Contacto automatizado** — Envío de mensajes a 4 portales con rate limiting
+- **Contacto automatizado** — Cola post-scrape con plantillas A/B; nunca contacta dos veces al mismo vendedor aunque esté en varios portales
 
 ### Valoraciones
 - **ACM (Análisis Comparativo de Mercado)** — Búsqueda de comparables, índice de confianza
@@ -50,34 +52,36 @@
 ### Plataforma
 - **API REST v1** — Autenticación X-API-Key, filtros, paginación, webhooks
 - **PWA** — Service Worker, Push Notifications, instalable en móvil
-- **Alertas Telegram** — Resumen diario, bajadas de precio, errores de scraping
-- **Analytics** — Dashboard con KPIs, embudo de conversión, métricas por portal/zona
+- **Alertas Telegram** — Resumen diario, bajadas de precio, control de calidad del scraping
+- **Analytics** — Dashboard con KPIs, embudo de conversión, métricas por portal/zona, mapa de leads
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-         Contabo VPS (Windows Server)              GitHub Actions
-         ─────────────────────────                  ──────────────
-         │ Camoufox + IPRoyal proxy │               │ Botasaurus  │
-         │ habitaclia, milanuncios  │               │ fotocasa    │
-         │ L-X-V 13:00 CET         │               │ Camoufox    │
-         │                          │               │ idealista   │
-         │ Django CRM (waitress)    │               │ L-X-V 12:00 │
-         │ Cloudflare Tunnel        │               └──────┬──────┘
-         └────────────┬─────────────┘                      │
-                      │                                    │
-                      ▼                                    ▼
-              ┌───────────────────────────────────────────────┐
-              │          Neon PostgreSQL (Serverless)          │
-              │                                               │
-              │  raw.raw_listings → stg_* → dim_leads (dbt)  │
-              └───────────────────────────────────────────────┘
-                                    │
-                                    ▼
-                      https://fincaradar.com
-                      Cloudflare CDN + SSL
+              GitHub Actions (cron DIARIO 12:00 UTC)
+              ───────────────────────────────────────
+              │ Scrapling: habitaclia, wallapop      │
+              │ Bright Data: fotocasa, milanuncios   │
+              │ (idealista: solo dispatch manual)    │
+              │   → dbt (staging → marts)            │
+              │   → cola de contacto automático      │
+              │   → validación calidad + Telegram    │
+              └──────────────────┬───────────────────┘
+                                 │
+                                 ▼
+              ┌───────────────────────────────────────┐
+              │      Neon PostgreSQL (Serverless)     │
+              │ raw.raw_listings → stg_* → dim_leads  │
+              └──────────────────┬────────────────────┘
+                                 │
+         Contabo VPS (Windows Server)
+         ────────────────────────────
+         │ Django CRM (waitress)     │ ──► https://fincaradar.com
+         │ Cloudflare Tunnel         │     Cloudflare CDN + SSL
+         │ milanuncios L-X-V (resid.)│
+         └───────────────────────────┘
 ```
 
 ### Costes
@@ -88,26 +92,28 @@
 | Neon PostgreSQL | Gratis |
 | GitHub Actions | Gratis |
 | Cloudflare (DNS + Tunnel) | Gratis |
-| 2Captcha (Habitaclia reCAPTCHA) | ~€3/mes |
-| IPRoyal proxy (Idealista DataDome) | ~€1/mes* |
-| **Total** | **~€9/mes** |
+| Bright Data Web Unlocker (fotocasa, milanuncios, idealista) | ~€1/mes |
+| 2Captcha (Cloudflare Turnstile) | ~€3/mes |
+| IPRoyal proxy (wallapop desde GH Actions) | ~€1/mes* |
+| **Total** | **~€10/mes** |
 
-<sub>*IPRoyal: compra única de $7/GB, tráfico no expira. Estimado ~100-200MB/mes.</sub>
+<sub>*IPRoyal: compra única de $7/GB, tráfico no expira.</sub>
 
 ---
 
 ## 🌐 Portales
 
-| Portal | Scraper | Anti-bot | Infraestructura |
-|--------|---------|----------|-----------------|
-| **Habitaclia** | Camoufox | Imperva → proxy residencial | VPS + GitHub Actions |
-| **Fotocasa** | Botasaurus | Imperva (bloquea datacenter) | GitHub Actions |
-| **Milanuncios** | Camoufox | GeeTest (bypass nativo) | VPS + GitHub Actions |
-| **Idealista** | Camoufox | DataDome → proxy residencial | GitHub Actions |
+| Portal | Scraper | Anti-bot / vía | Infraestructura |
+|--------|---------|----------------|-----------------|
+| **Habitaclia** | Scrapling | Imperva (bypass nativo) | GitHub Actions diario |
+| **Fotocasa** | Bright Data + API interna `propertysearch` | Imperva / geo-block | GitHub Actions diario |
+| **Milanuncios** | Bright Data (URLs provinciales `?vendedor=part`) | GeeTest / geo-block | GitHub Actions diario |
+| **Wallapop** | Scrapling (`__NEXT_DATA__`) | Proxy ES (IPRoyal) | GitHub Actions diario |
+| **Idealista** | Bright Data Web Unlocker | DataDome | Dispatch manual (~0.6% particulares) |
+
+Los scrapers antiguos (Botasaurus/Camoufox) se conservan como fallback; Camoufox sigue en uso para el **contacto automático** (login + formulario/chat en 4 portales, rate limit 5/día con delay 2-5 min).
 
 **Datos extraídos**: listing_id, URL, título, precio, descripción, ubicación, teléfono, tipo de propiedad, habitaciones, baños, m², fotos, tipo de vendedor (particular/agencia).
-
-**Contacto automático**: Login en portal → formulario/chat → mensaje personalizado. Rate limit: 5/día, delay 2-5min.
 
 ---
 
@@ -117,7 +123,6 @@
 
 - Python 3.11+
 - PostgreSQL 16 (o [Neon](https://neon.tech) gratuito)
-- Google Chrome (para Botasaurus)
 
 ### Instalación
 
@@ -130,6 +135,7 @@ source .venv/bin/activate  # Linux/Mac
 # .venv\Scripts\activate   # Windows
 
 pip install -r requirements.txt
+scrapling install   # navegador Patchright para los scrapers
 
 # Configurar .env en raíz del proyecto
 cp .env.example .env  # Editar con tus credenciales
@@ -144,17 +150,20 @@ python manage.py runserver
 ### Scraping manual
 
 ```bash
-# Habitaclia (Botasaurus)
-python run_habitaclia_scraper.py --zones salou cambrils --postgres
+# Scrapling (sin proxy desde IP española)
+python -m scrapers.scrapling_habitaclia --zones salou cambrils --postgres
+python -m scrapers.scrapling_wallapop --zones lleida --max-pages 2 --postgres
 
-# Milanuncios (Camoufox)
-python run_camoufox_milanuncios_scraper.py --zones tarragona --max-pages 2 --postgres
-
-# Idealista (Camoufox + proxy)
-python run_camoufox_idealista_scraper.py --zones igualada --max-pages 2 --postgres
+# Bright Data (requiere BRIGHTDATA_API_KEY)
+python -m scrapers.scrapling_fotocasa_bd --zones salou --max-pages 2 --postgres
+python -m scrapers.scrapling_milanuncios_bd --max-pages 3 --postgres
+python -m scrapers.scrapling_idealista_bd --zones lleida --max-pages 1 --postgres
 
 # dbt transformaciones
 cd dbt_project && dbt run --select staging marts
+
+# Trigger del workflow completo en GitHub Actions
+gh workflow run scrape-neon.yml -f portals="habitaclia,wallapop" -f zones="salou,cambrils"
 ```
 
 ---
@@ -201,22 +210,24 @@ Eventos: `new_lead`, `status_change`, `price_drop`. Firma HMAC-SHA256 en `X-Webh
 casa-teva-lead-system/
 ├── backend/                  # Django 5.x
 │   ├── apps/
-│   │   ├── leads/            # Lead model, CRM views, scoring, PDF
+│   │   ├── leads/            # Lead model, CRM views, scoring, PDF, audit log
 │   │   ├── acm/              # Análisis Comparativo de Mercado
 │   │   ├── api_v1/           # REST API + API Keys
 │   │   ├── widget/           # Widget valorador embebible
-│   │   ├── analytics/        # Dashboard, métricas, export
+│   │   ├── analytics/        # Dashboard, métricas, mapa, export
 │   │   ├── notifications/    # Telegram + Push notifications
 │   │   └── core/             # Tenants, health, utilidades
 │   └── templates/            # HTMX + TailwindCSS
 ├── scrapers/                 # Web scrapers
-│   ├── botasaurus_*.py       # Chrome headless (hab, foto)
-│   ├── camoufox_*.py         # Anti-detect Firefox (mil, ide, hab)
+│   ├── scrapling_base.py     # StealthySession multi-tenant
+│   ├── scrapling_*.py        # Scrapers por portal (+ *_bd.py via Bright Data)
+│   ├── zones/                # ZONAS_GEOGRAFICAS por portal
+│   ├── camoufox_*.py         # Legacy / fallback
 │   └── contact_automation/   # Auto-contacto (4 portales)
-├── dbt_project/              # raw → staging → marts
+├── dbt_project/              # raw → staging → marts (dim_leads, duplicados)
 ├── ai_agents/                # Ollama vision scoring (PoC)
-├── scripts/                  # VPS setup, cron, tunnel
-└── .github/workflows/        # Scraping + contacto (GH Actions)
+├── scripts/                  # Cola de contacto, health checks, reports
+└── .github/workflows/        # scrape-neon, contact-queue, dbt-refresh
 ```
 
 ---
@@ -225,10 +236,11 @@ casa-teva-lead-system/
 
 | Tarea | Schedule | Infraestructura |
 |-------|----------|-----------------|
-| Scraping habitaclia + milanuncios | L-X-V 13:00 CET | VPS (schtasks) |
-| Scraping fotocasa + idealista | L-X-V 12:00 UTC | GitHub Actions (cron) |
-| Contacto automático | L-V 18:00 CET | VPS (schtasks) |
-| Alertas Telegram | Diario + eventos | Automático |
+| Scraping (wallapop, habitaclia, fotocasa, milanuncios) + dbt + cola contacto | **Diario** 12:00 UTC | GitHub Actions (`scrape-neon.yml`) |
+| Scraping idealista | Manual (`gh workflow run`) | GitHub Actions |
+| Scraping milanuncios (residual) | L-X-V 13:00 CET | VPS (schtasks) |
+| Procesado cola de contacto | L-V 18:00 CET | GitHub Actions (`contact-queue.yml`) |
+| Alertas y control de calidad Telegram | Tras cada scrape | Automático |
 
 ---
 
