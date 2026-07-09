@@ -122,16 +122,21 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      # Wallapop geo-bloquea tráfico no-ES desde runners US -> proxy IPRoyal ES.
-      - name: Run Wallapop scraper (Scrapling + IPRoyal ES)
+      # Wallapop geo-bloquea runners US. Bright Data Web Unlocker (country=es)
+      # trae el HTML SSR con __NEXT_DATA__ sin navegador: 1 request por zona +
+      # detalle solo de anuncios nuevos -> ~$0.5-1/mes.
+      # (IPRoyal retirado 9 Jul 2026: ERR_TUNNEL_CONNECTION_FAILED)
+      - name: Run Wallapop scraper (Bright Data Web Unlocker)
         if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'wallapop')
         continue-on-error: true
+        timeout-minutes: 20
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
-          python -m scrapers.scrapling_wallapop --zones ${ZONES//,/ } --max-pages 2 --postgres --proxy "$DATADOME_PROXY"
+          python -m scrapers.scrapling_wallapop_bd --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          DATADOME_PROXY: ${{ secrets.DATADOME_PROXY }}
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          BRIGHTDATA_ZONE: web_unlocker1
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
