@@ -1,0 +1,55 @@
+# Obra Nueva Watch — detecta promociones nuevas en idealista/fotocasa (Lleida)
+# y alerta por Telegram para llamar a la promotora el dia que sale al mercado.
+# Flujo separado del scraping de particulares. ~4 requests BD/dia (~$0.20/mes).
+name: Obra Nueva Watch
+
+on:
+  schedule:
+    - cron: '30 6 * * *'  # diario 06:30 UTC (08:30 Madrid)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'normal | seed (poblar sin alertar) | dry-run'
+        required: false
+        default: 'normal'
+      dump:
+        description: 'true = subir HTML/JSON fetcheado como artifact'
+        required: false
+        default: 'false'
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install requests psycopg2-binary scrapling python-dotenv
+
+      - name: Run watcher
+        run: |
+          ARGS=""
+          [ "${{ github.event.inputs.mode }}" = "seed" ] && ARGS="--seed"
+          [ "${{ github.event.inputs.mode }}" = "dry-run" ] && ARGS="--dry-run"
+          [ "${{ github.event.inputs.dump }}" = "true" ] && ARGS="$ARGS --dump-dir output/obra_nueva"
+          python -m scrapers.obra_nueva_watch $ARGS
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          BRIGHTDATA_ZONE: web_unlocker1
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Upload debug dumps
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: obra-nueva-debug
+          path: output/obra_nueva
+          if-no-files-found: ignore
+          retention-days: 3
