@@ -158,40 +158,40 @@ class ObraNuevaWatcher:
             return None
 
     def check_idealista(self, zona: str, url: str):
-        html = self._bd_request(url)
-        if not html:
+        # Parse por regex sobre el HTML crudo (validado contra dump real 9 Jul
+        # 2026): cards <article> con href="/obra-nueva/<id>/", title=direccion,
+        # precio en item-price h2-simulated y promotora en logo-branding alt.
+        import html as htmllib
+        raw = self._bd_request(url)
+        if not raw:
             return
-        self._dump(f"idealista_obranueva_{zona}.html", html)
+        self._dump(f"idealista_obranueva_{zona}.html", raw)
 
-        from scrapling.parser import Adaptor
-        page = Adaptor(content=html, url=url)
         seen_ids = set()
-        for art in page.css("article.item"):
-            link = art.css_first("a.item-link")
-            if link is None:
-                continue
-            href = (link.attrib.get("href") or "").split("?", 1)[0]
-            m = re.search(r"/(\d{6,})/", href)
+        for art in re.split(r"<article", raw)[1:]:
+            m = re.search(r'href="(/obra-nueva/(\d+)/)"', art)
             if not m:
                 continue
-            promo_id = m.group(1)
+            href, promo_id = m.group(1), m.group(2)
             if promo_id in seen_ids:
                 continue
             seen_ids.add(promo_id)
-            nombre = (link.attrib.get("title") or link.get_all_text(strip=True) or "")[:200]
-            price_el = art.css_first(".item-price")
-            precio = self._parse_price(price_el.get_all_text() if price_el is not None else "")
-            promotora_el = art.css_first(".item-branding-info, .logo-branding, .item-multimedia-branding")
-            promotora = (promotora_el.get_all_text(strip=True)[:100]
-                         if promotora_el is not None else None)
+            title = re.search(r'class="item-link[^"]*"[^>]*title="([^"]+)"', art)
+            price = re.search(r'item-price h2-simulated">([\d.]+)', art)
+            brand = re.search(r'logo-branding.*?alt="([^"]*)"', art, re.DOTALL)
+            detail = re.search(r'class="item-detail">([^<]+)', art)
+            nombre = htmllib.unescape(title.group(1))[:200] if title else None
+            if detail:
+                tipologia = htmllib.unescape(detail.group(1)).strip()
+                nombre = f"{nombre} — {tipologia}"[:200] if nombre else tipologia[:200]
             promo = {
                 "portal": "idealista",
                 "promo_id": promo_id,
                 "nombre": nombre,
-                "url": href if href.startswith("http") else f"https://www.idealista.com{href}",
+                "url": f"https://www.idealista.com{href}",
                 "zona": zona,
-                "precio_desde": precio,
-                "promotora": promotora,
+                "precio_desde": self._parse_price(price.group(1) + " €") if price else None,
+                "promotora": htmllib.unescape(brand.group(1))[:100] if brand and brand.group(1) else None,
                 "raw_data": {"href": href},
             }
             if self._upsert(promo) and not self.seed:
