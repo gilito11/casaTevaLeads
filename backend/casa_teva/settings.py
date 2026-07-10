@@ -27,7 +27,9 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-%lg%rtbwo@rpn9@d0r+hp(c#0xrgkq9b(8g5*2$mweuzo%(e1g')
+# Prod lo carga de DJANGO_SECRET_KEY (.env). Sin variable => key efímera (solo dev).
+from django.core.management.utils import get_random_secret_key
+SECRET_KEY = config('DJANGO_SECRET_KEY', default='') or get_random_secret_key()
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default='False', cast=bool)
