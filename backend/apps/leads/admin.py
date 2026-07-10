@@ -2,7 +2,7 @@ from django.contrib import admin
 from django import forms
 from .models import (
     Lead, Nota, LeadEstado, PortalCredential, ContactQueue,
-    MessageTemplate, AutoContactConfig, AuditLog,
+    MessageTemplate, AutoContactConfig, AuditLog, UserSession,
 )
 
 
@@ -169,6 +169,33 @@ class AuditLogAdmin(admin.ModelAdmin):
     def titulo_corto(self, obj):
         return (obj.titulo[:60] + '...') if len(obj.titulo) > 60 else obj.titulo
     titulo_corto.short_description = 'Titulo'
+
+    def has_module_permission(self, request):
+        return request.user.is_active and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_active and request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(UserSession)
+class UserSessionAdmin(admin.ModelAdmin):
+    """Sesiones de uso: visible solo para superuser y de solo lectura."""
+    list_display = ['username', 'started_at', 'last_seen', 'duracion', 'request_count']
+    list_filter = ['username', 'started_at']
+    date_hierarchy = 'started_at'
+
+    def duracion(self, obj):
+        mins = int((obj.last_seen - obj.started_at).total_seconds() // 60)
+        return f"{mins // 60}h {mins % 60}min" if mins >= 60 else f"{mins}min"
 
     def has_module_permission(self, request):
         return request.user.is_active and request.user.is_superuser

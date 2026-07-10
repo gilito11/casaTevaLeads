@@ -786,3 +786,28 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.created_at:%Y-%m-%d %H:%M} {self.username or 'sistema'}: {self.accion} {self.lead_id}"
+
+
+class UserSession(models.Model):
+    """
+    Sesion de uso de la web (solo superuser via admin).
+    Una fila por rachas de actividad: si pasan mas de 4h entre dos requests
+    del mismo usuario, se abre una sesion nueva y se avisa por Telegram.
+    """
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='activity_sessions'
+    )
+    username = models.CharField(max_length=150, blank=True, default='')
+    started_at = models.DateTimeField(db_index=True)
+    last_seen = models.DateTimeField(db_index=True)
+    request_count = models.IntegerField(default=1)
+
+    class Meta:
+        db_table = 'leads_user_session'
+        verbose_name = 'Sesion de Usuario'
+        verbose_name_plural = 'Sesiones de Usuario'
+        ordering = ['-last_seen']
+
+    def __str__(self):
+        return f"{self.username}: {self.started_at:%d/%m %H:%M} - {self.last_seen:%H:%M}"
