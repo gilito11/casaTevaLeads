@@ -459,9 +459,12 @@ final AS (
         e.precio_por_m2,
         e.fotos_json,
 
-        -- Price tracking (for detecting price drops)
-        pc.precio_anterior,
-        pc.precio_cambio_pct,
+        -- Price tracking (for detecting price drops). Solo si el ultimo precio
+        -- del historial coincide con el precio actual del anuncio: si el precio
+        -- revirtio (A->B->A), el historial no registra la vuelta (UNIQUE por
+        -- precio + DO NOTHING) y el cambio mostrado seria engañoso.
+        CASE WHEN pc.precio_actual = e.precio THEN pc.precio_anterior END AS precio_anterior,
+        CASE WHEN pc.precio_actual = e.precio THEN pc.precio_cambio_pct END AS precio_cambio_pct,
 
         -- Days on market (since first capture)
         EXTRACT(DAY FROM NOW() - e.fecha_primera_captura)::INTEGER AS dias_en_mercado,
@@ -478,7 +481,8 @@ final AS (
         -- Combined score: lead_score + image_score (max 130 = 100 + 30)
         -- Bonus +15 if price dropped (motivated seller)
         e.lead_score + COALESCE(lis.image_score, 0)
-            + CASE WHEN pc.precio_cambio_pct < 0 THEN 15 ELSE 0 END AS lead_score_total,
+            + CASE WHEN pc.precio_actual = e.precio AND pc.precio_cambio_pct < 0
+                   THEN 15 ELSE 0 END AS lead_score_total,
 
         -- CRM workflow fields
         e.estado,
