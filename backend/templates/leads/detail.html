@@ -270,10 +270,17 @@
                      loading: true,
                      hasHistory: false,
                      currentPrice: null,
-                     changePct: null,
+                     prevPrice: null,
+                     lastChangePct: null,
+                     lastChangeEuros: null,
+                     lastChangeDate: null,
+                     firstPrice: null,
+                     firstDate: null,
+                     totalPct: null,
                      numChanges: 0,
                      message: '',
                      chart: null,
+                     fmt(n) { return n === null || n === undefined ? '-' : Math.round(n).toLocaleString('es-ES') + ' €'; },
                      async loadPriceHistory() {
                          try {
                              const res = await fetch('{% url 'leads:price_history' lead.lead_id %}');
@@ -281,12 +288,25 @@
                              this.loading = false;
                              this.hasHistory = data.has_history;
                              this.currentPrice = data.current_price;
-                             this.changePct = data.change_pct;
                              this.numChanges = data.num_changes || 0;
                              this.message = data.message || '';
 
-                             if (data.has_history && data.labels && data.prices) {
-                                 this.renderChart(data.labels, data.prices);
+                             if (data.has_history && data.labels && data.prices && data.prices.length) {
+                                 const p = data.prices, l = data.labels, n = p.length;
+                                 this.firstPrice = p[0];
+                                 this.firstDate = l[0];
+                                 this.totalPct = data.change_pct;
+                                 if (n > 1) {
+                                     this.prevPrice = p[n - 2];
+                                     this.lastChangeDate = l[n - 1];
+                                     this.lastChangeEuros = p[n - 1] - this.prevPrice;
+                                     if (this.prevPrice > 0) {
+                                         this.lastChangePct = Math.round((this.lastChangeEuros / this.prevPrice) * 1000) / 10;
+                                     }
+                                 }
+                                 // El canvas vive dentro de un x-if: hay que esperar a que
+                                 // Alpine lo pinte o getElementById devuelve null y no hay grafico.
+                                 this.$nextTick(() => this.renderChart(l, p));
                              }
                          } catch (e) {
                              this.loading = false;
@@ -296,10 +316,13 @@
                      renderChart(labels, prices) {
                          const ctx = document.getElementById('priceHistoryChart');
                          if (!ctx) return;
+                         if (this.chart) { this.chart.destroy(); }
 
                          const isDark = document.documentElement.classList.contains('dark');
-                         const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+                         const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
                          const textColor = isDark ? '#9ca3af' : '#6b7280';
+                         const lineColor = isDark ? '#3b82f6' : '#2563eb';
+                         const pointBorder = isDark ? '#1f2937' : '#ffffff';
 
                          this.chart = new Chart(ctx, {
                              type: 'line',
@@ -308,43 +331,42 @@
                                  datasets: [{
                                      label: 'Precio',
                                      data: prices,
-                                     borderColor: '#2563eb',
-                                     backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                     borderColor: lineColor,
+                                     backgroundColor: isDark ? 'rgba(59,130,246,0.10)' : 'rgba(37,99,235,0.08)',
                                      borderWidth: 2,
                                      fill: true,
-                                     tension: 0.3,
+                                     stepped: true,
                                      pointRadius: 4,
-                                     pointBackgroundColor: '#2563eb',
-                                     pointBorderColor: '#fff',
+                                     pointBackgroundColor: lineColor,
+                                     pointBorderColor: pointBorder,
                                      pointBorderWidth: 2,
-                                     pointHoverRadius: 6
+                                     pointHoverRadius: 7
                                  }]
                              },
                              options: {
                                  responsive: true,
                                  maintainAspectRatio: false,
+                                 interaction: { mode: 'index', intersect: false },
                                  plugins: {
                                      legend: { display: false },
                                      tooltip: {
                                          callbacks: {
-                                             label: function(context) {
-                                                 return context.parsed.y.toLocaleString('es-ES') + ' EUR';
-                                             }
+                                             label: (c) => ' ' + c.parsed.y.toLocaleString('es-ES') + ' €'
                                          }
                                      }
                                  },
                                  scales: {
                                      x: {
-                                         grid: { color: gridColor },
+                                         grid: { display: false },
                                          ticks: { color: textColor }
                                      },
                                      y: {
+                                         grace: '10%',
                                          grid: { color: gridColor },
                                          ticks: {
                                              color: textColor,
-                                             callback: function(value) {
-                                                 return value.toLocaleString('es-ES') + ' EUR';
-                                             }
+                                             maxTicksLimit: 6,
+                                             callback: (v) => v.toLocaleString('es-ES') + ' €'
                                          }
                                      }
                                  }
@@ -376,29 +398,34 @@
                     <!-- Has price history -->
                     <template x-if="!loading && hasHistory">
                         <div>
-                            <!-- Summary stats -->
-                            <div class="flex flex-wrap gap-4 mb-4">
-                                <div class="flex items-center text-sm">
-                                    <span class="text-gray-500 dark:text-gray-400 mr-2">Precio actual:</span>
-                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="currentPrice ? currentPrice.toLocaleString('es-ES') + ' EUR' : '-'"></span>
-                                </div>
-                                <template x-if="changePct !== null">
-                                    <div class="flex items-center text-sm">
-                                        <span class="text-gray-500 dark:text-gray-400 mr-2">Variacion:</span>
-                                        <span class="font-semibold"
-                                              :class="changePct < 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
-                                              x-text="(changePct > 0 ? '+' : '') + changePct + '%'"></span>
-                                    </div>
+                            <!-- Hero: precio actual vs anterior -->
+                            <div class="flex flex-wrap items-end gap-x-4 gap-y-2 mb-1">
+                                <span class="text-3xl font-bold text-gray-900 dark:text-white" x-text="fmt(currentPrice)"></span>
+                                <template x-if="prevPrice !== null && prevPrice !== currentPrice">
+                                    <span class="text-lg text-gray-400 dark:text-gray-500 line-through" x-text="fmt(prevPrice)"></span>
                                 </template>
-                                <div class="flex items-center text-sm">
-                                    <span class="text-gray-500 dark:text-gray-400 mr-2">Registros:</span>
-                                    <span class="font-semibold text-gray-900 dark:text-white" x-text="numChanges"></span>
-                                </div>
+                                <template x-if="lastChangePct !== null && lastChangePct !== 0">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-semibold"
+                                          :class="lastChangePct < 0 ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'">
+                                        <span x-text="(lastChangePct < 0 ? '▼ ' : '▲ +') + lastChangePct + '%'"></span>
+                                        <span class="ml-1.5 font-normal" x-text="'(' + (lastChangeEuros < 0 ? '−' : '+') + Math.abs(Math.round(lastChangeEuros)).toLocaleString('es-ES') + ' €)'"></span>
+                                    </span>
+                                </template>
                             </div>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                <template x-if="lastChangeDate && prevPrice !== currentPrice">
+                                    <span x-text="'Último cambio el ' + lastChangeDate + '.'"></span>
+                                </template>
+                                <template x-if="firstPrice !== null && firstPrice !== currentPrice">
+                                    <span x-text="' Salió a ' + fmt(firstPrice) + ' el ' + firstDate + ' (' + (totalPct > 0 ? '+' : '') + totalPct + '% acumulado).'"></span>
+                                </template>
+                                <span x-text="' ' + numChanges + ' precios registrados.'"></span>
+                            </p>
                             <!-- Chart container -->
                             <div class="h-64">
                                 <canvas id="priceHistoryChart"></canvas>
                             </div>
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">Cada punto es un precio detectado por el scraper; el escalón indica hasta cuándo se mantuvo.</p>
                         </div>
                     </template>
 
