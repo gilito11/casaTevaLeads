@@ -245,7 +245,16 @@ enriched AS (
         telefono_norm,
         telefono_raw,
         email,
-        nombre_contacto,
+        -- Nombre normalizado: los placeholder del portal ('Particular' en
+        -- habitaclia/fotocasa, vacio en milanuncios) pasan a NULL para que la
+        -- UI muestre UNA sola etiqueta consistente; los nombres reales se
+        -- limpian de espacios dobles (wallapop: 'Tomas   F.').
+        CASE
+            WHEN LOWER(TRIM(COALESCE(nombre_contacto, ''))) IN
+                 ('', 'particular', 'particulares', 'anunciante particular', 'vendedor particular')
+            THEN NULL
+            ELSE REGEXP_REPLACE(TRIM(nombre_contacto), '\s+', ' ', 'g')
+        END AS nombre_contacto,
         anunciante,
 
         -- Property information
