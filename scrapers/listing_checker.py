@@ -320,16 +320,20 @@ class ListingChecker:
 
             tenant_id, telefono_norm = row
 
+            # created_at/updated_at son NOT NULL sin default en BD (los rellena
+            # Django ORM, no la tabla): sin ellos el INSERT falla para leads que
+            # aun no tienen fila de estado y el marcado se pierde en silencio.
             cursor.execute("""
                 INSERT INTO leads_lead_estado (
                     lead_id, tenant_id, telefono_norm, estado,
-                    fecha_cambio_estado, numero_intentos
+                    fecha_cambio_estado, numero_intentos, created_at, updated_at
                 ) VALUES (
-                    %s, %s, %s, 'YA_VENDIDO', NOW(), 0
+                    %s, %s, %s, 'YA_VENDIDO', NOW(), 0, NOW(), NOW()
                 )
                 ON CONFLICT (lead_id) DO UPDATE SET
                     estado = 'YA_VENDIDO',
-                    fecha_cambio_estado = NOW()
+                    fecha_cambio_estado = NOW(),
+                    updated_at = NOW()
             """, (
                 lead_id, tenant_id, telefono_norm or '',
             ))

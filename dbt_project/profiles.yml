@@ -11,5 +11,6 @@ casa_teva:
       schema: public
       threads: 4
       connect_timeout: 30
-      search_path: public,raw,staging,marts,analytics
+      # search_path eliminado: incompatible con el pooler de Neon (fix auto-heal
+      # que vivia solo como commit local en el VPS desde entonces)
       sslmode: require
