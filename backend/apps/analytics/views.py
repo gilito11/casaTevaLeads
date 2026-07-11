@@ -689,27 +689,27 @@ def scrape_history_view(request):
 
     with connection.cursor() as cursor:
         try:
-            # Agrupar por día y franja horaria (mañana 12:00, tarde 18:00)
+            # Agrupar por día y franja horaria (mañana 12:00, tarde 18:00).
+            # Fuente: raw.scraper_zone_runs (log real de ejecuciones). raw_listings
+            # NO sirve: el upsert deja una fila por anuncio con la ULTIMA fecha,
+            # así que las sesiones antiguas colapsaban en la más reciente.
             cursor.execute("""
                 WITH scrape_sessions AS (
                     SELECT
-                        DATE(scraping_timestamp) as fecha,
+                        DATE(scraped_at) as fecha,
                         CASE
-                            WHEN EXTRACT(HOUR FROM scraping_timestamp) < 15 THEN '12:00'
+                            WHEN EXTRACT(HOUR FROM scraped_at) < 15 THEN '12:00'
                             ELSE '18:00'
                         END as franja,
-                        raw_data->>'zona_geografica' as zona,
+                        zona,
                         portal,
-                        COUNT(*) as listings,
-                        MIN(scraping_timestamp) as start_time,
-                        MAX(scraping_timestamp) as end_time
-                    FROM raw.raw_listings
-                    WHERE tenant_id = %s
-                      AND scraping_timestamp >= CURRENT_DATE - INTERVAL '%s days'
-                      AND raw_data->>'zona_geografica' IS NOT NULL
-                    GROUP BY DATE(scraping_timestamp),
-                             CASE WHEN EXTRACT(HOUR FROM scraping_timestamp) < 15 THEN '12:00' ELSE '18:00' END,
-                             raw_data->>'zona_geografica',
+                        SUM(saved) as listings
+                    FROM raw.scraper_zone_runs
+                    WHERE tenant_id::TEXT = %s::TEXT
+                      AND scraped_at >= CURRENT_DATE - INTERVAL '%s days'
+                    GROUP BY DATE(scraped_at),
+                             CASE WHEN EXTRACT(HOUR FROM scraped_at) < 15 THEN '12:00' ELSE '18:00' END,
+                             zona,
                              portal
                 )
                 SELECT

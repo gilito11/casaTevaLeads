@@ -6,7 +6,8 @@ scrapes sin retorno? Usa TODO el histórico ya almacenado en el data lake — no
 necesita instrumentación nueva.
 
 Métricas por (portal, zona):
-  - scrapes        : nº de días distintos en que se scrapeó esa zona
+  - scrapes        : runs reales (raw.scraper_zone_runs); fallback dias distintos
+                     para datos anteriores al log (~28 May 2026)
   - listings       : filas totales escritas en raw
   - particulares   : filas con es_particular=true (los leads reales)
   - yield%         : particulares / listings (relevante sobre todo en idealista,
@@ -96,9 +97,32 @@ def fetch_rows(conn, days=None, portal=None):
     return rows
 
 
-def aggregate(rows):
-    # (portal, zona) -> {listings, particulares, dias:set}
-    agg = defaultdict(lambda: {"listings": 0, "particulares": 0, "dias": set()})
+def fetch_run_counts(conn, days=None, portal=None):
+    """Runs reales por (portal, zona) desde raw.scraper_zone_runs (log de
+    ejecuciones, desde ~28 May 2026). raw_listings NO sirve para contar
+    scrapes: el upsert deja una sola fila por anuncio con la ULTIMA fecha."""
+    where = []
+    params = []
+    if days:
+        where.append("scraped_at >= %s")
+        params.append(datetime.utcnow() - timedelta(days=days))
+    if portal:
+        where.append("portal = %s")
+        params.append(portal)
+    sql = "SELECT portal, zona, COUNT(*) FROM raw.scraper_zone_runs"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " GROUP BY 1, 2"
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    counts = {(p, _norm_zona(z)): n for p, z, n in cur.fetchall()}
+    cur.close()
+    return counts
+
+
+def aggregate(rows, run_counts=None):
+    # (portal, zona) -> {listings, particulares, dias:set, runs}
+    agg = defaultdict(lambda: {"listings": 0, "particulares": 0, "dias": set(), "runs": 0})
     for portal, zona, es_part, dia in rows:
         key = (portal, _norm_zona(zona))
         a = agg[key]
@@ -106,7 +130,14 @@ def aggregate(rows):
         if es_part:
             a["particulares"] += 1
         a["dias"].add(dia)
+    for key, a in agg.items():
+        a["runs"] = (run_counts or {}).get(key, 0)
     return agg
+
+
+def _scrapes(a):
+    """Runs reales si los hay; si no (datos pre-log), dias distintos (cota inferior)."""
+    return a["runs"] or len(a["dias"])
 
 
 def print_report(agg, portal_filter=None):
@@ -123,7 +154,7 @@ def print_report(agg, portal_filter=None):
         for (p, zona), a in agg.items():
             if p != portal:
                 continue
-            scrapes = len(a["dias"])
+            scrapes = _scrapes(a)
             part = a["particulares"]
             tot = a["listings"]
             items.append({
@@ -167,7 +198,7 @@ def print_learnings(agg):
     # Mejores combinaciones portal x zona
     combos = []
     for (p, zona), a in agg.items():
-        scrapes = len(a["dias"])
+        scrapes = _scrapes(a)
         if scrapes and a["particulares"] > 0:
             combos.append((a["particulares"] / scrapes, p, zona, a["particulares"], scrapes))
     combos.sort(reverse=True)
@@ -176,8 +207,8 @@ def print_learnings(agg):
         print(f"    {p:<11} {zona:<20} {lps:>5.1f} leads/scrape  ({part} en {scr} scrapes)")
 
     # Zonas que nunca dieron un particular (gasto sin retorno)
-    dead = [(p, zona, len(a["dias"]), a["listings"]) for (p, zona), a in agg.items()
-            if a["particulares"] == 0 and len(a["dias"]) >= 1]
+    dead = [(p, zona, _scrapes(a), a["listings"]) for (p, zona), a in agg.items()
+            if a["particulares"] == 0 and _scrapes(a) >= 1]
     dead.sort(key=lambda x: -x[2])
     if dead:
         print("\n• Combinaciones portal×zona con 0 particulares (scrapes sin retorno):")
@@ -218,11 +249,12 @@ def main():
 
     conn = _connect()
     rows = fetch_rows(conn, days=args.days, portal=args.portal)
+    run_counts = fetch_run_counts(conn, days=args.days, portal=args.portal)
     conn.close()
     if not rows:
         print("Sin datos.")
         return
-    agg = aggregate(rows)
+    agg = aggregate(rows, run_counts)
     print_report(agg, portal_filter=args.portal)
     print_learnings(agg)
     if args.telegram:

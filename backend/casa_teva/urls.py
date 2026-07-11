@@ -135,13 +135,16 @@ def scraper_health(request):
     """Scraper health dashboard - shows last scrape per portal with freshness indicator."""
     from datetime import datetime, timedelta
 
-    portals = ['habitaclia', 'fotocasa', 'milanuncios', 'idealista']
+    portals = ['habitaclia', 'fotocasa', 'milanuncios', 'idealista', 'wallapop']
     now = datetime.now()
     portal_health = {}
 
     try:
         with connection.cursor() as cursor:
-            # Last scrape per portal from raw.raw_listings
+            # Last scrape per portal from raw.raw_listings.
+            # OJO semantica: scraping_timestamp se machaca en cada upsert, asi que
+            # last_24h/7d = anuncios VISTOS en la ventana (frescura). Los NUEVOS
+            # de verdad salen de created_at, que el upsert no toca.
             cursor.execute("""
                 SELECT
                     portal,
@@ -152,7 +155,9 @@ def scraper_health(request):
                     COUNT(*) FILTER (
                         WHERE scraping_timestamp >= NOW() - INTERVAL '7 days'
                         AND raw_data->>'es_particular' = 'true'
-                    ) as particulares_7d
+                    ) as particulares_7d,
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') as nuevos_24h,
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') as nuevos_7d
                 FROM raw.raw_listings
                 WHERE portal = ANY(%s)
                 GROUP BY portal
@@ -165,10 +170,12 @@ def scraper_health(request):
 
                 portal_health[portal_name] = {
                     'total_all_time': row[1],
-                    'last_24h': row[2],
-                    'last_7d': row[3],
+                    'vistos_24h': row[2],
+                    'vistos_7d': row[3],
                     'last_new_data': last_scrape.isoformat() if last_scrape else None,
                     'particulares_7d': row[5],
+                    'nuevos_24h': row[6],
+                    'nuevos_7d': row[7],
                 }
 
             # Check scraper_runs for last run time (more reliable than raw_listings)
@@ -198,8 +205,9 @@ def scraper_health(request):
             for p in portals:
                 if p not in portal_health:
                     portal_health[p] = {
-                        'total_all_time': 0, 'last_24h': 0, 'last_7d': 0,
+                        'total_all_time': 0, 'vistos_24h': 0, 'vistos_7d': 0,
                         'last_new_data': None, 'particulares_7d': 0,
+                        'nuevos_24h': 0, 'nuevos_7d': 0,
                     }
                 ph = portal_health[p]
 
