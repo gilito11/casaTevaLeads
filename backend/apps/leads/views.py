@@ -481,7 +481,13 @@ def mark_as_agency_view(request, lead_id):
     if tenant_id and lead.tenant_id != tenant_id:
         return HttpResponse(status=403)
 
-    if not (lead.anuncio_id and lead.portal):
+    # Blacklist y raw usan el anuncio_id del PORTAL (external_id), no el serial
+    # de raw_listings (lead.anuncio_id): con el serial ni bloqueaba el re-scrape
+    # ni borraba el raw, y el anuncio resucitaba en el siguiente dbt run.
+    portal_anuncio_id = lead.external_id or (
+        lead.data_lake_reference.rsplit('/', 1)[-1] if lead.data_lake_reference else None
+    )
+    if not (portal_anuncio_id and lead.portal):
         return HttpResponse("Lead sin anuncio_id/portal", status=400)
 
     motivo = f"Marcado como agencia por {request.user.username} desde CRM"
@@ -491,7 +497,7 @@ def mark_as_agency_view(request, lead_id):
         tenant_id=lead.tenant_id, user=request.user,
         telefono=lead.telefono_norm, portal=lead.portal,
         titulo=lead.titulo or lead.direccion or '',
-        detalle=f"anuncio_id={lead.anuncio_id}, precio={lead.precio}",
+        detalle=f"anuncio_id={portal_anuncio_id}, precio={lead.precio}",
     )
 
     with connection.cursor() as cursor:
@@ -501,13 +507,13 @@ def mark_as_agency_view(request, lead_id):
             VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s)
             ON CONFLICT (tenant_id, portal, anuncio_id) DO UPDATE SET motivo = EXCLUDED.motivo
             """,
-            [tenant_id or lead.tenant_id, lead.portal, lead.anuncio_id,
+            [tenant_id or lead.tenant_id, lead.portal, portal_anuncio_id,
              lead.url_anuncio or '', (lead.titulo or '')[:500], motivo,
              request.user.id if request.user.is_authenticated else None],
         )
         cursor.execute(
             "DELETE FROM raw.raw_listings WHERE tenant_id=%s AND portal=%s AND raw_data->>'anuncio_id'=%s",
-            [tenant_id or lead.tenant_id, lead.portal, lead.anuncio_id],
+            [tenant_id or lead.tenant_id, lead.portal, portal_anuncio_id],
         )
         cursor.execute(
             "DELETE FROM public_marts.dim_leads WHERE tenant_id=%s AND source_portal=%s AND lead_id=%s",
@@ -1879,8 +1885,12 @@ def price_history_view(request, lead_id):
     if tenant_id and lead.tenant_id != tenant_id:
         return JsonResponse({'error': 'Forbidden'}, status=403)
 
-    # Get the source listing ID and portal from the lead
-    anuncio_id = lead.anuncio_id
+    # listing_price_history guarda el anuncio_id del PORTAL (external_id), no el
+    # serial de raw_listings (lead.anuncio_id). Fallback: ultimo segmento del
+    # data_lake_path, que tambien es el id del portal.
+    anuncio_id = lead.external_id or (
+        lead.data_lake_reference.rsplit('/', 1)[-1] if lead.data_lake_reference else None
+    )
     portal = lead.portal
 
     if not anuncio_id or not portal:

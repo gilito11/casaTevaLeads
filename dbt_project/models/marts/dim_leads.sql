@@ -419,6 +419,7 @@ final AS (
 
         -- Source tracking
         e.source_listing_id,
+        e.external_id,
         e.source_portal,
         e.data_lake_path,
 

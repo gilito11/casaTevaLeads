@@ -50,7 +50,9 @@ class LeadDetailSerializer(serializers.Serializer):
 
     portal = serializers.CharField(source='source_portal', read_only=True)
     url_anuncio = serializers.CharField(source='listing_url', read_only=True)
-    anuncio_id = serializers.CharField(source='source_listing_id', read_only=True)
+    # external_id = anuncio_id del PORTAL; source_listing_id es el serial interno
+    # de raw_listings y no sirve para cruzar con los portales.
+    anuncio_id = serializers.CharField(source='external_id', read_only=True)
 
     telefono = serializers.CharField(source='telefono_norm', read_only=True)
     email = serializers.EmailField(read_only=True)

@@ -216,6 +216,14 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
+      - name: Price drop alerts
+        continue-on-error: true
+        run: python scripts/check_price_drops.py
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Validate scrape quality
         continue-on-error: true
         run: python scripts/validate_scrape_quality.py

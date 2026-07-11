@@ -48,6 +48,9 @@ class Lead(models.Model):
     asignado_a_id = models.IntegerField(null=True, blank=True, db_column='asignado_a')
     updated_at = models.DateTimeField(null=True, blank=True, db_column='ultima_actualizacion')
     anuncio_id = models.CharField(max_length=255, blank=True, null=True, db_column='source_listing_id')
+    # Id del anuncio EN EL PORTAL (raw_data->>'anuncio_id'). anuncio_id de arriba
+    # es el serial interno de raw_listings — no sirve para listing_price_history.
+    external_id = models.CharField(max_length=255, blank=True, null=True)
     # Additional dbt columns
     es_particular = models.BooleanField(null=True, blank=True)
     permite_inmobiliarias = models.BooleanField(null=True, blank=True)
