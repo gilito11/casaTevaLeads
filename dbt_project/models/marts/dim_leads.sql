@@ -108,7 +108,7 @@
 WITH all_staging_sources AS (
     -- Fotocasa listings
     SELECT
-        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        raw_listing_id, external_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
         latitud, longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
@@ -123,7 +123,7 @@ WITH all_staging_sources AS (
 
     -- Milanuncios listings
     SELECT
-        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        raw_listing_id, external_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
         NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
@@ -138,7 +138,7 @@ WITH all_staging_sources AS (
 
     -- Habitaclia listings
     SELECT
-        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        raw_listing_id, external_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
         NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
@@ -153,7 +153,7 @@ WITH all_staging_sources AS (
 
     -- Idealista listings (ScrapingBee)
     SELECT
-        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        raw_listing_id, external_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
         NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
@@ -168,7 +168,7 @@ WITH all_staging_sources AS (
 
     -- Wallapop listings
     SELECT
-        raw_listing_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
+        raw_listing_id, external_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
         NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
@@ -190,8 +190,42 @@ deduplicated AS (
         ROW_NUMBER() OVER (
             PARTITION BY tenant_id, COALESCE(NULLIF(telefono_norm, ''), MD5(url))
             ORDER BY scraping_timestamp DESC, created_at DESC
-        ) AS rn
+        ) AS rn,
+        -- created_at del raw NO se toca en el upsert del scraper (a diferencia
+        -- de scraping_timestamp, que se machaca en cada re-scrape), asi que su
+        -- MIN es la verdadera primera captura.
+        MIN(created_at) OVER (
+            PARTITION BY tenant_id, COALESCE(NULLIF(telefono_norm, ''), MD5(url))
+        ) AS primera_captura_batch
     FROM all_staging_sources
+),
+
+{#
+    fecha_primera_captura debe SOBREVIVIR a los re-scrapes. El dedup se queda
+    con la fila mas reciente (rn=1), asi que su scraping_timestamp es la ULTIMA
+    captura, no la primera. En incremental recuperamos la fecha ya guardada en
+    la tabla; en full-refresh usamos el MIN del batch (todo el historico de
+    staging). Sin esto, cada re-scrape resetea dias_en_mercado a 0 y rompe el
+    lead_score.
+#}
+dedup_first_capture AS (
+    SELECT
+        d.*,
+        {% if is_incremental() %}
+        LEAST(
+            COALESCE(prev.fecha_primera_captura, d.primera_captura_batch),
+            d.primera_captura_batch
+        ) AS primera_captura_real
+        {% else %}
+        d.primera_captura_batch AS primera_captura_real
+        {% endif %}
+    FROM deduplicated d
+    {% if is_incremental() %}
+    LEFT JOIN {{ this }} prev
+        ON prev.tenant_id::TEXT = d.tenant_id::TEXT
+        AND prev.lead_unique_key = d.lead_unique_key
+    {% endif %}
+    WHERE d.rn = 1
 ),
 
 enriched AS (
@@ -202,6 +236,7 @@ enriched AS (
 
         -- Source information
         raw_listing_id AS source_listing_id,
+        external_id,
         tenant_id,
         portal AS source_portal,
         data_lake_path,
@@ -301,7 +336,7 @@ enriched AS (
                 WHEN fecha_publicacion IS NOT NULL THEN
                     LEAST(30, EXTRACT(DAY FROM NOW() - fecha_publicacion)::INTEGER)
                 ELSE
-                    LEAST(30, EXTRACT(DAY FROM NOW() - scraping_timestamp)::INTEGER)
+                    LEAST(30, EXTRACT(DAY FROM NOW() - primera_captura_real)::INTEGER)
             END
             -- 2. Tiene telefono visible: +20pts (menos spam recibido)
             + CASE WHEN telefono_norm IS NOT NULL AND telefono_norm != '' THEN 20 ELSE 0 END
@@ -326,12 +361,11 @@ enriched AS (
 
         -- Timestamps
         fecha_publicacion,
-        scraping_timestamp AS fecha_primera_captura,
+        primera_captura_real AS fecha_primera_captura,
         scraping_timestamp AS ultima_actualizacion,
         CURRENT_TIMESTAMP AS created_at_marts
 
-    FROM deduplicated
-    WHERE rn = 1  -- Keep only the most recent record per tenant + phone
+    FROM dedup_first_capture
 ),
 
 -- Image scores from staging (table created via pre_hook if not exists)
@@ -463,9 +497,12 @@ final AS (
 
     FROM enriched e
     LEFT JOIN image_scores lis ON e.lead_id = lis.lead_id
-    LEFT JOIN price_changes pc ON e.tenant_id = pc.tenant_id
+    -- OJO: price_history guarda el anuncio_id del PORTAL (external_id), no el
+    -- id serial de raw_listings (source_listing_id). Con source_listing_id el
+    -- join no casaba nunca y las bajadas de precio jamas llegaban al mart.
+    LEFT JOIN price_changes pc ON e.tenant_id::TEXT = pc.tenant_id::TEXT
         AND e.source_portal = pc.portal
-        AND e.source_listing_id::TEXT = pc.anuncio_id
+        AND e.external_id = pc.anuncio_id::TEXT
     -- Filtro ALQUILER: Casa Teva solo trabaja COMPRA/VENTA. Excluimos los anuncios
     -- que son ofertas o demandas de alquiler ("se alquila", "llogar", "se busca
     -- alquiler"...). Para evitar tumbar VENTAS que solo mencionan alquiler como

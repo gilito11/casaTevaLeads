@@ -26,6 +26,7 @@ extracted AS (
     SELECT
         -- IDs and metadata
         id AS raw_listing_id,
+        raw_data->>'anuncio_id' AS external_id,
         tenant_id,
         portal,
         data_lake_path,
@@ -202,6 +203,7 @@ final AS (
     SELECT
         -- Primary keys
         raw_listing_id,
+        external_id,
         tenant_id,
 
         -- Source metadata
