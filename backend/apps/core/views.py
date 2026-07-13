@@ -200,14 +200,12 @@ def profile_view(request):
     # Estadisticas del usuario
     user_stats = {}
     if tenant_user:
-        leads_qs = Lead.objects.filter(tenant_id=tenant_user.tenant.tenant_id)
+        tenant_id = tenant_user.tenant.tenant_id
+        mis_estados = LeadEstado.objects.filter(tenant_id=tenant_id, asignado_a=request.user)
         user_stats = {
-            'total_leads': leads_qs.count(),
-            'leads_asignados': leads_qs.filter(asignado_a_id=request.user.id).count(),
-            'clientes_convertidos': leads_qs.filter(
-                asignado_a_id=request.user.id,
-                estado='CLIENTE'
-            ).count(),
+            'total_leads': Lead.objects.filter(tenant_id=tenant_id).count(),
+            'leads_asignados': mis_estados.count(),
+            'clientes_convertidos': mis_estados.filter(estado='CLIENTE').count(),
         }
 
     context = {
