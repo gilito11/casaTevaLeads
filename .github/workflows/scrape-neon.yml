@@ -36,7 +36,7 @@ env:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90  # scraping ~58min y subiendo; +margen para dbt + listing_checker + alertas
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -79,6 +79,7 @@ jobs:
       - name: Run Habitaclia scraper (Scrapling)
         if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'habitaclia')
         continue-on-error: true
+        timeout-minutes: 40  # hard cap: es el mas lento (~31min) y variable; no debe ahogar dbt
         run: |
           ZONES="${{ steps.zones.outputs.zones }}"
           python -m scrapers.scrapling_habitaclia --zones ${ZONES//,/ } --postgres
@@ -250,14 +251,15 @@ jobs:
   notify:
     needs: scrape
     runs-on: ubuntu-latest
-    if: failure()
+    # failure() NO cubre timeouts (conclusion=cancelled) -> el fallo era silencioso.
+    if: always() && (needs.scrape.result == 'failure' || needs.scrape.result == 'cancelled')
     steps:
       - name: Send failure notification via Telegram
         run: |
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d parse_mode=HTML \
-            -d text="🔴 <b>GH Actions Scraping FAILED</b>%0A%0AWorkflow: scrape-neon.yml%0ACheck: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -d text="🔴 <b>GH Actions Scraping FAILED/CANCELLED</b> (${{ needs.scrape.result }})%0A%0AWorkflow: scrape-neon.yml%0ACheck: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
