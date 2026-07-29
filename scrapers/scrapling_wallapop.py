@@ -254,7 +254,10 @@ class ScraplingWallapop(ScraplingBaseScraper):
     def _parse_api_results(self, text: str, zona_key: str, zona_cfg: dict) -> List[Dict[str, Any]]:
         items = self._api_payload_items(text)
         if not items:
-            logger.warning(f"[wallapop] {zona_key}: 0 items del API geolocalizado")
+            # El snippet distingue "sin inventario" ({"data":...items":[]}) de
+            # una respuesta rota (error page, HTML, bloqueo del fetcher).
+            snippet = re.sub(r"\s+", " ", (text or ""))[:200]
+            logger.warning(f"[wallapop] {zona_key}: 0 items del API geolocalizado (body: {snippet!r})")
             return []
 
         results: List[Dict[str, Any]] = []

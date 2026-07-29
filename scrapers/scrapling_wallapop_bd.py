@@ -134,10 +134,33 @@ class ScraplingWallapopBD(ScraplingWallapop):
         )
         return self.stats
 
+    # El API geolocalizado (zonas sin vertical) es público y sin anti-bot:
+    # GET directo desde el runner (gratis, headers de app) y BD solo como
+    # fallback si el directo falla (p.ej. geo-block del runner US).
+    API_HEADERS = {
+        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"),
+        "X-DeviceOS": "0",
+        "Accept": "application/json",
+        "Accept-Language": "es-ES,es;q=0.9",
+    }
+
+    def _fetch_search_body(self, zona_key: str, url: str) -> Optional[str]:
+        if not url.startswith(ScraplingWallapop.API_SEARCH_URL):
+            return self._bd_request(url)
+        try:
+            r = requests.get(url, headers=self.API_HEADERS, timeout=30)
+            if r.status_code == 200 and r.text.lstrip().startswith("{"):
+                return r.text
+            logger.info(f"[wallapop-bd] {zona_key}: API directa HTTP {r.status_code}, fallback BD")
+        except requests.RequestException as e:
+            logger.info(f"[wallapop-bd] {zona_key}: API directa falló ({e}), fallback BD")
+        return self._bd_request(url)
+
     def _scrape_zone_bd(self, zona_key: str):
         url = self.build_search_url(zona_key)
         logger.info(f"[wallapop-bd] {zona_key}: {url}")
-        html = self._bd_request(url)
+        html = self._fetch_search_body(zona_key, url)
         if html is None:
             return
 
