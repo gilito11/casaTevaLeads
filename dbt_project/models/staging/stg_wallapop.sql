@@ -142,6 +142,9 @@ classified AS (
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('mollerussa_rural') THEN 'Lleida - Mollerussa'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('chamartin', 'chamartín') THEN 'Madrid - Chamartin'
             WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('hortaleza') THEN 'Madrid - Hortaleza'
+            -- Única clave de zona cuyo fallback INITCAP no casa con la keep-list
+            -- de dim_leads ('vallfogona balaguer' vs 'vallfogona de balaguer').
+            WHEN LOWER(COALESCE(zona_busqueda, '')) IN ('vallfogona_balaguer') THEN 'Vallfogona de Balaguer'
             -- Fallback: zona sin caso explícito -> formatea bonito (sin guiones bajos
             -- ni minúsculas crudas tipo "vila_seca"). INITCAP capitaliza cada palabra.
             WHEN zona_busqueda IS NOT NULL AND zona_busqueda <> ''

@@ -8,9 +8,13 @@ demás portales). Cada zona aporta:
   - nombre   : display name -> raw_data.zona_geografica
   - slug     : ciudad para la ruta vertical /inmobiliaria/<slug> (carga el
                contexto de inmobiliaria + cookies anti-bot del SPA)
-  - lat/lng  : coordenadas para la búsqueda directa por API (fallback
-               determinista cuando la vertical no existe para municipios pequeños)
+  - lat/lng  : coordenadas para la búsqueda geolocalizada por API
   - radius_km: radio de búsqueda en km
+
+Municipios pequeños SIN vertical SEO (la landing /inmobiliaria/<slug> devuelve
+404): slug=None. Para ellos el scraper usa el API geolocalizado
+api.wallapop.com/api/v3/search con lat/lng/distance + category_id=200
+(ver ScraplingWallapop.build_search_url). Validado 29 Jul 2026.
 
 Las coords son aproximadas (centro del municipio); el radio cubre el área.
 """
@@ -45,6 +49,37 @@ ZONAS_GEOGRAFICAS = {
     'vielha': {'nombre': 'Vielha', 'slug': 'vielha', 'lat': 42.7020, 'lng': 0.7960, 'radius_km': 12},
     'mollerussa_rural': {'nombre': 'Mollerussa Rural', 'slug': 'el-palau-danglesola', 'lat': 41.6510, 'lng': 0.8800, 'radius_km': 6},
 
+    # ---- Cinturón Lleida <=20km, pueblos sin vertical SEO (slug=None -> API) ----
+    # Claves idénticas a las del cron en scrape-neon.yml y al resto de portales.
+    'albatarrec': {'nombre': 'Albatàrrec', 'slug': None, 'lat': 41.5730, 'lng': 0.6070, 'radius_km': 3},
+    'torre_serona': {'nombre': 'Torre-serona', 'slug': None, 'lat': 41.6640, 'lng': 0.5980, 'radius_km': 3},
+    'montoliu_de_lleida': {'nombre': 'Montoliu de Lleida', 'slug': None, 'lat': 41.5700, 'lng': 0.6330, 'radius_km': 3},
+    'alcoletge': {'nombre': 'Alcoletge', 'slug': None, 'lat': 41.6460, 'lng': 0.6940, 'radius_km': 3},
+    'sudanell': {'nombre': 'Sudanell', 'slug': None, 'lat': 41.5590, 'lng': 0.5730, 'radius_km': 3},
+    'benavent_de_segria': {'nombre': 'Benavent de Segrià', 'slug': None, 'lat': 41.7120, 'lng': 0.6350, 'radius_km': 3},
+    'rossello': {'nombre': 'Rosselló', 'slug': None, 'lat': 41.6900, 'lng': 0.6070, 'radius_km': 3},
+    'artesa_de_lleida': {'nombre': 'Artesa de Lleida', 'slug': None, 'lat': 41.5520, 'lng': 0.7010, 'radius_km': 3},
+    'corbins': {'nombre': 'Corbins', 'slug': None, 'lat': 41.6800, 'lng': 0.7000, 'radius_km': 3},
+    'vilanova_de_segria': {'nombre': 'Vilanova de Segrià', 'slug': None, 'lat': 41.7230, 'lng': 0.6280, 'radius_km': 3},
+    'alfes': {'nombre': 'Alfés', 'slug': None, 'lat': 41.5490, 'lng': 0.6180, 'radius_km': 3},
+    'sunyer': {'nombre': 'Sunyer', 'slug': None, 'lat': 41.5420, 'lng': 0.5960, 'radius_km': 3},
+    'vilanova_de_la_barca': {'nombre': 'Vilanova de la Barca', 'slug': None, 'lat': 41.6870, 'lng': 0.7230, 'radius_km': 3},
+    'puigverd_de_lleida': {'nombre': 'Puigverd de Lleida', 'slug': None, 'lat': 41.5380, 'lng': 0.6930, 'radius_km': 3},
+    'torres_de_segre': {'nombre': 'Torres de Segre', 'slug': None, 'lat': 41.5320, 'lng': 0.5120, 'radius_km': 3},
+    'alguaire': {'nombre': 'Alguaire', 'slug': None, 'lat': 41.7350, 'lng': 0.5850, 'radius_km': 3},
+    'aspa': {'nombre': 'Aspa', 'slug': None, 'lat': 41.5320, 'lng': 0.6720, 'radius_km': 3},
+    'soses': {'nombre': 'Soses', 'slug': None, 'lat': 41.5360, 'lng': 0.5180, 'radius_km': 3},
+    'menarguens': {'nombre': 'Menàrguens', 'slug': None, 'lat': 41.7340, 'lng': 0.7370, 'radius_km': 3},
+    'bellvis': {'nombre': 'Bellvís', 'slug': None, 'lat': 41.6700, 'lng': 0.8180, 'radius_km': 3},
+    'sidamon': {'nombre': 'Sidamon', 'slug': None, 'lat': 41.6320, 'lng': 0.8430, 'radius_km': 3},
+    'sarroca_de_lleida': {'nombre': 'Sarroca de Lleida', 'slug': None, 'lat': 41.4430, 'lng': 0.5540, 'radius_km': 4},
+    'aitona': {'nombre': 'Aitona', 'slug': None, 'lat': 41.4920, 'lng': 0.4610, 'radius_km': 4},
+    'fondarella': {'nombre': 'Fondarella', 'slug': None, 'lat': 41.6340, 'lng': 0.8700, 'radius_km': 3},
+    'torrebesses': {'nombre': 'Torrebesses', 'slug': None, 'lat': 41.4280, 'lng': 0.5980, 'radius_km': 4},
+    'miralcamp': {'nombre': 'Miralcamp', 'slug': None, 'lat': 41.6070, 'lng': 0.8680, 'radius_km': 3},
+    'vallfogona_balaguer': {'nombre': 'Vallfogona de Balaguer', 'slug': None, 'lat': 41.7710, 'lng': 0.8210, 'radius_km': 3},
+    'gimenells': {'nombre': 'Gimenells', 'slug': None, 'lat': 41.6540, 'lng': 0.3900, 'radius_km': 4},
+
     # ---- Tarragona / Costa Dorada ----
     'tarragona': {'nombre': 'Tarragona Ciudad', 'slug': 'tarragona', 'lat': 41.1189, 'lng': 1.2445, 'radius_km': 12},
     'salou': {'nombre': 'Salou', 'slug': 'salou', 'lat': 41.0772, 'lng': 1.1417, 'radius_km': 6},
@@ -63,6 +98,14 @@ ZONAS_GEOGRAFICAS = {
     'tortosa': {'nombre': 'Tortosa', 'slug': 'tortosa', 'lat': 40.8126, 'lng': 0.5211, 'radius_km': 10},
     'amposta': {'nombre': 'Amposta', 'slug': 'amposta', 'lat': 40.7130, 'lng': 0.5810, 'radius_km': 8},
     'deltebre': {'nombre': 'Deltebre', 'slug': 'deltebre', 'lat': 40.7190, 'lng': 0.7180, 'radius_km': 6},
+
+    # ---- Costa secundaria keep-list (validado 29 Jul 2026: estos 4 SÍ tienen vertical) ----
+    'constanti': {'nombre': 'Constantí', 'slug': 'constanti', 'lat': 41.1530, 'lng': 1.2130, 'radius_km': 4},
+    'la_canonja': {'nombre': 'La Canonja', 'slug': 'la-canonja', 'lat': 41.1220, 'lng': 1.1960, 'radius_km': 3},
+    'riudoms': {'nombre': 'Riudoms', 'slug': 'riudoms', 'lat': 41.1370, 'lng': 1.0510, 'radius_km': 4},
+    'mont_roig_del_camp': {'nombre': 'Mont-roig del Camp', 'slug': 'mont-roig-del-camp', 'lat': 41.0870, 'lng': 0.9580, 'radius_km': 5},
+    'montbrio_del_camp': {'nombre': 'Montbrió del Camp', 'slug': None, 'lat': 41.1210, 'lng': 1.0010, 'radius_km': 3},
+    'vinyols_i_els_arcs': {'nombre': 'Vinyols i els Arcs', 'slug': None, 'lat': 41.1120, 'lng': 1.0410, 'radius_km': 3},
 
     # ---- Madrid (Find&Look, tenant 2) ----
     'chamartin': {'nombre': 'Chamartín', 'slug': 'madrid', 'lat': 40.4600, 'lng': -3.6770, 'radius_km': 4},
