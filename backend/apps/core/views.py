@@ -59,6 +59,14 @@ def home_view(request):
     )
 
 
+def video_view(request):
+    """Pagina publica del video comercial, con OG tags para LinkedIn/WhatsApp."""
+    return FileResponse(
+        open(settings.BASE_DIR / 'templates' / 'landing' / 'video.html', 'rb'),
+        content_type='text/html; charset=utf-8',
+    )
+
+
 @login_required
 def dashboard_view(request):
     """Vista del dashboard principal con KPIs y graficos"""
