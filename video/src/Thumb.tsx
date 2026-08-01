@@ -36,7 +36,7 @@ export const Thumb: React.FC = () => (
           marginTop: 36,
         }}
       >
-        Leads de particulares en tu lista de las 08:00
+        Leads de particulares en tu lista, cada mañana
       </div>
       <div
         style={{
@@ -46,7 +46,7 @@ export const Thumb: React.FC = () => (
           marginTop: 26,
         }}
       >
-        5 portales · cada madrugada · scoring 0-90 · fincaradar.com
+        5 portales · fuera agencias · scoring 0-90 · fincaradar.com
       </div>
     </AbsoluteFill>
   </AbsoluteFill>
