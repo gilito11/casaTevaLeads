@@ -12,7 +12,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Count, Q
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
+from django.conf import settings
 from datetime import timedelta
 
 from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS, ZONAS_POR_REGION, ScrapingJob
@@ -46,6 +47,16 @@ def logout_view(request):
     """Vista de logout"""
     logout(request)
     return redirect('login')
+
+
+def home_view(request):
+    """Raiz del dominio: landing publica para anonimos, dashboard para usuarios."""
+    if request.user.is_authenticated:
+        return dashboard_view(request)
+    return FileResponse(
+        open(settings.BASE_DIR / 'templates' / 'landing' / 'index.html', 'rb'),
+        content_type='text/html; charset=utf-8',
+    )
 
 
 @login_required

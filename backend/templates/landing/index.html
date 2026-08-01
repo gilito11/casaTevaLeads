@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FincaRadar — Leads de particulares en tu lista de las 08:00</title>
+<meta name="description" content="Cada madrugada, FincaRadar barre Idealista, Fotocasa, Habitaclia, Milanuncios y Wallapop; descarta agencias y duplicados, puntúa cada lead de 0 a 90 y se lo sirve a tu equipo comercial antes de que llame tu competencia.">
+<meta property="og:title" content="FincaRadar — Publicado ayer a las 23:41. En tu lista de las 08:00.">
+<meta property="og:description" content="5 portales barridos cada madrugada. Fuera agencias y duplicados. Cada lead puntuado de 0 a 90. Tu equipo llama primero.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_ES">
+<meta property="og:site_name" content="FincaRadar">
+<meta property="og:url" content="https://fincaradar.com/">
+<link rel="canonical" href="https://fincaradar.com/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563EB'/%3E%3Ccircle cx='10' cy='22' r='2' fill='white'/%3E%3Cpath d='M10 15a7 7 0 0 1 7 7' stroke='white' stroke-width='2' stroke-linecap='round' fill='none'/%3E%3Cpath d='M10 9a13 13 0 0 1 13 13' stroke='white' stroke-width='2' stroke-linecap='round' fill='none'/%3E%3Ccircle cx='18' cy='14' r='2.4' fill='white'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>document.documentElement.className += ' js';</script>
+<style>
+/* ============ 1 · TOKENS Y RESET ============ */
+:root{
+  --papel:#F2F5FA;
+  --blanco:#FFFFFF;
+  --tinta:#0C1D3A;
+  --tinta-2:#4A5B7A;
+  --azul:#2563EB;
+  --azul-hover:#1E53C8;
+  --ambar:#E8930C;
+  --verde:#047857;
+  --rojo:#B3372E;
+  --rejilla:#C7D3E8;
+  --sombra:0 1px 2px rgba(12,29,58,.06);
+  --radius:8px;
+  --radius-sm:4px;
+  --text-xs:11px;
+  --text-sm:13px;
+  --text-base:15px;
+  --text-md:17px;
+  --text-lg:20px;
+  --track-data:.06em;
+  --track-eyebrow:.12em;
+  --font-display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --font-body:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'Spline Sans Mono','Cascadia Code',Consolas,monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{
+  background:var(--papel);
+  color:var(--tinta);
+  font-family:var(--font-body);
+  font-size:var(--text-md);
+  line-height:1.6;
+  overflow-x:clip;
+}
+::selection{background:var(--azul);color:#fff}
+a{color:var(--azul)}
+img,svg{max-width:100%;height:auto}
+button{font:inherit;cursor:pointer}
+input{font:inherit}
+:focus-visible{outline:2px solid var(--azul);outline-offset:2px;border-radius:2px}
+section[id],footer[id]{scroll-margin-top:96px}
+
+.skip-link{
+  position:absolute;left:-9999px;top:0;z-index:200;
+  background:var(--tinta);color:var(--papel);padding:10px 18px;border-radius:0 0 8px 0;
+}
+.skip-link:focus{left:0}
+
+/* ============ 2 · UTILIDADES ============ */
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+@media (min-width:961px){.container{padding:0 40px 0 128px}}
+
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+.eyebrow{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  margin-bottom:24px;
+}
+.eyebrow-time{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);letter-spacing:var(--track-data);color:var(--tinta);font-weight:500;
+}
+.eyebrow-stage{
+  font-family:var(--font-display);font-weight:800;font-stretch:120%;
+  font-size:var(--text-sm);letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--tinta-2);
+}
+.h2{
+  font-family:var(--font-display);font-weight:750;font-stretch:120%;
+  font-size:clamp(1.75rem,3vw,2.5rem);line-height:1.12;letter-spacing:-.01em;
+  color:var(--tinta);max-width:20ch;
+}
+.section-sub{color:var(--tinta-2);max-width:56ch;margin-top:16px}
+
+.section{padding:128px 0}
+@media (max-width:760px){.section{padding:80px 0}}
+
+.card{
+  background:var(--blanco);
+  border:1px solid var(--rejilla);
+  border-radius:var(--radius);
+  box-shadow:var(--sombra);
+}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-family:var(--font-body);font-weight:600;font-size:16px;
+  border-radius:var(--radius);padding:14px 26px;text-decoration:none;
+  border:1px solid transparent;transition:background-color .15s ease,border-color .15s ease;
+}
+.btn-primary{background:var(--azul);color:#fff}
+.btn-primary:hover{background:var(--azul-hover)}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:8px;
+  background:transparent;color:var(--tinta);border:none;padding:14px 6px;
+  text-decoration:none;font-weight:500;
+}
+.btn-ghost svg{flex:none}
+.btn-ghost:hover{color:var(--azul)}
+
+.chip-portal{
+  display:inline-block;
+  font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);
+  border:1px solid var(--rejilla);border-radius:var(--radius-sm);
+  padding:3px 8px;color:var(--tinta-2);background:var(--papel);
+  text-transform:uppercase;white-space:nowrap;
+}
+
+/* Sello estampado: exactamente 3 apariciones + variantes de hero */
+.sello{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--font-mono);font-size:var(--text-sm);font-weight:500;
+  letter-spacing:var(--track-data);text-transform:uppercase;
+  border:1.5px solid currentColor;border-radius:var(--radius-sm);
+  padding:5px 10px;transform:rotate(-2deg);
+  background:rgba(255,255,255,.88);
+  white-space:nowrap;
+}
+.sello svg{flex:none}
+.sello--tinta{color:var(--tinta)}
+.sello--rojo{color:var(--rojo)}
+.sello--ambar{
+  color:var(--tinta);background:var(--ambar);border-color:var(--ambar);
+}
+
+.data-strip{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);letter-spacing:var(--track-data);color:var(--tinta-2);
+  text-transform:uppercase;
+  border-top:1px solid var(--rejilla);
+  padding-top:16px;
+}
+
+/* ============ 3 · NAV ============ */
+.nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(242,245,250,.92);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  border-bottom:1px solid transparent;
+  transition:border-color .2s ease;
+}
+.nav.scrolled{border-bottom-color:var(--rejilla)}
+.nav-inner{
+  max-width:1200px;margin:0 auto;padding:0 24px;
+  height:68px;display:flex;align-items:center;gap:32px;
+}
+@media (min-width:961px){.nav-inner{padding:0 40px}}
+.brand{
+  display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--tinta);
+  font-family:var(--font-display);font-weight:750;font-stretch:115%;font-size:18px;
+  letter-spacing:-.01em;margin-right:auto;
+}
+.brand-mark{
+  width:32px;height:32px;border-radius:var(--radius);background:var(--azul);
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:none;overflow:hidden;
+}
+.brand-mark svg{display:block;width:100%;height:100%}
+.nav-links{display:flex;align-items:center;gap:24px;list-style:none}
+.nav-links a:not(.btn){
+  color:var(--tinta-2);text-decoration:none;font-weight:500;font-size:var(--text-base);
+}
+.nav-links a:not(.btn):hover{color:var(--tinta)}
+.nav-links .btn{padding:10px 20px;font-size:var(--text-base)}
+.nav-toggle{
+  display:none;background:none;border:1px solid var(--rejilla);border-radius:var(--radius);
+  width:42px;height:38px;align-items:center;justify-content:center;flex:none;
+}
+.nav-toggle svg{display:block}
+.nav-toggle .icon-close{display:none}
+.nav-toggle[aria-expanded="true"] .icon-open{display:none}
+.nav-toggle[aria-expanded="true"] .icon-close{display:block}
+@media (max-width:860px){
+  .nav-toggle{display:inline-flex}
+  .nav-links{
+    display:none;position:absolute;top:68px;left:0;right:0;
+    flex-direction:column;align-items:stretch;gap:0;
+    background:var(--papel);border-bottom:1px solid var(--rejilla);
+    padding:8px 24px 20px;
+  }
+  .nav-links.open{display:flex}
+  .nav-links li{border-top:1px solid var(--rejilla)}
+  .nav-links li:first-child{border-top:none}
+  .nav-links a:not(.btn){display:block;padding:14px 0;font-size:var(--text-md)}
+  .nav-links li.nav-cta{border-top:none;padding-top:12px}
+  .nav-links .btn{width:100%}
+}
+
+/* ============ 4 · TRAZA HORARIA (raíl) ============ */
+#railWrap{position:absolute;inset:0;pointer-events:none;z-index:0;display:none}
+@media (min-width:961px){#railWrap{display:block}}
+#railSvg{position:absolute;top:0;left:0;overflow:visible}
+#railPath{fill:none;stroke:var(--tinta);stroke-width:2}
+#railTicks{fill:none;stroke:var(--rejilla);stroke-width:1.5}
+#railDot{opacity:0;transition:opacity .3s ease}
+#railDot.on{opacity:1}
+main{position:relative}
+main > *{position:relative;z-index:1}
+/* El raíl pinta por encima de las secciones: la vertical corre por el margen
+   (nunca cruza texto) y el tramo final debe verse entrar en el botón. */
+main > #railWrap{z-index:2}
+
+/* ============ 5 · HERO ============ */
+.hero{
+  padding:96px 0 112px;
+  background-image:
+    linear-gradient(rgba(199,211,232,.38) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(199,211,232,.38) 1px,transparent 1px);
+  background-size:24px 24px;
+  border-bottom:1px solid var(--rejilla);
+}
+.hero-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:48px;align-items:center}
+@media (max-width:980px){.hero-grid{grid-template-columns:1fr;gap:48px}}
+.hero h1{
+  font-family:var(--font-display);font-weight:750;font-stretch:120%;
+  font-size:clamp(2.5rem,5.5vw,4.25rem);line-height:1.04;letter-spacing:-.01em;
+  color:var(--tinta);max-width:15ch;
+}
+.hero-sub{color:var(--tinta-2);max-width:54ch;margin-top:24px;font-size:18px}
+.hero-ctas{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:32px}
+.hero .data-strip{margin-top:48px}
+
+/* Pipeline (esquema vivo) */
+.pipe{
+  position:relative;
+  max-width:600px;margin-left:auto;
+  aspect-ratio:600/560;
+}
+@media (max-width:980px){.pipe{margin-left:0}}
+.pipe-svg{position:absolute;inset:0;width:100%;height:100%}
+.pipe-svg .in-line,.pipe-svg .mid-line,.pipe-svg .out-line{
+  fill:none;stroke:var(--tinta);stroke-width:2;stroke-linecap:round;
+}
+.pipe-svg .drop-line{fill:none;stroke:var(--rejilla);stroke-width:1.5;stroke-dasharray:4 5}
+.pipe-svg .node-c{fill:var(--blanco);stroke:var(--tinta);stroke-width:2}
+.pipe-svg .node-c.node-act{stroke:var(--azul)}
+.pipe-svg .node-x{stroke:var(--tinta);stroke-width:1.6;stroke-linecap:round}
+.pipe-svg text{
+  font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);fill:var(--tinta-2);
+}
+.pipe-svg .node-label{font-size:var(--text-xs);text-anchor:middle;fill:var(--tinta-2)}
+
+/* Tarjeta de lead superviviente */
+.lead-card{
+  position:absolute;right:-6px;top:50%;transform:translateY(-50%);
+  width:248px;padding:18px 18px 16px;z-index:2;
+}
+.lead-card .lc-title{
+  font-family:var(--font-display);font-weight:750;font-stretch:112%;
+  font-size:var(--text-md);line-height:1.25;letter-spacing:-.005em;
+}
+.lead-card .lc-data{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);color:var(--tinta-2);margin-top:8px;line-height:1.8;
+}
+.lc-score{
+  display:inline-block;font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  background:var(--ambar);color:var(--tinta);font-size:var(--text-sm);font-weight:500;
+  border-radius:var(--radius-sm);padding:3px 8px;margin-top:8px;
+}
+.lc-particular{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);font-weight:500;
+  color:var(--verde);margin-top:8px;text-transform:uppercase;
+}
+.lc-particular svg{flex:none}
+.sello-detectado{position:absolute;top:-14px;right:-10px}
+
+/* Tarjeta AGENCIA que cae */
+.agencia-card{
+  position:absolute;left:45%;top:76%;transform:translateX(-50%) rotate(-2deg);
+  z-index:2;
+  background:var(--blanco);border:1px solid var(--rejilla);border-radius:var(--radius);
+  box-shadow:var(--sombra);padding:10px 14px 12px;width:172px;
+}
+.agencia-card .ac-line{
+  font-family:var(--font-mono);font-size:var(--text-xs);color:var(--tinta-2);
+  text-decoration:line-through;text-decoration-color:rgba(74,91,122,.5);
+}
+.agencia-card .sello{margin-top:8px;font-size:var(--text-xs);padding:4px 8px}
+
+/* Pipeline versión móvil */
+.pipe-mobile{display:none}
+@media (max-width:820px){
+  .pipe{aspect-ratio:auto;max-width:420px}
+  .pipe-svg{display:none}
+  .pipe{display:flex;flex-direction:column;gap:0;position:static}
+  .pipe-mobile{display:flex;flex-direction:column;gap:0;order:1}
+  .pm-chips{display:flex;flex-wrap:wrap;gap:8px}
+  .pm-joint{
+    width:2px;height:26px;background:var(--tinta);margin:8px 0 8px 24px;flex:none;
+  }
+  .pm-filters{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);
+    color:var(--tinta);text-transform:uppercase;
+  }
+  .pm-filters .pm-node{
+    display:inline-flex;align-items:center;gap:6px;
+    border:2px solid var(--tinta);border-radius:999px;padding:5px 12px;background:var(--blanco);
+  }
+  .pm-filters .pm-node svg{flex:none}
+  .pm-filters .pm-node--act{border-color:var(--azul)}
+  .pm-arrow{color:var(--tinta-2);display:inline-flex}
+  .agencia-card{position:static;transform:rotate(-2deg);order:2;margin:16px 0 8px 24px}
+  .lead-card{position:static;transform:none;order:3;margin:16px 0 0;width:100%;max-width:300px}
+  .sello-detectado{top:-14px;right:8px}
+  .lead-card{position:relative}
+}
+
+/* ---- Secuencia de carga del hero (solo con motion) ---- */
+@media (prefers-reduced-motion:no-preference){
+  .js .pipe-draw{stroke-dasharray:1;stroke-dashoffset:1}
+  .js .hero-play .pipe-draw{animation:pipeDraw .55s cubic-bezier(.4,0,.2,1) both}
+  .js .hero-play .pipe-draw.d2{animation-delay:.5s;animation-duration:.3s}
+  .js .hero-play .pipe-draw.d3{animation-delay:.82s;animation-duration:.38s}
+  .js .pipe-node{opacity:0}
+  .js .hero-play .pipe-node{animation:fadeIn .3s .48s ease both}
+  .js .hero-play .pipe-node.n2{animation-delay:.72s}
+  .js .pipe-fade{opacity:0}
+  .js .hero-play .pipe-fade{animation:fadeIn .4s 1s ease both}
+  .js .lead-card{opacity:0}
+  .js .hero-play .lead-card{animation:cardIn .45s 1.02s cubic-bezier(.2,.7,.3,1) both}
+  .js .agencia-card{opacity:0}
+  .js .hero-play .agencia-card{animation:acFall .3s 1.3s cubic-bezier(.5,0,.8,.4) both}
+  .js .sello-detectado{opacity:0}
+  .js .hero-play .sello-detectado{animation:stamp .25s 2.45s cubic-bezier(.2,1.4,.4,1) both}
+}
+@keyframes pipeDraw{to{stroke-dashoffset:0}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes cardIn{from{opacity:0;transform:translateY(-44%) scale(.97)}to{opacity:1;transform:translateY(-50%) scale(1)}}
+@media (max-width:820px){
+  @keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+}
+@keyframes acFall{
+  from{opacity:0;transform:translateX(-50%) translateY(-26px) rotate(0deg)}
+  to{opacity:1;transform:translateX(-50%) translateY(0) rotate(-2deg)}
+}
+@media (max-width:820px){
+  @keyframes acFall{
+    from{opacity:0;transform:translateY(-18px) rotate(0deg)}
+    to{opacity:1;transform:translateY(0) rotate(-2deg)}
+  }
+}
+@keyframes stamp{
+  from{opacity:0;transform:rotate(-2deg) scale(1.6)}
+  to{opacity:1;transform:rotate(-2deg) scale(1)}
+}
+.sello-detectado{transform:rotate(-2deg)}
+
+/* ============ 6 · S2 ENTRADA ============ */
+.portales-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:48px;
+}
+@media (max-width:1080px){.portales-grid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:700px){.portales-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:460px){.portales-grid{grid-template-columns:1fr}}
+.portal-card{padding:24px 16px}
+.portal-card p{font-size:var(--text-base);color:var(--tinta-2);margin-top:16px;line-height:1.55}
+.portal-card .pc-extract{
+  font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--track-data);
+  color:var(--tinta-2);text-transform:uppercase;margin-top:16px;
+  border-top:1px solid var(--rejilla);padding-top:8px;
+}
+.s2-cierre{
+  margin-top:48px;
+  font-family:var(--font-display);font-weight:750;font-stretch:115%;
+  font-size:var(--text-lg);color:var(--tinta);
+}
+
+/* ============ 7 · S3 FILTRADO ============ */
+.filtrado-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px}
+@media (max-width:860px){.filtrado-grid{grid-template-columns:1fr}}
+.filtro-panel{padding:24px;position:relative}
+.filtro-panel h3{
+  font-family:var(--font-display);font-weight:750;font-stretch:112%;
+  font-size:var(--text-lg);letter-spacing:-.005em;margin-bottom:16px;
+}
+.anuncio-fake{
+  border:1px solid var(--rejilla);border-radius:var(--radius);
+  padding:16px 18px;background:var(--papel);position:relative;opacity:.82;
+}
+.anuncio-fake .af-title{font-weight:600;font-size:var(--text-base)}
+.anuncio-fake .af-data{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);color:var(--tinta-2);margin-top:8px;
+}
+.anuncio-fake .af-desc{font-size:var(--text-sm);color:var(--tinta-2);margin-top:8px;font-style:italic}
+.sello-agencia{position:absolute;right:14px;top:-14px}
+.filtro-copy{font-size:var(--text-base);color:var(--tinta-2);margin-top:16px}
+
+.fusion{display:flex;flex-direction:column;gap:0}
+.fusion-inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:420px){.fusion-inputs{grid-template-columns:1fr}}
+.fusion-mini{
+  border:1px solid var(--rejilla);border-radius:var(--radius);
+  padding:12px 14px;background:var(--papel);
+}
+.fusion-mini .fm-data{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);color:var(--tinta-2);margin-top:8px;line-height:1.7;
+}
+.fusion-join{
+  align-self:center;width:2px;height:26px;background:var(--tinta);margin:2px 0;
+}
+.fusion-out{
+  border:1px solid var(--rejilla);border-radius:var(--radius);
+  padding:14px 16px;background:var(--blanco);position:relative;
+  box-shadow:var(--sombra);
+}
+.fusion-out .fo-title{font-weight:600;font-size:var(--text-base)}
+.fusion-out .fo-data{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);color:var(--tinta-2);margin-top:4px;
+}
+.fusion-out .lc-particular{margin-top:8px}
+.fusion-badge{
+  position:absolute;right:12px;top:-13px;
+  display:inline-flex;align-items:center;gap:4px;
+  font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--track-data);font-weight:500;
+  color:var(--verde);border:1.5px solid var(--verde);border-radius:var(--radius-sm);
+  background:rgba(255,255,255,.9);padding:3px 8px;transform:rotate(-2deg);
+  text-transform:uppercase;
+}
+.fusion-badge svg{flex:none}
+
+/* ============ 8 · S4 SCORING ============ */
+.scoring-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:24px;margin-top:48px}
+@media (max-width:920px){.scoring-grid{grid-template-columns:1fr}}
+.score-panel{padding:32px}
+.score-panel .sp-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+.score-panel .sp-lead{font-weight:600;font-size:var(--text-md)}
+.score-panel .sp-leaddata{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);color:var(--tinta-2);margin-top:4px;
+}
+.score-total{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:38px;font-weight:500;color:var(--tinta);line-height:1;
+}
+.score-total small{font-size:var(--text-md);color:var(--tinta-2)}
+.bars{margin-top:24px;display:flex;flex-direction:column;gap:16px}
+.bar-row{display:grid;grid-template-columns:150px 1fr 80px;gap:16px;align-items:center}
+@media (max-width:480px){.bar-row{grid-template-columns:104px 1fr 72px;gap:8px}}
+.bar-label{
+  font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--track-data);
+  color:var(--tinta-2);text-transform:uppercase;
+}
+.bar-track{display:block;height:14px;background:var(--papel);border:1px solid var(--rejilla);border-radius:var(--radius-sm);overflow:hidden}
+.bar-fill{display:block;height:100%;background:var(--ambar);width:var(--w);border-radius:4px 0 0 4px}
+.bar-val{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);color:var(--tinta);text-align:right;
+}
+@media (prefers-reduced-motion:no-preference){
+  .js .bar-fill{width:0;transition:width .9s cubic-bezier(.25,.1,.25,1)}
+  .js .bars.in .bar-fill{width:var(--w)}
+  .js .bars.in .bar-row:nth-child(2) .bar-fill{transition-delay:.12s}
+  .js .bars.in .bar-row:nth-child(3) .bar-fill{transition-delay:.24s}
+  .js .bars.in .bar-row:nth-child(4) .bar-fill{transition-delay:.36s}
+}
+.score-copy{font-size:var(--text-base);color:var(--tinta-2);margin-top:24px}
+
+.bajada-panel{padding:32px;display:flex;flex-direction:column}
+.bajada-panel h3{
+  font-family:var(--font-display);font-weight:750;font-stretch:112%;
+  font-size:var(--text-lg);letter-spacing:-.005em;
+}
+.bajada-chart{margin-top:24px;position:relative}
+.bajada-chart svg{display:block;width:100%}
+.bajada-chart .bc-axis{stroke:var(--rejilla);stroke-width:1}
+.bajada-chart .bc-line{stroke:var(--tinta);stroke-width:2;fill:none}
+.bajada-chart .bc-drop{stroke:var(--ambar);stroke-width:4;fill:none;stroke-linecap:round}
+.bajada-chart .bc-ref{stroke:var(--rejilla);stroke-width:1;stroke-dasharray:4 4}
+.bajada-chart text{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);fill:var(--tinta-2);
+}
+.sello-bajada{position:absolute;top:2px;right:6px}
+.telegram-chip{
+  display:inline-flex;align-items:center;gap:8px;align-self:flex-start;
+  font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);
+  color:var(--tinta);border:1px solid var(--rejilla);border-radius:999px;
+  background:var(--papel);padding:6px 14px;margin-top:16px;text-transform:uppercase;
+}
+.telegram-chip .tc-dot{width:7px;height:7px;border-radius:50%;background:var(--azul);flex:none}
+.bajada-copy{font-size:var(--text-base);color:var(--tinta-2);margin-top:16px}
+
+/* ============ 9 · S5 ENTREGA (CRM) ============ */
+.browser-frame{margin-top:48px;overflow:hidden}
+.bf-bar{
+  display:flex;align-items:center;gap:16px;
+  border-bottom:1px solid var(--rejilla);padding:12px 16px;background:var(--papel);
+  border-radius:var(--radius) var(--radius) 0 0;
+}
+.bf-url{
+  font-family:var(--font-mono);font-size:var(--text-sm);color:var(--tinta-2);
+  background:var(--blanco);border:1px solid var(--rejilla);border-radius:var(--radius);
+  padding:5px 14px;flex:1;max-width:340px;
+}
+.bf-stamp{margin-left:auto;font-size:var(--text-xs);padding:4px 8px}
+.crm{display:grid;grid-template-columns:1.55fr 1fr;background:var(--blanco)}
+@media (max-width:860px){.crm{grid-template-columns:1fr}}
+.crm-main{padding:24px;min-width:0}
+.crm-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.crm-title{font-family:var(--font-display);font-weight:750;font-stretch:112%;font-size:var(--text-md)}
+.crm-count{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--tinta-2);letter-spacing:var(--track-data)}
+.crm-table{width:100%;border-collapse:collapse}
+.crm-table th{
+  font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--track-data);font-weight:500;
+  color:var(--tinta-2);text-transform:uppercase;text-align:left;
+  border-bottom:1px solid var(--rejilla);padding:6px 8px 8px;
+}
+.crm-table td{
+  padding:11px 8px;border-bottom:1px solid var(--rejilla);
+  font-size:var(--text-sm);vertical-align:middle;white-space:nowrap;
+}
+.crm-table tr:last-child td{border-bottom:none}
+.crm-lead{font-weight:600;color:var(--tinta)}
+.crm-loc{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--tinta-2);display:block;margin-top:2px}
+.crm-precio{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:var(--text-sm);color:var(--tinta)}
+.crm-m2{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:var(--text-xs);color:var(--tinta-2);display:block;margin-top:2px}
+.score-badge{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  display:inline-block;background:var(--ambar);color:var(--tinta);
+  font-size:var(--text-sm);font-weight:500;border-radius:var(--radius-sm);padding:2px 8px;
+}
+.estado-chip{
+  font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--track-data);
+  border:1px solid var(--rejilla);border-radius:999px;padding:3px 10px;
+  color:var(--tinta-2);text-transform:uppercase;white-space:nowrap;
+}
+.estado-chip--nuevo{border-color:var(--azul);color:var(--azul)}
+.baj-chip{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  display:inline-block;background:var(--ambar);color:var(--tinta);
+  font-size:var(--text-xs);font-weight:500;border-radius:var(--radius-sm);padding:1px 6px;margin-left:6px;
+}
+.crm-side{
+  border-left:1px solid var(--rejilla);padding:24px;background:var(--papel);
+  display:flex;flex-direction:column;gap:24px;
+}
+@media (max-width:860px){.crm-side{border-left:none;border-top:1px solid var(--rejilla)}}
+.crm-side h4{
+  font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--track-data);font-weight:500;
+  color:var(--tinta-2);text-transform:uppercase;margin-bottom:8px;
+}
+.crm-map{border:1px solid var(--rejilla);border-radius:var(--radius-sm);background:var(--blanco);display:block}
+.agenda-item{
+  display:flex;gap:10px;align-items:baseline;
+  border-top:1px solid var(--rejilla);padding:8px 0;font-size:var(--text-sm);
+}
+.agenda-item:first-of-type{border-top:none;padding-top:0}
+.agenda-hora{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:var(--text-sm);color:var(--tinta);flex:none}
+.agenda-txt{color:var(--tinta-2)}
+.crm-scroll{overflow-x:auto}
+
+.entrega-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+@media (max-width:860px){.entrega-cols{grid-template-columns:1fr}}
+.ec-dato{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-size:var(--text-sm);letter-spacing:var(--track-data);color:var(--tinta);font-weight:500;
+  text-transform:uppercase;border-bottom:1px solid var(--rejilla);
+  display:inline-block;padding-bottom:8px;margin-bottom:16px;
+}
+.entrega-col h3{
+  font-family:var(--font-display);font-weight:750;font-stretch:112%;
+  font-size:var(--text-md);margin-bottom:8px;
+}
+.entrega-col p{font-size:var(--text-base);color:var(--tinta-2)}
+
+/* ============ 10 · S6 INSTRUMENTAL ============ */
+.instr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+@media (max-width:920px){.instr-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.instr-grid{grid-template-columns:1fr}}
+.instr-card{padding:24px}
+.instr-card > svg{display:block;color:var(--tinta-2)}
+.instr-card .ec-dato{margin:16px 0 8px;font-size:var(--text-xs)}
+.instr-card h3{
+  font-family:var(--font-display);font-weight:750;font-stretch:112%;
+  font-size:var(--text-md);margin-top:0;letter-spacing:-.005em;
+}
+.instr-card p{font-size:var(--text-base);color:var(--tinta-2);margin-top:8px}
+
+/* ============ 11 · S7 TU ZONA ============ */
+.zona-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;margin-top:48px}
+@media (max-width:860px){.zona-grid{grid-template-columns:1fr;gap:32px}}
+.zona-map{padding:10px;background:var(--blanco)}
+.zona-map svg{display:block;width:100%}
+.zona-map .zm-coast{stroke:var(--rejilla);stroke-width:1.5;fill:none}
+.zona-map .zm-road{stroke:var(--rejilla);stroke-width:1;fill:none;stroke-dasharray:2 5}
+.zona-map .zm-perimetro{stroke:var(--azul);stroke-width:2;fill:rgba(37,99,235,.05);stroke-linejoin:round}
+.zona-map .zm-dot{fill:var(--azul)}
+.zona-map .zm-dot-out{fill:var(--rejilla)}
+.zona-map text{font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--track-data);fill:var(--tinta-2)}
+.zona-map .zm-tag{fill:var(--azul);font-weight:500}
+.zona-copy p{font-size:var(--text-md);color:var(--tinta-2);margin-top:16px}
+.zona-copy p strong{color:var(--tinta);font-weight:600}
+
+/* ============ 12 · S8 CIERRE + DEMO ============ */
+.cierre{padding-bottom:144px}
+.cierre .h2{max-width:24ch}
+.cierre .data-strip{margin-top:32px;max-width:720px}
+.demo-card{margin-top:48px;padding:32px;max-width:720px}
+.demo-form{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:640px){.demo-form{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{
+  font-family:var(--font-body);font-size:var(--text-sm);font-weight:500;
+  color:var(--tinta-2);
+}
+.field input{
+  border:1px solid var(--rejilla);border-radius:var(--radius);background:var(--blanco);
+  padding:12px 14px;font-size:16px;color:var(--tinta);width:100%;
+}
+.field input::placeholder{color:var(--tinta-2)}
+.field input:focus{outline:2px solid var(--azul);outline-offset:0;border-color:var(--azul)}
+.field--full{grid-column:1 / -1}
+.demo-actions{grid-column:1 / -1;display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:4px}
+.demo-note{font-size:var(--text-base);color:var(--tinta-2);max-width:40ch}
+.form-ok{
+  display:none;grid-column:1 / -1;
+  border-top:1px solid var(--rejilla);margin-top:8px;padding-top:16px;
+}
+.form-ok .fo-mono{
+  font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);
+  color:var(--tinta);text-transform:uppercase;font-weight:500;
+}
+.form-ok p{font-size:var(--text-base);color:var(--tinta-2);margin-top:8px}
+.form-err{
+  display:none;grid-column:1 / -1;
+  border-top:1px solid var(--rejilla);margin-top:8px;padding-top:16px;
+}
+.form-err .fe-mono{
+  font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);
+  color:var(--tinta);text-transform:uppercase;font-weight:500;
+}
+.form-err p{font-size:var(--text-base);color:var(--tinta-2);margin-top:8px}
+.demo-form.error .form-err{display:block}
+.demo-form.sent .form-ok{display:block}
+.demo-form.sent .form-err{display:none}
+.demo-form.sent input{opacity:.55}
+.demo-form.sent .demo-note{display:none}
+
+/* ============ 13 · FAQ ============ */
+.faq{padding-top:0}
+.faq-list{margin-top:48px;max-width:760px;border-top:1px solid var(--rejilla)}
+.faq-item{border-bottom:1px solid var(--rejilla)}
+.faq-item summary{
+  list-style:none;cursor:pointer;display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+  padding:20px 4px;font-weight:600;font-size:var(--text-md);color:var(--tinta);
+}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary .faq-mark{
+  font-family:var(--font-mono);color:var(--tinta-2);flex:none;font-size:var(--text-base);
+}
+.faq-item[open] summary .faq-mark{color:var(--azul)}
+.faq-item .faq-body{padding:0 4px 24px;color:var(--tinta-2);font-size:var(--text-base);max-width:64ch}
+
+/* ============ 14 · FOOTER (único bloque oscuro) ============ */
+.footer{background:var(--tinta);color:var(--rejilla);padding:64px 0 48px}
+.footer .container{padding-left:24px}
+@media (min-width:961px){.footer .container{padding-left:40px}}
+.footer-grid{display:flex;justify-content:space-between;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.footer-brand{display:flex;align-items:center;gap:10px;color:var(--papel);
+  font-family:var(--font-display);font-weight:750;font-stretch:115%;font-size:var(--text-md)}
+.footer-claim{color:var(--rejilla);font-size:var(--text-base);margin-top:8px;max-width:34ch}
+.footer-links{list-style:none;display:flex;gap:24px;flex-wrap:wrap}
+.footer-links a{color:var(--rejilla);text-decoration:none;font-size:var(--text-base)}
+.footer-links a:hover{color:var(--papel)}
+.footer-links a:focus-visible{outline-color:var(--papel)}
+.footer-meta{
+  font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:var(--track-data);color:#8A9CC0;
+  border-top:1px solid rgba(199,211,232,.18);margin-top:48px;padding-top:24px;
+  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;text-transform:uppercase;
+}
+
+/* ============ 15 · REVEALS ============ */
+@media (prefers-reduced-motion:no-preference){
+  .js .reveal{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+  .js .reveal.in{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Saltar al contenido</a>
+
+<header class="nav" id="siteNav">
+  <div class="nav-inner">
+    <a class="brand" href="#inicio" aria-label="FincaRadar — inicio">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><circle cx="10" cy="22" r="2" fill="#fff"/><path d="M10 15a7 7 0 0 1 7 7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M10 9a13 13 0 0 1 13 13" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="14" r="2.4" fill="#fff"/></svg></span>
+      FincaRadar
+    </a>
+    <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+      <svg class="icon-open" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <svg class="icon-close" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <ul class="nav-links" id="navMenu">
+      <li><a href="#entrega">Producto</a></li>
+      <li><a href="#entrada">Cómo funciona</a></li>
+      <li><a href="#zona">Tu zona</a></li>
+      <li><a href="/login/">Acceder</a></li>
+      <li class="nav-cta"><a class="btn btn-primary" href="#demo">Solicitar demo</a></li>
+    </ul>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- Traza horaria: raíl SVG construido por JS -->
+  <div id="railWrap" aria-hidden="true">
+    <svg id="railSvg" xmlns="http://www.w3.org/2000/svg">
+      <path id="railTicks" d=""></path>
+      <path id="railPath" d=""></path>
+      <g id="railDot">
+        <circle r="7" fill="#F2F5FA"></circle>
+        <circle r="4" fill="#2563EB"></circle>
+      </g>
+    </svg>
+  </div>
+
+  <!-- ============ S1 · HERO ============ -->
+  <section class="hero" id="inicio">
+    <div class="container">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">
+            <span class="eyebrow-time">06:58</span>
+            <span class="eyebrow-stage">· La máquina arranca</span>
+          </p>
+          <h1>Publicado ayer a las 23:41. En tu lista de las 08:00.</h1>
+          <p class="hero-sub">Cada madrugada, FincaRadar barre Idealista, Fotocasa, Habitaclia, Milanuncios y Wallapop; descarta agencias y duplicados, puntúa cada lead de 0 a 90 y se lo sirve a tu equipo comercial, priorizado y listo para llamar. Antes de que suene el primer teléfono de tu competencia.</p>
+          <div class="hero-ctas">
+            <a class="btn btn-primary" href="#demo">Solicitar demo</a>
+            <a class="btn-ghost" href="#entrada">Ver la máquina por dentro <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.5v11M3.5 9L8 13.5 12.5 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          </div>
+          <p class="data-strip">5 portales · Barrido cada madrugada · Scoring 0-90</p>
+        </div>
+
+        <div class="pipe" role="img" aria-label="Esquema del pipeline: cinco portales convergen en dos filtros y sale un lead verificado">
+          <svg class="pipe-svg" viewBox="0 0 600 560" aria-hidden="true" focusable="false">
+            <!-- etiquetas de entrada -->
+            <text x="10" y="66">IDEALISTA</text>
+            <text x="10" y="166">FOTOCASA</text>
+            <text x="10" y="266">HABITACLIA</text>
+            <text x="10" y="366">MILANUNCIOS</text>
+            <text x="10" y="466">WALLAPOP</text>
+            <!-- 5 líneas de entrada -->
+            <path class="in-line pipe-draw" pathLength="1" d="M10 80 H150 C215 80 215 280 250 280"/>
+            <path class="in-line pipe-draw" pathLength="1" d="M10 180 H150 C215 180 215 280 250 280"/>
+            <path class="in-line pipe-draw" pathLength="1" d="M10 280 H250"/>
+            <path class="in-line pipe-draw" pathLength="1" d="M10 380 H150 C215 380 215 280 250 280"/>
+            <path class="in-line pipe-draw" pathLength="1" d="M10 480 H150 C215 480 215 280 250 280"/>
+            <!-- nodo 1: filtro agencias -->
+            <g class="pipe-node">
+              <circle class="node-c" cx="270" cy="280" r="18"/>
+              <path class="node-x" d="M263 273l14 14M277 273l-14 14"/>
+              <text class="node-label" x="270" y="322">FILTRO</text>
+              <text class="node-label" x="270" y="338">AGENCIAS</text>
+            </g>
+            <!-- descarte -->
+            <path class="drop-line pipe-fade" d="M270 300 V392"/>
+            <!-- conexión nodos -->
+            <path class="mid-line pipe-draw d2" pathLength="1" d="M290 280 H382"/>
+            <!-- nodo 2: filtro duplicados -->
+            <g class="pipe-node n2">
+              <circle class="node-c node-act" cx="402" cy="280" r="18"/>
+              <path class="node-x" d="M396 280h12M402 274v12" stroke="#2563EB"/>
+              <text class="node-label" x="402" y="322">FILTRO</text>
+              <text class="node-label" x="402" y="338">DUPLICADOS</text>
+            </g>
+            <!-- línea de salida (entra bajo la tarjeta) -->
+            <path class="out-line pipe-draw d3" pathLength="1" d="M422 280 H596"/>
+          </svg>
+
+          <!-- Pipeline versión móvil -->
+          <div class="pipe-mobile" aria-hidden="true">
+            <div class="pm-chips">
+              <span class="chip-portal">Idealista</span>
+              <span class="chip-portal">Fotocasa</span>
+              <span class="chip-portal">Habitaclia</span>
+              <span class="chip-portal">Milanuncios</span>
+              <span class="chip-portal">Wallapop</span>
+            </div>
+            <span class="pm-joint"></span>
+            <div class="pm-filters">
+              <span class="pm-node"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M2.2 2.2l6.6 6.6M8.8 2.2L2.2 8.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Filtro agencias</span>
+              <span class="pm-arrow"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1.5 7h11M8.5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="pm-node pm-node--act">Filtro duplicados</span>
+            </div>
+          </div>
+
+          <!-- tarjeta descartada -->
+          <div class="agencia-card" aria-hidden="true">
+            <p class="ac-line">Piso céntrico · Reus</p>
+            <p class="ac-line">Ref. 4482 · 145.000 €</p>
+            <span class="sello sello--rojo"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M2.2 2.2l6.6 6.6M8.8 2.2L2.2 8.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Agencia</span>
+          </div>
+
+          <!-- tarjeta de lead superviviente -->
+          <div class="lead-card card">
+            <span class="sello sello--tinta sello-detectado">Detectado 06:58</span>
+            <p class="lc-title">Piso 3 hab · Salou</p>
+            <p class="lc-data mono">189.000 € · 92 m²<br>Publicado: 23:41</p>
+            <span class="lc-score">SCORE <span class="js-score">84</span>/90</span><br>
+            <span class="lc-particular">Particular<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S2 · ENTRADA ============ -->
+  <section class="section" id="entrada">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow" data-stop>
+          <span class="eyebrow-time">07:12</span>
+          <span class="eyebrow-stage">· Entrada</span>
+        </p>
+        <h2 class="h2">Cinco portales, un solo barrido.</h2>
+        <p class="section-sub">Tus comerciales no abren cinco pestañas cada mañana. La máquina lo hace por ellos, portal a portal, anuncio a anuncio.</p>
+      </div>
+      <div class="portales-grid reveal">
+        <div class="card portal-card">
+          <span class="chip-portal">Idealista</span>
+          <p>Anuncios de particular con precio, superficie y habitaciones. Los perfiles profesionales se marcan y se descartan.</p>
+          <p class="pc-extract">Precio · m² · Fecha · Tel.</p>
+        </div>
+        <div class="card portal-card">
+          <span class="chip-portal">Fotocasa</span>
+          <p>Solo anuncios publicados por particulares, ordenados por fecha: lo más reciente entra primero.</p>
+          <p class="pc-extract">Precio · m² · Fecha · Tel.</p>
+        </div>
+        <div class="card portal-card">
+          <span class="chip-portal">Habitaclia</span>
+          <p>Viviendas de particulares, con la zona y el precio leídos del propio anuncio.</p>
+          <p class="pc-extract">Precio · Zona · Fecha · Tel.</p>
+        </div>
+        <div class="card portal-card">
+          <span class="chip-portal">Milanuncios</span>
+          <p>Vendedor particular confirmado con seis señales del anuncio. Un «Ref:» en el texto lo delata como agencia.</p>
+          <p class="pc-extract">Precio · m² · Fecha · Tel.</p>
+        </div>
+        <div class="card portal-card">
+          <span class="chip-portal">Wallapop</span>
+          <p>Donde muchos propietarios publican primero. Precio, fotos y hora de publicación, recién salidos.</p>
+          <p class="pc-extract">Precio · Fotos · Hora · Zona</p>
+        </div>
+      </div>
+      <p class="s2-cierre reveal">Cada madrugada, sin excepción.</p>
+    </div>
+  </section>
+
+  <!-- ============ S3 · FILTRADO ============ -->
+  <section class="section" id="filtrado">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow" data-stop>
+          <span class="eyebrow-time">07:31</span>
+          <span class="eyebrow-stage">· Filtrado</span>
+        </p>
+        <h2 class="h2">Fuera agencias. Fuera duplicados.</h2>
+        <p class="section-sub">Tu lista es corta porque la máquina descarta antes de que tú mires. Cada tarjeta que llega es un propietario particular, una sola vez.</p>
+      </div>
+      <div class="filtrado-grid reveal">
+        <div class="card filtro-panel">
+          <h3>La agencia no pasa del filtro</h3>
+          <div class="anuncio-fake">
+            <span class="sello sello--rojo sello-agencia"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M2.2 2.2l6.6 6.6M8.8 2.2L2.2 8.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Agencia · Descartada</span>
+            <p class="af-title">Piso reformado en el centro</p>
+            <p class="af-data">Reus · 145.000 € · 84 m²</p>
+            <p class="af-desc">«Su inmobiliaria de confianza. Ref. 4482. Financiación al 100%…»</p>
+          </div>
+          <p class="filtro-copy">Una firma comercial, un «Ref.», un perfil profesional enlazado: cualquiera de esas señales del anuncio descarta la tarjeta antes de que llegue a tu lista.</p>
+        </div>
+        <div class="card filtro-panel">
+          <h3>Dos portales, un solo lead</h3>
+          <div class="fusion">
+            <div class="fusion-inputs">
+              <div class="fusion-mini">
+                <span class="chip-portal">Fotocasa</span>
+                <p class="fm-data">Casa adosada · Cambrils<br>265.000 € · 148 m²<br>Tel. 6·· ·· 21 47</p>
+              </div>
+              <div class="fusion-mini">
+                <span class="chip-portal">Habitaclia</span>
+                <p class="fm-data">Adosado 4 hab · Cambrils<br>265.000 € · 148 m²<br>Tel. 6·· ·· 21 47</p>
+              </div>
+            </div>
+            <span class="fusion-join" aria-hidden="true"></span>
+            <div class="fusion-out">
+              <span class="fusion-badge">Particular<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <p class="fo-title">Casa adosada · Cambrils</p>
+              <p class="fo-data">265.000 € · 148 m² · 1 lead, 2 portales</p>
+            </div>
+          </div>
+          <p class="filtro-copy">La misma vivienda en dos portales entra una sola vez: se cruza el teléfono y, si no lo hay, ubicación + precio + metros. Tu comercial no llama dos veces al mismo propietario.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S4 · SCORING ============ -->
+  <section class="section" id="scoring">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow" data-stop>
+          <span class="eyebrow-time">07:47</span>
+          <span class="eyebrow-stage">· Scoring</span>
+        </p>
+        <h2 class="h2">Cada lead, puntuado de 0 a 90.</h2>
+        <p class="section-sub">La lista no se ordena por intuición. Se ordena por datos del propio anuncio, los mismos para todos los leads, todas las mañanas.</p>
+      </div>
+      <div class="scoring-grid reveal">
+        <div class="card score-panel">
+          <div class="sp-head">
+            <div>
+              <p class="sp-lead">Piso 3 hab · Salou</p>
+              <p class="sp-leaddata">189.000 € · 92 m² · Publicado: 23:41</p>
+            </div>
+            <p class="score-total">84<small>/90</small></p>
+          </div>
+          <div class="bars" id="scoreBars">
+            <div class="bar-row">
+              <span class="bar-label">Recién publicado</span>
+              <span class="bar-track"><span class="bar-fill" style="--w:93.3%"></span></span>
+              <span class="bar-val">28/30 pts</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Teléfono visible</span>
+              <span class="bar-track"><span class="bar-fill" style="--w:100%"></span></span>
+              <span class="bar-val">20/20 pts</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Fotos del anuncio</span>
+              <span class="bar-track"><span class="bar-fill" style="--w:80%"></span></span>
+              <span class="bar-val">16/20 pts</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">Precio vs. zona</span>
+              <span class="bar-track"><span class="bar-fill" style="--w:100%"></span></span>
+              <span class="bar-val">20/20 pts</span>
+            </div>
+          </div>
+          <p class="score-copy">Publicado anoche, con teléfono a la vista y precio en mercado: ese lead abre tu lista. El que lleva cuatro meses publicado baja al final. Nadie pierde la mañana decidiendo a quién llamar.</p>
+        </div>
+        <div class="card bajada-panel">
+          <h3>Bajó el precio. Lo sabes tú primero.</h3>
+          <div class="bajada-chart">
+            <span class="sello sello--ambar sello-bajada">Bajada −6,2%</span>
+            <svg viewBox="0 0 420 210" role="img" aria-label="Gráfico de precio: de 210.000 euros baja a 197.000 euros, una bajada del 6,2 por ciento">
+              <line class="bc-axis" x1="16" y1="180" x2="404" y2="180"/>
+              <line class="bc-ref" x1="16" y1="62" x2="404" y2="62"/>
+              <text x="20" y="54">210.000 €</text>
+              <path class="bc-line" d="M20 62 H230"/>
+              <path class="bc-drop" d="M230 62 V118"/>
+              <path class="bc-line" d="M230 118 H400"/>
+              <text x="298" y="144">197.000 €</text>
+              <text x="20" y="200">12 JUN</text>
+              <text x="212" y="200">23 JUL</text>
+              <text x="366" y="200">HOY</text>
+            </svg>
+          </div>
+          <span class="telegram-chip"><span class="tc-dot" aria-hidden="true"></span>Alerta Telegram · 07:52</span>
+          <p class="bajada-copy">Una bajada de más del 5% significa prisa por vender. FincaRadar la detecta al comparar cada barrido con el anterior y avisa a tu equipo al momento.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S5 · ENTREGA ============ -->
+  <section class="section" id="entrega">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow" data-stop>
+          <span class="eyebrow-time">08:00</span>
+          <span class="eyebrow-stage">· Entrega</span>
+        </p>
+        <h2 class="h2">Tu lista de la mañana, en tu CRM.</h2>
+        <p class="section-sub">A las 08:00, tu equipo abre FincaRadar y encuentra la lista priorizada: score, estado, teléfono y mapa. Sin pestañas de portales, sin hojas de cálculo.</p>
+      </div>
+
+      <div class="card browser-frame reveal" role="img" aria-label="Panel del CRM de FincaRadar: lista de leads priorizada por score, con estados, mapa de la zona y agenda del día">
+        <div class="bf-bar" aria-hidden="true">
+          <span class="bf-url mono">app.fincaradar.com/leads</span>
+          <span class="sello sello--tinta bf-stamp">Barrido 06:58</span>
+        </div>
+        <div class="crm" aria-hidden="true">
+          <div class="crm-main">
+            <div class="crm-head">
+              <span class="crm-title">Lista de la mañana</span>
+              <span class="crm-count mono">14 LEADS NUEVOS</span>
+            </div>
+            <div class="crm-scroll">
+              <table class="crm-table">
+                <thead>
+                  <tr><th>Score</th><th>Lead</th><th>Precio</th><th>Estado</th><th>Portal</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="score-badge">84</span></td>
+                    <td><span class="crm-lead">Piso 3 hab</span><span class="crm-loc">Salou · Publicado 23:41</span></td>
+                    <td><span class="crm-precio">189.000 €</span><span class="crm-m2">92 m²</span></td>
+                    <td><span class="estado-chip estado-chip--nuevo">Nuevo</span></td>
+                    <td><span class="chip-portal">Fotocasa</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="score-badge">78</span></td>
+                    <td><span class="crm-lead">Casa adosada</span><span class="crm-loc">Cambrils · 2 portales</span></td>
+                    <td><span class="crm-precio">265.000 €</span><span class="crm-m2">148 m²</span></td>
+                    <td><span class="estado-chip estado-chip--nuevo">Nuevo</span></td>
+                    <td><span class="chip-portal">Habitaclia</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="score-badge">71</span></td>
+                    <td><span class="crm-lead">Piso 2 hab</span><span class="crm-loc">Reus · Bajada detectada</span></td>
+                    <td><span class="crm-precio">132.000 €<span class="baj-chip">−6,2%</span></span><span class="crm-m2">78 m²</span></td>
+                    <td><span class="estado-chip">En proceso</span></td>
+                    <td><span class="chip-portal">Idealista</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="score-badge">66</span></td>
+                    <td><span class="crm-lead">Ático con terraza</span><span class="crm-loc">Torredembarra</span></td>
+                    <td><span class="crm-precio">210.000 €</span><span class="crm-m2">85 m²</span></td>
+                    <td><span class="estado-chip">Contactado</span></td>
+                    <td><span class="chip-portal">Milanuncios</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="score-badge">59</span></td>
+                    <td><span class="crm-lead">Piso 4 hab</span><span class="crm-loc">Lleida · Cappont</span></td>
+                    <td><span class="crm-precio">158.000 €</span><span class="crm-m2">110 m²</span></td>
+                    <td><span class="estado-chip estado-chip--nuevo">Nuevo</span></td>
+                    <td><span class="chip-portal">Wallapop</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="crm-side">
+            <div>
+              <h4>Tu zona</h4>
+              <svg class="crm-map" viewBox="0 0 260 140" aria-hidden="true">
+                <path d="M0 108 C60 96 110 118 160 104 C205 92 235 100 260 90" fill="none" stroke="#C7D3E8" stroke-width="1.5"/>
+                <path d="M30 20 C70 40 90 70 96 100" fill="none" stroke="#C7D3E8" stroke-width="1" stroke-dasharray="2 5"/>
+                <path d="M200 10 C180 44 168 70 166 100" fill="none" stroke="#C7D3E8" stroke-width="1" stroke-dasharray="2 5"/>
+                <path d="M46 34 L150 22 L226 44 L232 86 L156 98 L60 92 Z" fill="rgba(37,99,235,.05)" stroke="#2563EB" stroke-width="1.5" stroke-linejoin="round"/>
+                <circle cx="96" cy="66" r="4" fill="#2563EB"/>
+                <circle cx="150" cy="52" r="4" fill="#2563EB"/>
+                <circle cx="188" cy="72" r="4" fill="#2563EB"/>
+                <circle cx="120" cy="84" r="4" fill="#2563EB"/>
+              </svg>
+            </div>
+            <div>
+              <h4>Agenda · Hoy</h4>
+              <p class="agenda-item"><span class="agenda-hora">09:15</span><span class="agenda-txt">Llamar · Piso 3 hab, Salou</span></p>
+              <p class="agenda-item"><span class="agenda-hora">12:00</span><span class="agenda-txt">Visita valoración · Cambrils</span></p>
+              <p class="agenda-item"><span class="agenda-hora">17:30</span><span class="agenda-txt">Seguimiento · Ático Torredembarra</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="entrega-cols reveal">
+        <div class="entrega-col">
+          <span class="ec-dato">9 estados de lead</span>
+          <h3>Estados y agenda comercial</h3>
+          <p>De NUEVO a CLIENTE. Cada lead con su estado, su comercial asignado y su próxima tarea en la agenda del día.</p>
+        </div>
+        <div class="entrega-col">
+          <span class="ec-dato">Historial de precios</span>
+          <h3>Cada vivienda, con su gráfico</h3>
+          <p>Cuánto pedía, cuánto pide y cuándo bajó. El argumento de la llamada, dibujado antes de descolgar.</p>
+        </div>
+        <div class="entrega-col">
+          <span class="ec-dato">Tu zona en el mapa</span>
+          <h3>Leads geolocalizados</h3>
+          <p>Tu territorio con cada lead sobre el plano. De la lista al mapa, y del mapa a la ruta de visitas.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S6 · INSTRUMENTAL ============ -->
+  <section class="section" id="instrumental">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow" data-stop>
+          <span class="eyebrow-time">08:15</span>
+          <span class="eyebrow-stage">· Y mientras tanto</span>
+        </p>
+        <h2 class="h2">El resto del instrumental.</h2>
+        <p class="section-sub">Captar el lead es el principio. Esto es lo que trabaja contigo desde la primera llamada hasta la exclusiva firmada.</p>
+      </div>
+      <div class="instr-grid reveal">
+        <div class="card instr-card">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M7 3h9l4 4v16H7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M16 3v4h4M10 12h7M10 16h7M10 20h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span class="ec-dato">PDF · Comparables reales</span>
+          <h3>Valoraciones ACM</h3>
+          <p>Comparables reales de la zona y PDF listo para poner sobre la mesa del propietario. El argumento que cierra exclusivas.</p>
+        </div>
+        <div class="card instr-card">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M9 8l-5 5 5 5M17 8l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ec-dato">Valoraciones 24/7</span>
+          <h3>Widget valorador</h3>
+          <p>Un valorador que se integra en tu web y convierte visitas en solicitudes de valoración.</p>
+        </div>
+        <div class="card instr-card">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M3 13l19-9-6 19-4-7-9-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M12 16l10-12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+          <span class="ec-dato">4 portales</span>
+          <h3>Contacto automatizado</h3>
+          <p>Primer mensaje al propietario enviado desde el propio portal, con los datos de tu agencia.</p>
+        </div>
+        <div class="card instr-card">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M13 4a6 6 0 016 6v4l2 3H5l2-3v-4a6 6 0 016-6zM10.5 20a2.5 2.5 0 005 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ec-dato">Aviso 07:52</span>
+          <h3>Alertas por Telegram</h3>
+          <p>Resumen de cada barrido y avisos urgentes, directos al móvil de tu equipo.</p>
+        </div>
+        <div class="card instr-card">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M3 7l7 7 4-4 9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M23 13v6h-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ec-dato">Barrido a barrido</span>
+          <h3>Bajadas de precio &gt;5%</h3>
+          <p>Cada rebaja detectada al comparar barridos. La prisa por vender, señalizada.</p>
+        </div>
+        <div class="card instr-card">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M9 4C6 4 6 7 6 9s-1 3-3 4c2 1 3 2 3 4s0 5 3 5M17 4c3 0 3 3 3 5s1 3 3 4c-2 1-3 2-3 4s0 5-3 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span class="ec-dato">JSON · X-API-Key</span>
+          <h3>API REST</h3>
+          <p>Tus leads, disponibles para tu web o tu sistema de siempre. Con clave de API por agencia.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S7 · TU ZONA ============ -->
+  <section class="section" id="zona">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow" data-stop>
+          <span class="eyebrow-time">08:40</span>
+          <span class="eyebrow-stage">· Tu zona</span>
+        </p>
+        <h2 class="h2">Tu zona, solo tuya.</h2>
+      </div>
+      <div class="zona-grid">
+        <div class="card zona-map reveal">
+          <svg viewBox="0 0 520 340" role="img" aria-label="Mapa esquemático con un perímetro de zona trazado en azul y leads dentro del perímetro">
+            <path class="zm-coast" d="M0 268 C80 250 150 282 230 262 C310 244 380 258 450 236 C480 226 500 228 520 218"/>
+            <path class="zm-road" d="M60 30 C120 90 160 150 178 238"/>
+            <path class="zm-road" d="M400 16 C360 90 330 160 322 240"/>
+            <path class="zm-road" d="M60 160 C180 140 320 150 470 118"/>
+            <path class="zm-perimetro" d="M96 78 L300 46 L448 92 L462 190 L318 232 L128 210 Z"/>
+            <circle class="zm-dot" cx="190" cy="120" r="5"/>
+            <circle class="zm-dot" cx="286" cy="98" r="5"/>
+            <circle class="zm-dot" cx="366" cy="146" r="5"/>
+            <circle class="zm-dot" cx="238" cy="176" r="5"/>
+            <circle class="zm-dot" cx="322" cy="190" r="5"/>
+            <circle class="zm-dot-out" cx="66" cy="260" r="4"/>
+            <circle class="zm-dot-out" cx="478" cy="264" r="4"/>
+            <text x="200" y="110">SALOU</text>
+            <text x="296" y="88">REUS</text>
+            <text x="376" y="136">CAMBRILS</text>
+            <text class="zm-tag" x="110" y="68">TU ZONA</text>
+          </svg>
+        </div>
+        <div class="zona-copy reveal">
+          <p>Defines tu territorio una vez: municipios concretos, una comarca o un radio alrededor de tu oficina. FincaRadar te sirve <strong>exclusivamente los leads que caen dentro</strong>.</p>
+          <p>Cada agencia ve exclusivamente su zona. <strong>Tus leads no se comparten entre agencias ni se revenden</strong> a terceros.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ S8 · CIERRE + DEMO ============ -->
+  <section class="section cierre" id="demo">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow" data-stop>
+          <span class="eyebrow-time">09:00</span>
+          <span class="eyebrow-stage">· Tu equipo ya está llamando</span>
+        </p>
+        <h2 class="h2">Mañana a las 08:00 puede estar tu primera lista.</h2>
+        <p class="data-strip">5 portales · Barrido cada madrugada · Scoring 0-90 · Filtrado de agencias automático</p>
+      </div>
+      <div class="card demo-card reveal">
+        <form class="demo-form" id="demoForm" novalidate>
+          <div class="field">
+            <label for="f-nombre">Nombre</label>
+            <input type="text" id="f-nombre" name="nombre" autocomplete="name" placeholder="Tu nombre" required>
+          </div>
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input type="email" id="f-email" name="email" autocomplete="email" placeholder="tu@agencia.com" required>
+          </div>
+          <div class="field field--full">
+            <label for="f-agencia">Agencia y zona</label>
+            <input type="text" id="f-agencia" name="agencia" autocomplete="organization" placeholder="Nombre de la agencia · zona que trabajáis" required>
+          </div>
+          <div class="demo-actions">
+            <button type="submit" class="btn btn-primary" id="ctaBtn">Solicitar demo</button>
+            <p class="demo-note">Sin precios públicos: cada agencia y cada zona son distintas. Te la enseñamos con datos de tu zona en 20 minutos.</p>
+          </div>
+          <div class="form-ok" id="formOk" role="status">
+            <p class="fo-mono">Solicitud enviada · Te respondemos en menos de un día laborable</p>
+            <p>Prepararemos la demo con datos reales de tu zona. 20 minutos, sin compromiso. Si no tienes noticias, escríbenos a <a href="mailto:hola@fincaradar.com">hola@fincaradar.com</a>.</p>
+          </div>
+          <div class="form-err" id="formErr" role="alert">
+            <p class="fe-mono">No se ha podido enviar la solicitud</p>
+            <p>Escríbenos directamente a <a id="errMail" href="mailto:hola@fincaradar.com?subject=Solicitud%20de%20demo">hola@fincaradar.com</a> y te respondemos en menos de un día laborable.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section class="section faq" id="faq" aria-labelledby="faq-title">
+    <div class="container">
+      <div class="reveal">
+        <p class="eyebrow">
+          <span class="eyebrow-stage">Preguntas frecuentes</span>
+        </p>
+        <h2 class="h2" id="faq-title">Lo que preguntan los gerentes.</h2>
+      </div>
+      <div class="faq-list reveal">
+        <details class="faq-item">
+          <summary>¿De dónde salen los leads? <span class="faq-mark" aria-hidden="true">+</span></summary>
+          <p class="faq-body">De los anuncios que los propietarios particulares publican en Idealista, Fotocasa, Habitaclia, Milanuncios y Wallapop. FincaRadar los barre cada madrugada, descarta agencias y duplicados y entrega el resto puntuado de 0 a 90.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Cómo distinguís un particular de una agencia? <span class="faq-mark" aria-hidden="true">+</span></summary>
+          <p class="faq-body">Por señales del propio anuncio: firmas comerciales, referencias de cartera, perfiles profesionales enlazados. Cualquiera de ellas descarta el anuncio. El sello PARTICULAR solo se concede cuando no aparece ninguna.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Esto sustituye a mi CRM? <span class="faq-mark" aria-hidden="true">+</span></summary>
+          <p class="faq-body">Incluye un CRM de captación completo: estados, agenda comercial, tareas, historial de precios y mapa. Y si prefieres tu sistema de siempre, la API REST te lleva los leads donde trabajes.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Qué zona puedo elegir? <span class="faq-mark" aria-hidden="true">+</span></summary>
+          <p class="faq-body">La que trabajes: municipios concretos, una comarca o un radio alrededor de tu oficina. Cada agencia ve exclusivamente su zona y sus leads no se comparten con nadie.</p>
+        </details>
+        <details class="faq-item">
+          <summary>¿Cuánto cuesta? <span class="faq-mark" aria-hidden="true">+</span></summary>
+          <p class="faq-body">No publicamos precios: dependen de la zona y del tamaño del equipo. En la demo, con datos de tu zona delante, te damos una propuesta cerrada.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <p class="footer-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><circle cx="10" cy="22" r="2" fill="#fff"/><path d="M10 15a7 7 0 0 1 7 7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M10 9a13 13 0 0 1 13 13" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="14" r="2.4" fill="#fff"/></svg></span>FincaRadar</p>
+        <p class="footer-claim">El turno de madrugada de tu agencia. La lista de la mañana, antes que nadie.</p>
+      </div>
+      <ul class="footer-links">
+        <li><a href="#entrada">Cómo funciona</a></li>
+        <li><a href="#demo">Solicitar demo</a></li>
+        <li><a href="mailto:hola@fincaradar.com">hola@fincaradar.com</a></li>
+      </ul>
+    </div>
+    <div class="footer-meta">
+      <span>FR · FincaRadar · 2026</span>
+      <span>5 portales · Barrido cada madrugada · Scoring 0-90</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- Nav ---------- */
+  var nav = document.getElementById('siteNav');
+  var navToggle = document.getElementById('navToggle');
+  var navMenu = document.getElementById('navMenu');
+
+  function onNavScroll() {
+    nav.classList.toggle('scrolled', window.scrollY > 8);
+  }
+  window.addEventListener('scroll', onNavScroll, { passive: true });
+  onNavScroll();
+
+  navToggle.addEventListener('click', function () {
+    var open = navMenu.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    navToggle.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+  });
+  navMenu.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A') {
+      navMenu.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && navMenu.classList.contains('open')) {
+      navMenu.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+      navToggle.focus();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (navMenu.classList.contains('open') && !nav.contains(e.target)) {
+      navMenu.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  /* ---------- Secuencia de carga del hero ---------- */
+  var hero = document.getElementById('inicio');
+  var scoreEls = document.querySelectorAll('.js-score');
+
+  function animateCount(els, to, dur) {
+    var t0 = null;
+    function step(t) {
+      if (t0 === null) t0 = t;
+      var p = Math.min(1, (t - t0) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      var v = Math.round(eased * to);
+      for (var i = 0; i < els.length; i++) els[i].textContent = v;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  if (!reduced) {
+    for (var i = 0; i < scoreEls.length; i++) scoreEls[i].textContent = '0';
+    requestAnimationFrame(function () {
+      hero.classList.add('hero-play');
+    });
+    setTimeout(function () { animateCount(scoreEls, 84, 800); }, 1600);
+  }
+
+  /* ---------- Reveals + barras de scoring ---------- */
+  var revealEls = document.querySelectorAll('.reveal');
+  var barsEl = document.getElementById('scoreBars');
+
+  if (!reduced && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach(function (el) { io.observe(el); });
+    if (barsEl) io.observe(barsEl);
+  } else {
+    revealEls.forEach(function (el) { el.classList.add('in'); });
+    if (barsEl) barsEl.classList.add('in');
+  }
+
+  /* ---------- Formulario de demo ---------- */
+  var form = document.getElementById('demoForm');
+  var ctaBtn = document.getElementById('ctaBtn');
+  var DEMO_ENDPOINT = 'https://fincaradar.com/api/widget/demo-request/';
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+    var payload = {
+      nombre: form.nombre.value.trim(),
+      email: form.email.value.trim(),
+      agencia: form.agencia.value.trim()
+    };
+    form.classList.remove('error');
+    ctaBtn.disabled = true;
+    ctaBtn.textContent = 'Enviando…';
+
+    fetch(DEMO_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function (data) {
+      if (!data.success) throw new Error('not registered');
+      form.classList.add('sent');
+      var inputs = form.querySelectorAll('input');
+      for (var j = 0; j < inputs.length; j++) inputs[j].disabled = true;
+      ctaBtn.innerHTML = 'Recibido <svg width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      ctaBtn.style.cursor = 'default';
+      document.getElementById('formOk').scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+      scheduleRailBuild();
+    }).catch(function () {
+      form.classList.add('error');
+      ctaBtn.disabled = false;
+      ctaBtn.textContent = 'Solicitar demo';
+      var mail = document.getElementById('errMail');
+      mail.href = 'mailto:hola@fincaradar.com?subject=' +
+        encodeURIComponent('Solicitud de demo — ' + payload.agencia) +
+        '&body=' + encodeURIComponent('Nombre: ' + payload.nombre + '\nEmail: ' + payload.email + '\nAgencia y zona: ' + payload.agencia);
+      document.getElementById('formErr').scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+      scheduleRailBuild();
+    });
+  });
+
+  /* ---------- Traza horaria: raíl + punto ---------- */
+  var railWrap = document.getElementById('railWrap');
+  var railSvg = document.getElementById('railSvg');
+  var railPath = document.getElementById('railPath');
+  var railTicks = document.getElementById('railTicks');
+  var railDot = document.getElementById('railDot');
+  var main = document.getElementById('main');
+
+  var railReady = false;
+  var totalLen = 0;
+  var scrollKeys = [];   // scrollY objetivo por parada
+  var lenAtKey = [];     // longitud del path en cada parada
+  var dotCur = 0;
+  var rafId = null;
+
+  function railVisible() {
+    return window.innerWidth >= 961;
+  }
+
+  function buildRail() {
+    if (!railVisible()) { railReady = false; railDot.classList.remove('on'); return; }
+
+    var mainRect = main.getBoundingClientRect();
+    var mainTop = mainRect.top + window.scrollY;
+    var W = main.offsetWidth;
+    var H = main.offsetHeight;
+
+    railSvg.setAttribute('width', W);
+    railSvg.setAttribute('height', H);
+    railSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+    var contRect = document.querySelector('.hero .container').getBoundingClientRect();
+    var x = Math.round(contRect.left - mainRect.left + 44) + 0.5;
+
+    var heroRect = hero.getBoundingClientRect();
+    var yStart = Math.round(heroRect.top + window.scrollY - mainTop + hero.offsetHeight - 72);
+
+    var stops = [];
+    var stopEls = document.querySelectorAll('[data-stop]');
+    for (var i = 0; i < stopEls.length; i++) {
+      var r = stopEls[i].getBoundingClientRect();
+      stops.push(Math.round(r.top + window.scrollY - mainTop + r.height / 2));
+    }
+
+    var btnRect = ctaBtn.getBoundingClientRect();
+    var by = Math.round(btnRect.top + window.scrollY - mainTop + btnRect.height / 2);
+    var bx = Math.round(btnRect.left - mainRect.left + Math.min(btnRect.width * 0.4, 70));
+    var radius = 24;
+
+    var d = 'M' + x + ' ' + yStart +
+            ' L' + x + ' ' + (by - radius) +
+            ' Q' + x + ' ' + by + ' ' + (x + radius) + ' ' + by +
+            ' L' + bx + ' ' + by;
+    railPath.setAttribute('d', d);
+
+    var ticks = '';
+    for (var t = 0; t < stops.length; t++) {
+      ticks += 'M' + (x - 7) + ' ' + stops[t] + ' H' + (x + 7) + ' ';
+    }
+    railTicks.setAttribute('d', ticks);
+
+    totalLen = railPath.getTotalLength();
+
+    var vh = window.innerHeight;
+    scrollKeys = [];
+    lenAtKey = [];
+
+    scrollKeys.push(Math.max(0, yStart + mainTop - vh * 0.9));
+    lenAtKey.push(0);
+
+    for (var s = 0; s < stops.length; s++) {
+      var len = Math.min(Math.max(stops[s] - yStart, 0), totalLen);
+      scrollKeys.push(stops[s] + mainTop - vh * 0.45);
+      lenAtKey.push(len);
+    }
+    scrollKeys.push(by + mainTop - vh * 0.55);
+    lenAtKey.push(totalLen);
+
+    for (var k = 1; k < scrollKeys.length; k++) {
+      if (scrollKeys[k] <= scrollKeys[k - 1]) scrollKeys[k] = scrollKeys[k - 1] + 1;
+      if (lenAtKey[k] < lenAtKey[k - 1]) lenAtKey[k] = lenAtKey[k - 1];
+    }
+
+    railReady = true;
+    railDot.classList.add('on');
+    updateDot(true);
+  }
+
+  function targetLen(sy) {
+    if (sy <= scrollKeys[0]) return lenAtKey[0];
+    var last = scrollKeys.length - 1;
+    if (sy >= scrollKeys[last]) return lenAtKey[last];
+    for (var i = 1; i <= last; i++) {
+      if (sy <= scrollKeys[i]) {
+        var f = (sy - scrollKeys[i - 1]) / (scrollKeys[i] - scrollKeys[i - 1]);
+        return lenAtKey[i - 1] + f * (lenAtKey[i] - lenAtKey[i - 1]);
+      }
+    }
+    return lenAtKey[last];
+  }
+
+  function placeDot(len) {
+    var pt = railPath.getPointAtLength(len);
+    railDot.setAttribute('transform', 'translate(' + pt.x.toFixed(1) + ',' + pt.y.toFixed(1) + ')');
+  }
+
+  function updateDot(immediate) {
+    if (!railReady) return;
+    var target = targetLen(window.scrollY);
+    if (immediate || reduced) {
+      dotCur = target;
+      placeDot(dotCur);
+    }
+  }
+
+  function dotLoop() {
+    if (railReady) {
+      var target = targetLen(window.scrollY);
+      dotCur += (target - dotCur) * 0.14;
+      if (Math.abs(target - dotCur) < 0.5) dotCur = target;
+      placeDot(dotCur);
+    }
+    rafId = requestAnimationFrame(dotLoop);
+  }
+
+  if (reduced) {
+    // punto estático en la última parada superada, sin animación
+    window.addEventListener('scroll', function () {
+      if (!railReady) return;
+      var sy = window.scrollY;
+      var len = lenAtKey[0];
+      for (var i = 0; i < scrollKeys.length; i++) {
+        if (sy >= scrollKeys[i]) len = lenAtKey[i];
+      }
+      placeDot(len);
+    }, { passive: true });
+  } else {
+    rafId = requestAnimationFrame(dotLoop);
+  }
+
+  var buildTimer = null;
+  function scheduleRailBuild() {
+    clearTimeout(buildTimer);
+    buildTimer = setTimeout(buildRail, 150);
+  }
+
+  window.addEventListener('resize', scheduleRailBuild);
+  window.addEventListener('load', buildRail);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(scheduleRailBuild);
+  }
+  buildRail();
+  setTimeout(buildRail, 600);
+})();
+</script>
+</body>
+</html>

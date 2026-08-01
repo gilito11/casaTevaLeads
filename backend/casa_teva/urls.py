@@ -22,7 +22,7 @@ from django.conf import settings
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from core.views import (
-    login_view, logout_view, dashboard_view, profile_view,
+    login_view, logout_view, home_view, profile_view,
     scrapers_view, add_zona_view, remove_zona_view, run_scraper_view, scraper_status_view,
     run_all_scrapers_view, scraper_status_partial_view,
     run_botasaurus_view, scraping_jobs_partial_view, scraping_job_detail_view,
@@ -308,7 +308,7 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
 
     # Frontend
-    path('', dashboard_view, name='dashboard'),
+    path('', home_view, name='dashboard'),
     path('profile/', profile_view, name='profile'),
     path('settings/alerts/', alert_settings_view, name='alert_settings'),
     path('leads/', include('leads.urls', namespace='leads')),
