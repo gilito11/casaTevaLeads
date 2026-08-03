@@ -560,13 +560,24 @@ def delete_lead_view(request, lead_id):
     with connection.cursor() as cursor:
         cursor.execute("DELETE FROM leads_contact_queue WHERE lead_id = %s", [lead_id])
 
-    # Eliminar de raw.raw_listings (source table; dim_leads is a view)
-    if lead.anuncio_id and lead.portal:
-        with connection.cursor() as cursor:
+    # Raw usa el anuncio_id del PORTAL (external_id), no el serial de
+    # raw_listings (lead.anuncio_id); con el serial el DELETE no encontraba
+    # nada y el lead resucitaba en el siguiente dbt run.
+    portal_anuncio_id = lead.external_id or (
+        lead.data_lake_reference.rsplit('/', 1)[-1] if lead.data_lake_reference else None
+    )
+    with connection.cursor() as cursor:
+        if portal_anuncio_id and lead.portal:
             cursor.execute(
                 "DELETE FROM raw.raw_listings WHERE tenant_id = %s AND portal = %s AND (raw_data->>'anuncio_id') = %s",
-                [tenant_id, lead.portal, lead.anuncio_id]
+                [tenant_id or lead.tenant_id, lead.portal, portal_anuncio_id]
             )
+        # dim_leads es tabla incremental, no una vista: sin este DELETE el
+        # lead sigue visible aunque el raw ya no exista.
+        cursor.execute(
+            "DELETE FROM public_marts.dim_leads WHERE tenant_id = %s AND lead_id = %s",
+            [tenant_id or lead.tenant_id, lead_id]
+        )
 
     # Devolver respuesta vacía para que HTMX elimine la fila
     return HttpResponse("")
@@ -667,10 +678,15 @@ def bulk_delete_view(request):
                     failed_ids.append({'id': lead_id, 'reason': 'tenant_mismatch'})
                     continue
 
+                # Blacklist/raw usan el anuncio_id del PORTAL (external_id),
+                # no el serial de raw_listings ni el lead_id
+                portal_anuncio_id = lead.external_id or (
+                    lead.data_lake_reference.rsplit('/', 1)[-1] if lead.data_lake_reference else None
+                )
+
                 # Si hay que añadir a blacklist y tenemos la info necesaria
                 if add_to_blacklist and portal:
-                    # Usar anuncio_id si está disponible, sino usar el lead_id
-                    blacklist_id = anuncio_id if anuncio_id else lead_id
+                    blacklist_id = portal_anuncio_id or anuncio_id or lead_id
                     try:
                         tenant = Tenant.objects.get(tenant_id=tenant_id)
                         AnuncioBlacklist.objects.get_or_create(
@@ -707,13 +723,18 @@ def bulk_delete_view(request):
                 with connection.cursor() as cursor:
                     cursor.execute("DELETE FROM leads_contact_queue WHERE lead_id = %s", [lead_id])
 
-                # Eliminar de raw.raw_listings (source table; dim_leads is a view)
-                if lead.anuncio_id and lead.portal:
-                    with connection.cursor() as cursor:
+                # Eliminar de raw.raw_listings (source) y de dim_leads
+                # (tabla incremental, no se auto-limpia)
+                with connection.cursor() as cursor:
+                    if portal_anuncio_id and lead.portal:
                         cursor.execute(
                             "DELETE FROM raw.raw_listings WHERE tenant_id = %s AND portal = %s AND (raw_data->>'anuncio_id') = %s",
-                            [tenant_id, lead.portal, lead.anuncio_id]
+                            [tenant_id or lead.tenant_id, lead.portal, portal_anuncio_id]
                         )
+                    cursor.execute(
+                        "DELETE FROM public_marts.dim_leads WHERE tenant_id = %s AND lead_id = %s",
+                        [tenant_id or lead.tenant_id, lead_id]
+                    )
 
                 deleted_count += 1
 

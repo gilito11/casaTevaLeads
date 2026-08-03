@@ -222,7 +222,10 @@ class ScraplingWallapop(ScraplingBaseScraper):
             url_anuncio = f"{self.BASE_URL}/item/{iid}"
 
         seller = item.get("seller") if isinstance(item.get("seller"), dict) else {}
-        vendedor = seller.get("userName") or seller.get("name") or seller.get("micro_name") or ""
+        vendedor = (
+            seller.get("userName") or seller.get("name")
+            or seller.get("microName") or seller.get("micro_name") or ""
+        )
 
         habitaciones, metros, tipo_inmueble, operation = self._real_estate_attrs(item)
         fotos = self._extract_photos(item)
@@ -457,6 +460,10 @@ class ScraplingWallapop(ScraplingBaseScraper):
                 return True
             if str(obj.get("type", "")).lower() in ("professional", "profesional", "business", "shop"):
                 return True
+            # itemSeller del detalle: sellerType="Business" con type="normal"
+            # (así se camufla yaencontre)
+            if str(obj.get("sellerType", "")).lower() in ("business", "professional", "pro", "shop"):
+                return True
         # 2) Nombre del vendedor (incluye yaencontre y portales camuflados)
         if vendedor and _AGENCY_NAME_RE.search(vendedor):
             return True
@@ -517,7 +524,8 @@ class ScraplingWallapop(ScraplingBaseScraper):
         # Re-verificar profesional con el perfil del vendedor (itemSeller)
         vendedor = (
             seller.get("userName") or seller.get("name")
-            or seller.get("micro_name") or listing.get("vendedor") or ""
+            or seller.get("microName") or seller.get("micro_name")
+            or listing.get("vendedor") or ""
         )
         if seller and self._is_professional(
             seller, item, vendedor, listing.get("titulo", ""), listing.get("descripcion", "")
