@@ -67,9 +67,12 @@ jobs:
           # camoufox dependency at runtime for Scrapling-only scrapes.
           # dbt pinned <1.10: dbt-postgres 1.10 pulls dbt-core 2.0 ("Fusion"),
           # whose Rust engine dropped the postgres adapter (dbt1005). Pin keeps
-          # the classic 1.9 engine. scrapling pinned <0.5 to avoid surprise
-          # breaking upgrades from the cron's fresh installs.
-          pip install "scrapling[fetchers]>=0.4.7,<0.5" psycopg2-binary python-decouple python-dotenv "dbt-postgres>=1.9,<1.10" requests Pillow
+          # the classic 1.9 engine. scrapling + apify-fingerprint-datapoints
+          # pineados como PAR exacto: scrapling hardcodea la version de Chrome y
+          # si los datapoints publican datos sin esa version (paso 1-4 Ago 2026,
+          # release 0.14.0) el import de StealthySession revienta con
+          # "No headers based on this input can be generated".
+          pip install "scrapling[fetchers]==0.4.12" "apify-fingerprint-datapoints==0.15.0" psycopg2-binary python-decouple python-dotenv "dbt-postgres>=1.9,<1.10" requests Pillow
 
       - name: Install Scrapling browsers (Patchright)
         run: scrapling install
@@ -115,7 +118,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 20
         run: |
-          python -m scrapers.scrapling_milanuncios_bd --max-pages 3 --postgres
+          # max-pages 5: la paginacion corta sola en pagina vacia, asi que solo
+          # pide p4/p5 si p3 trae contenido (hoy: 0 requests extra). Tarragona
+          # llena la p1 (41/41) y con 3 habia poco margen.
+          python -m scrapers.scrapling_milanuncios_bd --max-pages 5 --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
