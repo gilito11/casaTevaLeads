@@ -355,7 +355,7 @@
 
     {% if zonas_descartadas %}
     <!-- Zonas descartadas por el filtro geografico -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div id="zonas-descartadas" class="scroll-mt-24 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-shadow duration-500">
         <div class="p-6 border-b border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Zonas descartadas (ultimos 30 dias)</h3>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -402,6 +402,67 @@
             </table>
         </div>
     </div>
+
+    <!-- Aviso one-shot de la nueva seccion (se cierra al hacer clic fuera y no vuelve a salir) -->
+    <div id="aviso-zonas" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60"
+         role="dialog" aria-modal="true" aria-labelledby="aviso-zonas-titulo">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-w-md w-full p-6">
+            <div class="flex items-start gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 id="aviso-zonas-titulo" class="text-lg font-semibold text-gray-900 dark:text-white">Nueva seccion: Zonas descartadas</h3>
+                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                        El sistema ve anuncios de particulares en zonas fuera del area de trabajo
+                        ({{ zonas_descartadas|length }} zonas ahora mismo). Desde hoy podeis revisarlas
+                        al final del dashboard y activar con un clic las que os interesen: entraran
+                        en el rastreo diario de todos los portales.
+                    </p>
+                </div>
+            </div>
+            <div class="mt-5 flex items-center justify-end gap-3">
+                <span class="text-xs text-gray-400 dark:text-gray-500 mr-auto">Haz clic fuera para cerrar</span>
+                <button id="aviso-zonas-ir" type="button"
+                        class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">
+                    Ver la seccion
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var KEY = 'fincaradar_aviso_zonas_v1';
+        var aviso = document.getElementById('aviso-zonas');
+        if (!aviso || localStorage.getItem(KEY)) return;
+        aviso.classList.remove('hidden');
+
+        function cerrar() {
+            localStorage.setItem(KEY, '1');
+            aviso.classList.add('hidden');
+        }
+        aviso.addEventListener('click', function (e) {
+            if (e.target === aviso) cerrar();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !aviso.classList.contains('hidden')) cerrar();
+        });
+        document.getElementById('aviso-zonas-ir').addEventListener('click', function () {
+            cerrar();
+            var seccion = document.getElementById('zonas-descartadas');
+            if (seccion) {
+                seccion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                seccion.classList.add('ring-4', 'ring-primary-400');
+                setTimeout(function () {
+                    seccion.classList.remove('ring-4', 'ring-primary-400');
+                }, 2500);
+            }
+        });
+    })();
+    </script>
     {% endif %}
 </div>
 {% endblock %}
