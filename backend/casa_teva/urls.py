@@ -26,7 +26,8 @@ from core.views import (
     scrapers_view, add_zona_view, remove_zona_view, run_scraper_view, scraper_status_view,
     run_all_scrapers_view, scraper_status_partial_view,
     run_botasaurus_view, scraping_jobs_partial_view, scraping_job_detail_view,
-    clear_scraping_jobs_view, update_zona_radio_view, toggle_zona_portal_view
+    clear_scraping_jobs_view, update_zona_radio_view, toggle_zona_portal_view,
+    activar_zona_descartada_view
 )
 from notifications.views import alert_settings_view
 
@@ -309,6 +310,7 @@ urlpatterns = [
 
     # Frontend
     path('', home_view, name='dashboard'),
+    path('zonas/activar/', activar_zona_descartada_view, name='activar_zona_descartada'),
     path('video/', video_view, name='video_comercial'),
     path('profile/', profile_view, name='profile'),
     path('settings/alerts/', alert_settings_view, name='alert_settings'),

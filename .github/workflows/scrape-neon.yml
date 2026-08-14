@@ -44,23 +44,6 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Determine zones for today
-        id: zones
-        run: |
-          MANUAL_ZONES="${{ github.event.inputs.zones }}"
-          if [ -n "$MANUAL_ZONES" ]; then
-            echo "zones=$MANUAL_ZONES" >> $GITHUB_OUTPUT
-            echo "Using manual zones: $MANUAL_ZONES"
-          else
-            # Cron L-V: SOLO Wallapop, acotado a ~20km de Lleida ciudad (referencia
-            # de lejanía máxima = Mollerussa, 22.9km). Casa Teva solo trabaja esta
-            # área; municipios más lejanos (Balaguer, Tàrrega, Tremp, Cervera, Seu
-            # d'Urgell...) quedan fuera de cobertura por decisión de negocio.
-            ZONES="lleida,alpicat,alcarras,torrefarrera,bell_lloc,termens,juneda,almacelles,almenar,mollerussa,mollerussa_rural,albatarrec,torre_serona,montoliu_de_lleida,alcoletge,sudanell,benavent_de_segria,rossello,artesa_de_lleida,corbins,vilanova_de_segria,alfes,sunyer,vilanova_de_la_barca,puigverd_de_lleida,torres_de_segre,alguaire,aspa,soses,menarguens,bellvis,sidamon,sarroca_de_lleida,aitona,fondarella,torrebesses,miralcamp,vallfogona_balaguer,gimenells"
-            echo "zones=$ZONES" >> $GITHUB_OUTPUT
-            echo "Lleida <=20km (cron): $ZONES"
-          fi
-
       - name: Install dependencies
         run: |
           # ZONAS_GEOGRAFICAS now lives in scrapers/zones/* — no botasaurus or
@@ -79,12 +62,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Zonas por portal desde la BD (zonas_geograficas: activa + scrapear_<portal>).
+      # Activar una zona desde el dashboard la mete en el cron sin tocar este
+      # fichero. El input manual "zones" sobreescribe todos los portales; si la
+      # BD falla, el script cae a la lista historica Lleida <=20km.
+      - name: Determine zones for today
+        id: zones
+        run: |
+          MANUAL_ZONES="${{ github.event.inputs.zones }}"
+          if [ -n "$MANUAL_ZONES" ]; then
+            for P in habitaclia fotocasa wallapop idealista; do
+              echo "${P}=$MANUAL_ZONES" >> $GITHUB_OUTPUT
+            done
+            echo "Using manual zones: $MANUAL_ZONES"
+          else
+            for P in habitaclia fotocasa wallapop idealista; do
+              ZONES=$(python scripts/get_active_zones.py --portal $P)
+              echo "${P}=$ZONES" >> $GITHUB_OUTPUT
+              echo "$P: $ZONES"
+            done
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+
       - name: Run Habitaclia scraper (Scrapling)
         if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'habitaclia')
         continue-on-error: true
         timeout-minutes: 40  # hard cap: es el mas lento (~31min) y variable; no debe ahogar dbt
         run: |
-          ZONES="${{ steps.zones.outputs.zones }}"
+          ZONES="${{ steps.zones.outputs.habitaclia }}"
           python -m scrapers.scrapling_habitaclia --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -100,7 +106,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 20
         run: |
-          ZONES="${{ steps.zones.outputs.zones }}"
+          ZONES="${{ steps.zones.outputs.fotocasa }}"
           python -m scrapers.scrapling_fotocasa_bd --zones ${ZONES//,/ } --max-pages 2 --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -138,7 +144,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 20
         run: |
-          ZONES="${{ steps.zones.outputs.zones }}"
+          ZONES="${{ steps.zones.outputs.wallapop }}"
           python -m scrapers.scrapling_wallapop_bd --zones ${ZONES//,/ } --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -152,7 +158,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 20  # hard cap: a slow idealista must never starve dbt of the 60-min job budget
         run: |
-          ZONES="${{ steps.zones.outputs.zones }}"
+          ZONES="${{ steps.zones.outputs.idealista }}"
           python -m scrapers.scrapling_idealista_bd --zones ${ZONES//,/ } --max-pages 1 --postgres
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -251,7 +257,7 @@ jobs:
         run: |
           echo "## Scraping Complete" >> $GITHUB_STEP_SUMMARY
           echo "- Portals: ${{ github.event.inputs.portals || env.SCHEDULE_PORTALS }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Zones: ${{ steps.zones.outputs.zones }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Zones (habitaclia): ${{ steps.zones.outputs.habitaclia }}" >> $GITHUB_STEP_SUMMARY
           echo "- dbt: Transformations applied" >> $GITHUB_STEP_SUMMARY
 
   notify:

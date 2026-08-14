@@ -2,10 +2,12 @@
 Vistas principales de la aplicacion Core.
 Dashboard, login, perfil, scrapers, etc.
 """
+import logging
 import subprocess
 import sys
 import threading
 import os
+from django.db import connection
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -18,6 +20,8 @@ from datetime import timedelta
 
 from core.models import Tenant, TenantUser, ZonaGeografica, ZONAS_PREESTABLECIDAS, ZONAS_POR_REGION, ScrapingJob
 from leads.models import Lead, LeadEstado
+
+logger = logging.getLogger(__name__)
 
 
 def login_view(request):
@@ -206,9 +210,142 @@ def dashboard_view(request):
         'recent_leads': ultimos_leads,
         'trend_data': json.dumps(trend_data),
         'estados': Lead.ESTADO_CHOICES,
+        'zonas_descartadas': get_zonas_descartadas(tenant_id) if tenant_id == 1 else [],
     }
 
     return render(request, 'dashboard/index.html', context)
+
+
+# --- Zonas descartadas por el filtro geografico de dim_leads -----------------
+# Mismas expresiones de normalizacion y alias de grafia que dim_leads.sql:
+# si cambian alli, cambiar aqui.
+_ZONA_NORM_SQL = """TRIM(REGEXP_REPLACE(TRANSLATE(LOWER(__COL__),
+    'àáâäèéêëìíîïòóôöùúûüçñ''-·', 'aaaaeeeeiiiioooouuuucn   '), '\\s+', ' ', 'g'))"""
+
+_ZONA_ALIAS_SQL = """CASE __NORM__
+    WHEN 'partida balafia' THEN 'lleida'
+    WHEN 'bell lloc' THEN 'bell lloc d urgell'
+    WHEN 'vilaseca' THEN 'vila seca'
+    WHEN 'miami playa' THEN 'miami platja'
+    WHEN 'montroig del camp' THEN 'mont roig del camp'
+    WHEN 'gimenells i el pla de la font' THEN 'gimenells'
+    ELSE __NORM__ END"""
+
+# Pre-normalizacion de dim_leads (CTE enriched): quita prefijos de comarca y
+# fusiona variantes de capital antes de comparar contra zonas activas.
+_ZONA_CLEAN_SQL = """CASE
+    WHEN zona_clasificada IN ('Lleida Ciudad', 'Lleida Capital') THEN 'Lleida'
+    WHEN zona_clasificada IN ('Tarragona Ciudad', 'Tarragona Capital') THEN 'Tarragona'
+    ELSE REGEXP_REPLACE(zona_clasificada, '^(Lleida|Costa Dorada|Tarragona|Terres Ebre|Madrid) - ', '')
+    END"""
+
+_STAGING_VIEWS = ('stg_fotocasa', 'stg_milanuncios', 'stg_habitaclia',
+                  'stg_idealista', 'stg_wallapop')
+
+
+def _zona_alias_norm_sql(col):
+    norm = _ZONA_NORM_SQL.replace('__COL__', col)
+    return _ZONA_ALIAS_SQL.replace('__NORM__', norm)
+
+
+def get_zonas_descartadas(tenant_id, dias=30):
+    """Zonas vistas por los scrapers (ultimos N dias) sin fila activa en
+    zonas_geograficas, agregadas por zona. Cacheado 15 min."""
+    from django.core.cache import cache
+
+    cache_key = f'zonas_descartadas_t{tenant_id}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    union = "\nUNION ALL\n".join(
+        f"""SELECT {_ZONA_CLEAN_SQL} AS zona, portal, precio, es_particular, scraping_timestamp
+            FROM public_staging.{v}
+            WHERE tenant_id::TEXT = %s
+              AND scraping_timestamp >= NOW() - INTERVAL '{int(dias)} days'
+              AND zona_clasificada IS NOT NULL AND zona_clasificada <> ''"""
+        for v in _STAGING_VIEWS
+    )
+    alias_norm = _zona_alias_norm_sql('zona')
+    norm_nombre = _ZONA_NORM_SQL.replace('__COL__', 'nombre')
+    sql = f"""
+        WITH src AS ({union}),
+        activas AS (
+            SELECT {norm_nombre} AS zona_norm
+            FROM zonas_geograficas WHERE tenant_id = %s AND activa = TRUE
+        )
+        SELECT {alias_norm} AS zona_norm,
+               MIN(zona) AS zona,
+               COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE es_particular) AS particulares,
+               MIN(precio) FILTER (WHERE precio > 0) AS precio_min,
+               MAX(precio) AS precio_max,
+               STRING_AGG(DISTINCT portal, ', ' ORDER BY portal) AS portales,
+               MAX(scraping_timestamp) AS ultima_vista
+        FROM src
+        WHERE {alias_norm} NOT IN (SELECT zona_norm FROM activas)
+        GROUP BY 1
+        ORDER BY particulares DESC, total DESC
+        LIMIT 15
+    """
+    zonas = []
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [str(tenant_id)] * len(_STAGING_VIEWS) + [tenant_id])
+            for row in cursor.fetchall():
+                zonas.append({
+                    'zona': row[1], 'total': row[2], 'particulares': row[3],
+                    'precio_min': row[4], 'precio_max': row[5],
+                    'portales': row[6], 'ultima_vista': row[7],
+                })
+    except Exception:
+        logger.exception('Error calculando zonas descartadas')
+    cache.set(cache_key, zonas, 900)
+    return zonas
+
+
+@login_required
+def activar_zona_descartada_view(request):
+    """Activa una zona descartada: crea la fila en zonas_geograficas con todos
+    los portales habilitados. El siguiente ciclo scraping+dbt (diario) la
+    scrapea y sus anuncios vivos entran en dim_leads."""
+    from django.utils.text import slugify
+
+    if request.method != 'POST':
+        return redirect('dashboard')
+
+    tenant_id = request.session.get('tenant_id')
+    nombre = (request.POST.get('zona') or '').strip()
+    if not tenant_id or not nombre or len(nombre) > 100:
+        messages.error(request, 'Zona no válida')
+        return redirect('dashboard')
+
+    slug = slugify(nombre).replace('-', '_')
+    zona, created = ZonaGeografica.objects.get_or_create(
+        tenant_id=tenant_id, slug=slug,
+        defaults=dict(
+            nombre=nombre,
+            tipo='personalizada',
+            latitud=0, longitud=0, radio_km=6,
+            activa=True,
+            scrapear_milanuncios=True, scrapear_fotocasa=True,
+            scrapear_habitaclia=True, scrapear_idealista=True,
+            scrapear_wallapop=True,
+        ),
+    )
+    if not created and not zona.activa:
+        zona.activa = True
+        zona.save(update_fields=['activa', 'updated_at'])
+
+    from django.core.cache import cache
+    cache.delete(f'zonas_descartadas_t{tenant_id}')
+
+    messages.success(
+        request,
+        f'Zona "{nombre}" activada: sus anuncios entran en el próximo ciclo '
+        f'de scraping (diario, ~14:00). Gestiónala en Scrapers → Zonas.'
+    )
+    return redirect('dashboard')
 
 
 @login_required

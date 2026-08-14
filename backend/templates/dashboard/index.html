@@ -352,6 +352,57 @@
             </table>
         </div>
     </div>
+
+    {% if zonas_descartadas %}
+    <!-- Zonas descartadas por el filtro geografico -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Zonas descartadas (ultimos 30 dias)</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Los scrapers vieron anuncios en estas zonas, pero estan fuera del area de trabajo y no entran como leads.
+                Activar una zona la incluye en el scraping diario de todos los portales y sus anuncios vivos entran en el proximo ciclo.
+            </p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Zona</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Particulares</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Anuncios</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Precios</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Portales</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Accion</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for z in zonas_descartadas %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">{{ z.zona }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm {% if z.particulares %}text-green-700 dark:text-green-400 font-semibold{% else %}text-gray-500 dark:text-gray-400{% endif %}">{{ z.particulares }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ z.total }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {% if z.precio_min %}{{ z.precio_min|floatformat:0 }}{% if z.precio_max and z.precio_max != z.precio_min %} - {{ z.precio_max|floatformat:0 }}{% endif %} &euro;{% else %}-{% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ z.portales }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <form method="post" action="{% url 'activar_zona_descartada' %}" class="inline"
+                                  onsubmit="return confirm('Activar {{ z.zona|escapejs }}? Entrara en el scraping diario de todos los portales.');">
+                                {% csrf_token %}
+                                <input type="hidden" name="zona" value="{{ z.zona }}">
+                                <button type="submit"
+                                        class="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">
+                                    Activar zona
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

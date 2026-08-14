@@ -32,80 +32,49 @@
 */
 
 {#
-    ZONAS ACTIVAS (tenant 1 - Casa Teva). Mapa {variante normalizada -> nombre
-    canonico}: filtra Y unifica el nombre mostrado (evita duplicados tipo
-    "Bellvis"/"Bellvís" o "Mont Roig"/"Mont-roig"). Todo municipio que NO este
-    aqui queda DESCARTADO de dim_leads (las busquedas provinciales de
-    milanuncios/fotocasa arrastran pueblos de toda la provincia). Los datos raw
-    se conservan: para reactivar una zona basta con anadirla aqui (clave
-    normalizada: minusculas, sin acentos, apostrofes/guiones como espacio).
+    ZONAS ACTIVAS: desde 14 Ago 2026 viven en la tabla public.zonas_geograficas
+    (activa=TRUE), gestionada desde la app (dashboard "zonas descartadas" +
+    config de zonas). Todo municipio cuyo nombre normalizado NO case con una
+    zona activa del tenant queda DESCARTADO de dim_leads (las busquedas
+    provinciales de milanuncios/fotocasa arrastran pueblos de toda la
+    provincia); los datos raw se conservan y entran al activar la zona.
+    El nombre mostrado (zona_clasificada) se unifica al nombre de la tabla;
+    el CASE de abajo mapea variantes de grafia entre portales a la forma
+    normalizada canonica ("vilaseca" -> "vila seca").
     Excepcion: leads con fila en leads_lead_estado (trabajados por el equipo)
     nunca se filtran, esten donde esten.
     Alcance decidido 26 Jun 2026: Lleida <=20km + costa Tarragona y cinturon
-    inmediato de Tarragona/Reus/Cambrils.
+    inmediato de Tarragona/Reus/Cambrils (sembrado en zonas_geograficas por la
+    migracion core 0012).
 #}
-{% set zonas_activas_tenant1 = {
-    'lleida': 'Lleida',
-    'partida balafia': 'Lleida',
-    'alpicat': 'Alpicat',
-    'alcarras': 'Alcarràs',
-    'torrefarrera': 'Torrefarrera',
-    'bell lloc': "Bell-lloc d'Urgell",
-    'bell lloc d urgell': "Bell-lloc d'Urgell",
-    'termens': 'Térmens',
-    'juneda': 'Juneda',
-    'almacelles': 'Almacelles',
-    'almenar': 'Almenar',
-    'mollerussa': 'Mollerussa',
-    'albatarrec': 'Albatàrrec',
-    'torre serona': 'Torre-serona',
-    'montoliu de lleida': 'Montoliu de Lleida',
-    'alcoletge': 'Alcoletge',
-    'sudanell': 'Sudanell',
-    'benavent de segria': 'Benavent de Segrià',
-    'rossello': 'Rosselló',
-    'artesa de lleida': 'Artesa de Lleida',
-    'corbins': 'Corbins',
-    'vilanova de segria': 'Vilanova de Segrià',
-    'alfes': 'Alfés',
-    'sunyer': 'Sunyer',
-    'vilanova de la barca': 'Vilanova de la Barca',
-    'puigverd de lleida': 'Puigverd de Lleida',
-    'torres de segre': 'Torres de Segre',
-    'alguaire': 'Alguaire',
-    'aspa': 'Aspa',
-    'soses': 'Soses',
-    'menarguens': 'Menàrguens',
-    'bellvis': 'Bellvís',
-    'sidamon': 'Sidamon',
-    'sarroca de lleida': 'Sarroca de Lleida',
-    'aitona': 'Aitona',
-    'fondarella': 'Fondarella',
-    'torrebesses': 'Torrebesses',
-    'miralcamp': 'Miralcamp',
-    'vallfogona de balaguer': 'Vallfogona de Balaguer',
-    'gimenells': 'Gimenells',
-    'gimenells i el pla de la font': 'Gimenells',
-    'tarragona': 'Tarragona',
-    'bonavista': 'Bonavista',
-    'la canonja': 'La Canonja',
-    'reus': 'Reus',
-    'salou': 'Salou',
-    'cambrils': 'Cambrils',
-    'la pineda': 'La Pineda',
-    'vila seca': 'Vila-seca',
-    'vilaseca': 'Vila-seca',
-    'miami platja': 'Miami Platja',
-    'miami playa': 'Miami Platja',
-    'mont roig del camp': 'Mont-roig del Camp',
-    'montroig del camp': 'Mont-roig del Camp',
-    'vinyols i els arcs': 'Vinyols i els Arcs',
-    'montbrio del camp': 'Montbrió del Camp',
-    'riudoms': 'Riudoms',
-    'constanti': 'Constantí',
-} %}
+{% set norm_tpl %}TRIM(REGEXP_REPLACE(
+        TRANSLATE(LOWER(__COL__),
+                  'àáâäèéêëìíîïòóôöùúûüçñ''-·',
+                  'aaaaeeeeiiiioooouuuucn   '),
+        '\s+', ' ', 'g')){% endset %}
+{% set alias_tpl %}CASE {{ norm_tpl }}
+            WHEN 'partida balafia' THEN 'lleida'
+            WHEN 'bell lloc' THEN 'bell lloc d urgell'
+            WHEN 'vilaseca' THEN 'vila seca'
+            WHEN 'miami playa' THEN 'miami platja'
+            WHEN 'montroig del camp' THEN 'mont roig del camp'
+            WHEN 'gimenells i el pla de la font' THEN 'gimenells'
+            ELSE {{ norm_tpl }}
+        END{% endset %}
 
-WITH all_staging_sources AS (
+WITH zonas_activas_db AS (
+    -- Zonas activas por tenant, con el nombre normalizado como clave de match.
+    -- GROUP BY por si dos slugs comparten nombre: el join no debe duplicar filas.
+    SELECT
+        tenant_id::TEXT AS tenant_id,
+        {{ norm_tpl | replace('__COL__', 'nombre') }} AS zona_norm,
+        MIN(nombre) AS zona_canonica
+    FROM public.zonas_geograficas
+    WHERE activa = TRUE
+    GROUP BY 1, 2
+),
+
+all_staging_sources AS (
     -- Fotocasa listings
     SELECT
         raw_listing_id, external_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
@@ -444,20 +413,11 @@ final AS (
         e.descripcion,
         e.listing_url,
         e.ubicacion,
-        -- Nombre CANONICO por municipio (mapa zonas_activas_tenant1): unifica
+        -- Nombre CANONICO por municipio (tabla zonas_geograficas): unifica
         -- variantes de grafia entre portales ("Bellvis"/"Bellvís",
         -- "Mont Roig"/"Mont-roig del Camp", "Vilaseca"/"Vila-seca"...).
-        -- Zonas fuera del mapa (Madrid, etc.) conservan su nombre tal cual.
-        CASE TRIM(REGEXP_REPLACE(
-            TRANSLATE(LOWER(e.zona_clasificada),
-                      'àáâäèéêëìíîïòóôöùúûüçñ''-·',
-                      'aaaaeeeeiiiioooouuuucn   '),
-            '\s+', ' ', 'g'))
-        {% for k, v in zonas_activas_tenant1.items() %}
-            WHEN '{{ k }}' THEN '{{ v | replace("'", "''") }}'
-        {%- endfor %}
-            ELSE e.zona_clasificada
-        END AS zona_clasificada,
+        -- Zonas sin fila activa en la tabla conservan su nombre tal cual.
+        COALESCE(za.zona_canonica, e.zona_clasificada) AS zona_clasificada,
         e.latitud,
         e.longitud,
         e.tipo_propiedad,
@@ -510,6 +470,12 @@ final AS (
         e.created_at_marts
 
     FROM enriched e
+    -- Zona activa del tenant cuyo nombre normalizado casa con la zona del
+    -- anuncio (tras el mapa de alias de grafia). Da el nombre canonico y,
+    -- para tenant 1, decide si el lead pasa el filtro geografico final.
+    LEFT JOIN zonas_activas_db za
+        ON za.tenant_id = e.tenant_id::TEXT
+       AND za.zona_norm = {{ alias_tpl | replace('__COL__', 'e.zona_clasificada') }}
     LEFT JOIN image_scores lis ON e.lead_id = lis.lead_id
     -- OJO: price_history guarda el anuncio_id del PORTAL (external_id), no el
     -- id serial de raw_listings (source_listing_id). Con source_listing_id el
@@ -535,19 +501,15 @@ final AS (
 )
 
 SELECT * FROM final
--- Filtro ZONAS ACTIVAS (solo tenant 1): descarta municipios fuera del area de
--- trabajo (lista al inicio del fichero). Leads sin zona se conservan.
+-- Filtro ZONAS ACTIVAS (solo tenant 1): descarta municipios sin fila activa
+-- en public.zonas_geograficas. Leads sin zona se conservan.
 -- Leads ya trabajados por el equipo (fila en leads_lead_estado) se conservan
 -- siempre, aunque su zona este descartada.
 WHERE
     tenant_id::TEXT <> '1'
     OR zona_clasificada IS NULL OR zona_clasificada = ''
-    OR TRIM(REGEXP_REPLACE(
-        TRANSLATE(LOWER(zona_clasificada),
-                  'àáâäèéêëìíîïòóôöùúûüçñ''-·',
-                  'aaaaeeeeiiiioooouuuucn   '),
-        '\s+', ' ', 'g'
-    )) IN ({% for z in zonas_activas_tenant1 %}'{{ z }}'{% if not loop.last %}, {% endif %}{% endfor %})
+    OR {{ alias_tpl | replace('__COL__', 'zona_clasificada') }} IN (
+        SELECT zona_norm FROM zonas_activas_db WHERE tenant_id = '1')
     OR lead_id IN (SELECT lead_id FROM public.leads_lead_estado)
 
 {% if is_incremental() %}
