@@ -119,6 +119,8 @@ GitHub Actions (scraping)     Fly.io (Django)
 - **Cron**: `0 12 * * 1,3,5` (12:00 UTC, L-X-V)
 - **Manual**: `gh workflow run scrape-neon.yml`
 - **VPS scheduled**: `scripts/scheduled_scrape.py` corre los 4 portales L-X-V (antes solo 2)
+- **Estado del run**: `scripts/publish_scrape_status.py` → rama `ops-status` (`scrape_status.json`: paso por portal + vistos/nuevos 3h en Neon, `ok`/`problems`)
+- **Rutina cloud "FincaRadar scrape watch"** (`trig_01XAi9VYuiHYneEuVCKwp7VW`, Sonnet, diaria 14:00 UTC): lee `ops-status`; si `ok` responde y para; si no, diagnostica y abre issue o PR con label `scrape-watch`. Nunca toca master. Gestión: https://claude.ai/code/routines
 
 ### Migración Scrapling (4 May 2026)
 - IPRoyal proxy ya NO necesario (DataDome/Imperva bypass sin proxy desde IP española)
