@@ -9,3 +9,8 @@
 **Corrección del usuario**: tras montar el filtro de zonas, quedaron duplicados visibles ("Bellvis"/"Bellvís", "Mont Roig del Camp"/"Mont-roig del Camp") — el filtro los agrupaba internamente pero el nombre mostrado no.
 
 **Patrón**: cuando un campo de texto libre (zona, municipio, tipo...) se usa como dimensión visible (dropdowns, agrupaciones, KPIs), no basta con que el matching sea tolerante a variantes: hay que **canonicalizar el valor almacenado/mostrado**. Un solo mapa `{variante normalizada -> nombre canónico}` debe servir para filtrar Y para renombrar. Después de cualquier cambio así, comprobar `SELECT DISTINCT` en busca de duplicados por acento/guion/apóstrofe antes de dar por terminado.
+
+## 2026-09-15 — "Web de captación" = el pipeline de scraping, no la landing
+**Corrección del usuario**: ante "la web de captación no funciona" empecé por la landing de fincaradar.com (formulario de demo). El usuario aclaró: "web de captaciones significa el scraper".
+
+**Patrón**: en este proyecto "captación" es captar leads (scrapers → raw → dim_leads). Ante un "no funciona" genérico, empezar SIEMPRE por la salud del pipeline (último run de scrape-neon.yml: líneas `DONE in … found= saved= errors=` por portal + `max(scraping_timestamp)` por portal en Neon) antes que por la UI. Y un workflow en "success" no significa datos: los scrapers van con `continue-on-error`, hay que leer los contadores.

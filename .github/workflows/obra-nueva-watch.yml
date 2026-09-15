@@ -31,7 +31,17 @@ jobs:
       - name: Install dependencies
         run: pip install requests psycopg2-binary python-dotenv
 
+      - name: Check Bright Data token
+        id: bd
+        continue-on-error: true
+        run: python scripts/check_brightdata.py
+        env:
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Run watcher
+        if: steps.bd.outcome == 'success'
         run: |
           ARGS=""
           [ "${{ github.event.inputs.mode }}" = "seed" ] && ARGS="--seed"

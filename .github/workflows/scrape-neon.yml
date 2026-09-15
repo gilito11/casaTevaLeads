@@ -85,6 +85,19 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
+      # Las API keys de Bright Data CADUCAN (3 meses por defecto). Con token
+      # caducado fotocasa/milanuncios/wallapop devolvian 401 por zona, 0 leads,
+      # y el job seguia en "success" (27 Ago -> 15 Sep 2026 sin enterarse).
+      # Este paso avisa por Telegram y los scrapers BD se saltan via outcome.
+      - name: Check Bright Data token
+        id: bd
+        continue-on-error: true
+        run: python scripts/check_brightdata.py
+        env:
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Run Habitaclia scraper (Scrapling)
         if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'habitaclia')
         continue-on-error: true
@@ -102,7 +115,7 @@ jobs:
       # GB como IPRoyal — con ~78 req/dia sale a ~$3.5/mes. El parser lee el
       # JSON embebido (clientTypeId) del HTML crudo, sin navegador.
       - name: Run Fotocasa scraper (Bright Data Web Unlocker)
-        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'fotocasa')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'fotocasa') && steps.bd.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 20
         run: |
@@ -120,7 +133,7 @@ jobs:
       # PROVINCIA entera + pueblos; costa de Tarragona por municipio.
       # Detalle solo para anuncios nuevos -> ~$1-2/mes.
       - name: Run Milanuncios scraper (Bright Data Web Unlocker)
-        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'milanuncios')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'milanuncios') && steps.bd.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 20
         run: |
@@ -140,7 +153,7 @@ jobs:
       # detalle solo de anuncios nuevos -> ~$0.5-1/mes.
       # (IPRoyal retirado 9 Jul 2026: ERR_TUNNEL_CONNECTION_FAILED)
       - name: Run Wallapop scraper (Bright Data Web Unlocker)
-        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'wallapop')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'wallapop') && steps.bd.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 20
         run: |
@@ -154,7 +167,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Run Idealista scraper (Bright Data Web Unlocker — DataDome bypass managed)
-        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'idealista')
+        if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'idealista') && steps.bd.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 20  # hard cap: a slow idealista must never starve dbt of the 60-min job budget
         run: |
@@ -242,6 +255,7 @@ jobs:
         run: python scripts/validate_scrape_quality.py
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          PORTALS: ${{ github.event.inputs.portals || env.SCHEDULE_PORTALS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 

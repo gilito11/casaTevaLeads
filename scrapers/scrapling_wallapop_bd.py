@@ -24,6 +24,7 @@ from typing import Any, Dict, Optional, Set
 
 import requests
 
+from scrapers.brightdata import build_session, get_api_key, verify_token
 from scrapers.scrapling_wallapop import ScraplingWallapop
 
 logger = logging.getLogger(__name__)
@@ -44,15 +45,10 @@ class ScraplingWallapopBD(ScraplingWallapop):
     def __init__(self, *args, brightdata_api_key: Optional[str] = None,
                  brightdata_zone: str = "web_unlocker1", **kwargs):
         super().__init__(*args, **kwargs)
-        self.bd_api_key = brightdata_api_key or os.environ.get("BRIGHTDATA_API_KEY")
+        self.bd_api_key = get_api_key(brightdata_api_key)
         self.bd_zone = brightdata_zone or os.environ.get("BRIGHTDATA_ZONE", "web_unlocker1")
-        if not self.bd_api_key:
-            raise RuntimeError("BRIGHTDATA_API_KEY env var or --brightdata-api-key arg required")
-        self.bd_session = requests.Session()
-        self.bd_session.headers.update({
-            "Authorization": f"Bearer {self.bd_api_key}",
-            "Content-Type": "application/json",
-        })
+        self.bd_session = build_session(self.bd_api_key)
+        verify_token(self.bd_session)  # token caducado -> abortar ya, no 40 warnings 401
         self._known_ids: Set[str] = set()
 
     # ------------------------------------------------------------------

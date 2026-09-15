@@ -335,7 +335,7 @@ def build_report(results, score, total_checks, passed_checks, issues, scrape_cou
     zero_portals = [p for p, c in scrape_counts.items() if c == 0]
     if zero_portals:
         lines.append("")
-        lines.append(f"<b>WARNING: 0 results from: {', '.join(zero_portals)}</b>")
+        lines.append(f"🔴 <b>SIN RESULTADOS (48h): {', '.join(zero_portals)}</b> — revisar log del run")
 
     lines.append(f"\n{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     return "\n".join(lines)
@@ -354,7 +354,11 @@ def main():
     conn.close()
 
     scrape_counts = {}
-    expected_portals = ['fotocasa', 'idealista', 'habitaclia', 'milanuncios']
+    # Solo los portales que realmente corren (PORTALS lo pasa el workflow).
+    # Antes idealista (manual-only) salia SIEMPRE como "0 results" y ese ruido
+    # diario tapo 3 semanas de fotocasa/milanuncios a cero por token BD caducado.
+    env_portals = [p.strip() for p in os.environ.get('PORTALS', '').split(',') if p.strip()]
+    expected_portals = env_portals or ['fotocasa', 'habitaclia', 'milanuncios', 'wallapop']
     for portal in expected_portals:
         scrape_counts[portal] = len(by_portal.get(portal, []))
 

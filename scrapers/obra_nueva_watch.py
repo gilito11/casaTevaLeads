@@ -28,6 +28,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from scrapers.brightdata import build_session, get_api_key, verify_token
+
 from scrapers.scrapling_base import get_db_config
 
 logger = logging.getLogger(__name__)
@@ -49,15 +51,9 @@ class ObraNuevaWatcher:
         self.dry_run = dry_run
         self.seed = seed
         self.dump_dir = dump_dir
-        api_key = os.environ.get("BRIGHTDATA_API_KEY")
-        if not api_key:
-            raise RuntimeError("BRIGHTDATA_API_KEY required")
         self.bd_zone = os.environ.get("BRIGHTDATA_ZONE", "web_unlocker1")
-        self.session = requests.Session()
-        self.session.headers.update({
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        })
+        self.session = build_session(get_api_key())
+        verify_token(self.session)
         self.conn = None
         if not dry_run:
             import psycopg2

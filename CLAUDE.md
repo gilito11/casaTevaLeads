@@ -210,6 +210,7 @@ public_marts.dim_lead_duplicates
 **Scraping**:
 - `NEON_DATABASE_URL` - Connection string Neon ✅
 - `NEON_DB_PASSWORD` - Password para dbt ✅
+- `BRIGHTDATA_API_KEY` - Web Unlocker (fotocasa/milanuncios/wallapop/idealista/obra nueva). **CADUCA** (3 meses; la del 26 May murió el 27 Ago 2026 y nadie se enteró hasta el 15 Sep). Preflight `scripts/check_brightdata.py` avisa por Telegram y salta los scrapers BD. Renovar: brightdata.com → API keys → Add key con expiration **Unlimited** → `gh secret set BRIGHTDATA_API_KEY`
 
 **Contacto**:
 - `FOTOCASA_EMAIL/PASSWORD` ✅
