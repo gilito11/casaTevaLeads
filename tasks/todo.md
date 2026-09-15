@@ -148,6 +148,10 @@ Pendiente de deploy: push a GitHub (workflow) + pull en VPS (dashboard).
       lo ejecutan y saltan los scrapers BD si `steps.bd.outcome != success`.
 - [x] `validate_scrape_quality.py`: portales esperados desde env PORTALS (los que corren de verdad) + wallapop.
 - [x] Probado local: sin clave → exit 1; clave inválida → 401 → exit 1; constructor scraper → BrightDataAuthError.
-- [ ] **PENDIENTE USUARIO**: crear API key nueva en Bright Data (expiration Unlimited) y `gh secret set BRIGHTDATA_API_KEY`.
-- [ ] Tras la clave: `gh workflow run scrape-neon.yml -f portals="fotocasa,milanuncios,wallapop"` y verificar saved>0.
-- [ ] Push a master (no hecho: regla de push solo bajo petición).
+- [x] Clave nueva (Unlimited) creada por Eric, validada (status 200 + unlock real) y `gh secret set`.
+- [x] Run 34954852660: fotocasa found=867 saved=88, milanuncios 186/172, wallapop 437/69, errors 0/7/0. dbt OK.
+- [x] Neon: 13 leads nuevos hoy en dim_leads tenant 1 (7 fotocasa, 1 milanuncios, 5 wallapop).
+- [x] Push a master (autorizado por Eric: "no me pidas permiso para subir nada").
+- [x] Landing: endpoint demo-request commiteado y desplegado en VPS (400 en validación = ruta viva).
+- [x] `publish_scrape_status.py` + rama `ops-status`; validado con run 34957021078 (ok=true).
+- [x] Rutina cloud "FincaRadar scrape watch" (trig_01XAi9VYuiHYneEuVCKwp7VW, 14:00 UTC): primer run manual → "SCRAPE OK" en 5s, 2 turnos.
