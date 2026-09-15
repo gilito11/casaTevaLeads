@@ -204,6 +204,75 @@ def lead_api(request):
     return add_cors_headers(response, origin)
 
 
+def _send_demo_telegram(text):
+    from decouple import config
+    import requests
+    token = config('TELEGRAM_BOT_TOKEN', default='')
+    chat_id = config('TELEGRAM_CHAT_ID', default='')
+    if not token or not chat_id:
+        logger.error("Demo request: TELEGRAM_BOT_TOKEN/CHAT_ID no configurados")
+        return False
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={'chat_id': chat_id, 'text': text},
+            timeout=10,
+        )
+        return r.ok
+    except Exception as e:
+        logger.error(f"Demo request Telegram failed: {e}")
+        return False
+
+
+@csrf_exempt
+@require_http_methods(['POST', 'OPTIONS'])
+def demo_request_api(request):
+    """
+    Solicitud de demo desde la landing.
+
+    POST /api/widget/demo-request/
+    Body: {"nombre": "...", "email": "...", "agencia": "..."}
+    """
+    origin = request.headers.get('Origin', '')
+
+    if request.method == 'OPTIONS':
+        response = HttpResponse()
+        return add_cors_headers(response, origin)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        response = JsonResponse({'success': False, 'error': 'JSON invalido'}, status=400)
+        return add_cors_headers(response, origin)
+
+    nombre = str(data.get('nombre', '')).strip()[:120]
+    email = str(data.get('email', '')).strip()[:200]
+    agencia = str(data.get('agencia', '')).strip()[:300]
+
+    if not nombre or not agencia or not email or '@' not in email:
+        response = JsonResponse(
+            {'success': False, 'error': 'nombre, email y agencia son requeridos'}, status=400
+        )
+        return add_cors_headers(response, origin)
+
+    logger.info(f"Demo request landing: {nombre} <{email}> - {agencia}")
+    delivered = _send_demo_telegram(
+        "Solicitud de demo (landing)\n"
+        f"Nombre: {nombre}\n"
+        f"Email: {email}\n"
+        f"Agencia y zona: {agencia}"
+    )
+
+    if not delivered:
+        response = JsonResponse(
+            {'success': False, 'error': 'No se pudo registrar la solicitud'}, status=502
+        )
+        return add_cors_headers(response, origin)
+
+    response = JsonResponse({'success': True})
+    return add_cors_headers(response, origin)
+
+
 def valorador_js(request):
     """
     Sirve el widget JavaScript embebible.
