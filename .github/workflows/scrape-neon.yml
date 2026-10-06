@@ -35,10 +35,10 @@ env:
 
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pin: ubuntu-latest pasa a Ubuntu 26 el 19 Oct 2026 (deps de patchright)
     permissions:
       contents: write  # push de scrape_status.json a la rama ops-status
-    timeout-minutes: 90  # scraping ~58min y subiendo; +margen para dbt + listing_checker + alertas
+    timeout-minutes: 120  # topes por paso (habitaclia 40 + fotocasa 30 + milanuncios 20 + wallapop 20 = 110) + dbt y alertas
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -121,7 +121,7 @@ jobs:
         id: fotocasa
         if: contains(github.event.inputs.portals || env.SCHEDULE_PORTALS, 'fotocasa') && steps.bd.outcome == 'success'
         continue-on-error: true
-        timeout-minutes: 20
+        timeout-minutes: 30  # runs buenos 400-950s; con 20 corto 17-21 Sep
         run: |
           ZONES="${{ steps.zones.outputs.fotocasa }}"
           python -m scrapers.scrapling_fotocasa_bd --zones ${ZONES//,/ } --max-pages 2 --postgres
@@ -309,7 +309,7 @@ jobs:
 
   notify:
     needs: scrape
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # failure() NO cubre timeouts (conclusion=cancelled) -> el fallo era silencioso.
     if: always() && (needs.scrape.result == 'failure' || needs.scrape.result == 'cancelled')
     steps:
