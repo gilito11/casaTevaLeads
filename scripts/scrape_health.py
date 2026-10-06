@@ -64,6 +64,9 @@ def check_portals(conn, portals, tenant_id=1, window_hours=3):
         SELECT portal, MAX(created_at)
         FROM raw.raw_listings
         WHERE tenant_id = %s
+          -- wallapop guarda tambien las agencias descartadas (para no repagar
+          -- el detalle): no cuentan como lead nuevo.
+          AND raw_data->>'es_particular' IS DISTINCT FROM 'false'
         GROUP BY portal
         """,
         [tenant_id],
