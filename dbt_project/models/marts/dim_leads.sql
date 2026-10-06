@@ -109,7 +109,7 @@ all_staging_sources AS (
     SELECT
         raw_listing_id, external_id, tenant_id, portal, data_lake_path, scraping_timestamp, created_at,
         url, titulo, descripcion, ubicacion, zona_clasificada,
-        NULL::FLOAT AS latitud, NULL::FLOAT AS longitud,
+        latitud, longitud,
         telefono_raw, telefono_norm, email, nombre_contacto, anunciante,
         tipo_propiedad, superficie_m2, habitaciones, banos, precio, precio_por_m2,
         es_particular, permite_inmobiliarias, fecha_publicacion, fotos_json

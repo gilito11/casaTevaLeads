@@ -284,6 +284,13 @@ class LeadRefresher:
         except Exception as e:
             logger.debug(f"  parse fallo {lead['anuncio_id']}: {e}")
 
+        # 1b) Baja detectada por el parser (habitaclia redirige al buscador con 200)
+        if parsed.get("retirado"):
+            self.stats["removed"] += 1
+            self.events.append(f"BAJA  {portal} {lead['anuncio_id']} ({lead['titulo'] or ''})")
+            self._mark_sold(lead)
+            return
+
         # 2) ¿Ahora es agencia? (solo portales con señal fiable en el detalle)
         if portal in AGENCY_REEVAL_PORTALS and parsed.get("es_particular") is False \
                 and lead.get("es_particular") is True:

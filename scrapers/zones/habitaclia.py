@@ -103,6 +103,11 @@ ZONAS_GEOGRAFICAS = {
     'torrebesses': {'nombre': 'Torrebesses', 'url_slug': 'torrebesses'},
     'miralcamp': {'nombre': 'Miralcamp', 'url_slug': 'miralcamp'},
     'vallfogona_balaguer': {'nombre': 'Vallfogona de Balaguer', 'url_slug': 'vallfogona_de_balaguer'},
+    # Activas en zonas_geograficas pero ausentes aqui hasta Oct 2026 ("Zone not found")
+    'almenar': {'nombre': 'Almenar', 'url_slug': 'almenar'},
+    'termens': {'nombre': 'Térmens', 'url_slug': 'termens'},
+    'bell_lloc': {'nombre': "Bell-lloc d'Urgell", 'url_slug': 'bell_lloc_d_urgell'},
+    'mollerussa_rural': {'nombre': 'Mollerussa Rural', 'url_slug': 'palau_d_anglesola'},
     'la_canonja': {'nombre': 'La Canonja', 'url_slug': 'la_canonja'},
 
     'chamartin': {'nombre': 'Chamartín', 'url_slug': 'distrito_chamartin-madrid'},

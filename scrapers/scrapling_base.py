@@ -517,6 +517,8 @@ class ScraplingBaseScraper:
     def _scrape_zone(self, session, zona_key: str):
         for page_num in range(1, self.max_pages + 1):
             url = self.build_search_url(zona_key, page_num)
+            if not url:
+                break  # el scraper sabe que no hay mas paginas
             logger.info(f"[{self.PORTAL_NAME}] {zona_key} p{page_num}: {url}")
             try:
                 fetch_kwargs = {"network_idle": True, "wait": 2000}

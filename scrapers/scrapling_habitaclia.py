@@ -4,14 +4,32 @@ Habitaclia scraper basado en Scrapling.
 Replaces camoufox_habitaclia.py — bypassa Imperva/Incapsula SIN proxy gracias a
 Patchright + StealthySession (cookies persistentes).
 """
+import json
 import logging
 import re
+import unicodedata
 from typing import Any, Dict, List, Optional
 
 from scrapers.scrapling_base import ScraplingBaseScraper
 from scrapers.zones.habitaclia import ZONAS_GEOGRAFICAS
 
 logger = logging.getLogger(__name__)
+
+_TIPO = {
+    "flat": "piso", "apartment": "piso", "penthouse": "piso", "duplex": "piso",
+    "studio": "piso", "loft": "piso", "house": "casa", "chalet": "casa",
+    "detachedHouse": "casa", "semidetachedHouse": "casa", "terracedHouse": "casa",
+    "rusticHouse": "casa", "countryHouse": "casa", "villa": "casa",
+}
+
+
+def _norm_muni(name: Optional[str]) -> str:
+    """'Lleida Capital' / 'Albatàrrec' -> 'lleida' / 'albatarrec'."""
+    if not name:
+        return ""
+    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower().strip()
+    s = re.sub(r"\s+capital$", "", s)
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
 
 
 def _extract_phone_from_text(text: str) -> Optional[str]:
@@ -37,220 +55,165 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
     DETAIL_DELAY_RANGE = (2.0, 5.0)
     SEARCH_DELAY_RANGE = (3.0, 6.0)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._list_urls: Dict[str, Any] = {}
+
     # ------------------------------------------------------------------
     # URL building
     # ------------------------------------------------------------------
-    def build_search_url(self, zona_key: str, page: int = 1) -> str:
+    # Desde el 15 Sep 2026 habitaclia corre sobre la plataforma de fotocasa
+    # (Adevinta): /viviendas-particulares-<slug>.htm redirige (301) a
+    # /comprar/viviendas/<provincia>-provincia/<municipio>/particulares/s y la
+    # pagina N es <esa url>/N. La p1 usa la URL antigua (la redireccion resuelve
+    # provincia y slug nuevo, p.ej. lleida -> lleida-capital); las siguientes,
+    # la URL canonica que trae el propio JSON de la p1.
+    def build_search_url(self, zona_key: str, page: int = 1) -> Optional[str]:
+        if page > 1:
+            list_url, total_pages = self._list_urls.get(zona_key, (None, 0))
+            if not list_url or page > total_pages:
+                return None
+            return f"{self.BASE_URL}{list_url}/{page}"
+
         zona = self.ZONAS[zona_key]
         slug = zona["url_slug"]
-        is_province = zona.get("is_province", False)
+        if zona.get("is_province") or not self.only_private:
+            return f"{self.BASE_URL}/viviendas-{slug}.htm"
+        return f"{self.BASE_URL}/viviendas-particulares-{slug}.htm"
 
-        if is_province:
-            base = f"{self.BASE_URL}/viviendas-{slug}.htm"
-            paged = f"{self.BASE_URL}/viviendas-{slug}-pag{page}.htm"
-        elif self.only_private:
-            base = f"{self.BASE_URL}/viviendas-particulares-{slug}.htm"
-            paged = f"{self.BASE_URL}/viviendas-particulares-{slug}-pag{page}.htm"
-        else:
-            base = f"{self.BASE_URL}/viviendas-{slug}.htm"
-            paged = f"{self.BASE_URL}/viviendas-{slug}-pag{page}.htm"
-
-        return paged if page > 1 else base
+    def _wants_detail(self) -> bool:
+        # El JSON del listado ya trae telefono, email, precio, m2, fotos,
+        # descripcion, coordenadas y publisher.isAgent: la ficha no aporta.
+        return False
 
     # ------------------------------------------------------------------
-    # Search-page parsing (regex on full HTML — más fiable en habitaclia)
+    # Search-page parsing (window.__INITIAL_PROPS__)
     # ------------------------------------------------------------------
+    @staticmethod
+    def _initial_props(html: str) -> Optional[dict]:
+        m = re.search(r'window\.__INITIAL_PROPS__\s*=\s*JSON\.parse\((".*?")\);', html, re.S)
+        if not m:
+            return None
+        try:
+            return json.loads(json.loads(m.group(1)))
+        except ValueError:
+            return None
+
     def parse_search_page(self, page, zona_key: str) -> List[Dict[str, Any]]:
         try:
             html = page.html_content or ""
         except Exception:
             html = ""
 
-        if not html:
-            logger.warning(f"[habitaclia] {zona_key}: empty HTML")
+        props = self._initial_props(html) if html else None
+        ctx = ((props or {}).get("initialSearchResultsPage") or {}).get("initialSearchContext")
+        if not ctx:
+            # Sin JSON = cambio de plantilla o bloqueo: es un error, no "0 anuncios".
+            logger.error(f"[habitaclia] {zona_key}: sin __INITIAL_PROPS__ (html={len(html)} bytes)")
+            self.stats["errors"] += 1
             return []
 
-        zona_info = self.ZONAS.get(zona_key, {})
-        zone_name = zona_info.get("nombre", zona_key)
+        geo = ctx.get("geography") or {}
+        results = ctx.get("results") or {}
+        pag = results.get("pagination") or {}
+        if pag.get("page", 1) == 1:
+            self._list_urls[zona_key] = (
+                (ctx.get("urls") or {}).get("list"), int(pag.get("totalPages") or 0)
+            )
 
-        # Composite zones don't have url_slug → caller should pass child keys instead.
-        # Here we just extract listing links from whatever HTML we got.
-        links = re.findall(
-            r'href="(https://www\.habitaclia\.com/comprar-(?:piso|casa|chalet|vivienda)[^"]+\.htm)[^"]*"',
-            html,
+        zone_name = self.ZONAS.get(zona_key, {}).get("nombre", zona_key)
+        searched = _norm_muni(geo.get("name"))
+        items = results.get("items") or []
+        logger.info(
+            f"[habitaclia] {zona_key}: {geo.get('layer')}/{geo.get('slug')} "
+            f"p{pag.get('page')}/{pag.get('totalPages')} total={pag.get('totalCount')} items={len(items)}"
         )
-        links = list(dict.fromkeys(links))
-        links = [l for l in links if "vistamapa" not in l and "-i" in l]
-        logger.info(f"[habitaclia] {zona_key}: found {len(links)} listing links")
+        return [l for l in (self._item_to_listing(i, zone_name, searched) for i in items) if l]
 
-        results: List[Dict[str, Any]] = []
-        for url in links[:30]:
-            m = re.search(r"-i(\d{6,})", url)
-            if not m:
-                continue
-            results.append({
-                "anuncio_id": m.group(1),
-                "url_anuncio": url,
-                "tipo_inmueble": "piso",
-                "zona_busqueda": zone_name,
-                "zona_geografica": zone_name,
-                "es_particular": True,  # provisional; verified on detail page
-            })
-        return results
+    def _item_to_listing(self, item: dict, zone_name: str, searched: str) -> Optional[Dict[str, Any]]:
+        # legacyNumericId = el id -i<num>.htm de la web antigua: mantiene el
+        # upsert sobre los anuncios ya capturados.
+        anuncio_id = str(item.get("legacyNumericId") or item.get("id") or "").strip()
+        nav = item.get("navigationUrl") or (item.get("urls") or {}).get("canonical")
+        if not anuncio_id or not nav:
+            return None
+        tx = item.get("transaction") or {}
+        if tx.get("type") not in (None, "buy"):
+            return None
+
+        summary = item.get("summary") or {}
+        prop = item.get("property") or {}
+        loc = summary.get("location") or {}
+        coords = loc.get("coordinates") or {}
+        publisher = summary.get("publisher") or {}
+        contact = item.get("contact") or {}
+        price = tx.get("price") or {}
+        precio = None if price.get("hidden") else price.get("amount")
+
+        # Municipio real: si no es el buscado manda el real (la web antigua
+        # "sangraba" pisos de Lleida capital en las busquedas de pueblos vecinos).
+        municipio = re.sub(r"\s+capital$", "", (loc.get("municipality") or "").strip(), flags=re.I)
+        zona = zone_name
+        if municipio and searched and _norm_muni(municipio) != searched:
+            zona = municipio
+
+        es_agencia = bool(publisher.get("isAgent") or publisher.get("tradeName"))
+        descripcion = (summary.get("description") or "").strip()[:2000]
+        listing: Dict[str, Any] = {
+            "anuncio_id": anuncio_id,
+            "url_anuncio": f"{self.BASE_URL}{nav}",
+            "titulo": (summary.get("title") or "").strip()[:200],
+            "descripcion": descripcion,
+            "precio": float(precio) if precio else None,
+            "habitaciones": prop.get("rooms"),
+            "banos": prop.get("bathrooms"),
+            "metros": int(prop.get("builtSurface") or prop.get("landArea") or 0) or None,
+            "tipo_inmueble": _TIPO.get(prop.get("propertyType"), "piso"),
+            "direccion": ", ".join(x for x in (loc.get("displayAddressLine"), loc.get("displayZoneLine")) if x),
+            "municipio": municipio or None,
+            "latitud": coords.get("latitude"),
+            "longitud": coords.get("longitude"),
+            "zona_busqueda": zona,
+            "zona_geografica": zona,
+            "email": contact.get("email"),
+            "fotos": [i["url"] for i in ((summary.get("multimedia") or {}).get("images") or []) if i.get("url")][:10],
+            "es_particular": not es_agencia,
+            "vendedor": publisher.get("tradeName") or ("Inmobiliaria" if es_agencia else "Particular"),
+            "verified": True,
+        }
+        phone = re.sub(r"^34(?=\d{9}$)", "", re.sub(r"\D", "", contact.get("phone") or ""))
+        phone = phone or _extract_phone_from_text(descripcion)
+        if phone:
+            listing["telefono"] = phone
+            listing["telefono_norm"] = self.normalize_phone(phone)
+        return listing
 
     # ------------------------------------------------------------------
     # Detail-page enrichment
     # ------------------------------------------------------------------
     def parse_detail_page(self, page, listing: Dict[str, Any]) -> Dict[str, Any]:
+        """Ficha nueva (/.../<uuid>/d): __INITIAL_PROPS__.listing tiene el mismo
+        esquema que los items del listado. Un anuncio retirado redirige al
+        buscador (__INITIAL_PROPS__.initialSearchResultsPage): se marca
+        listing["retirado"] = True para que lead_refresher lo dé de baja."""
         try:
             html = page.html_content or ""
         except Exception:
             html = ""
-        if not html or len(html) < 5000:
+        props = self._initial_props(html) if html else None
+        if not props:
             return listing
-
-        # Guard anti-redirección: un anuncio retirado redirige a una página de
-        # buscador ("Viviendas en Tarragona") que contiene OTROS anuncios
-        # destacados. Su <title> NO tiene el patrón "... por <precio> €". Si no
-        # lo tiene, no es la ficha real → no enriquecer (evita coger precio/datos
-        # de un anuncio ajeno, p.ej. el bug del "sim-price" a 850.000 €).
-        title_guard = re.search(r"<title>(.*?)</title>", html, re.DOTALL | re.IGNORECASE)
-        if not title_guard or not re.search(
-            r"\bpor\s+\d{1,3}(?:\.\d{3})*", title_guard.group(1), re.IGNORECASE
-        ):
+        if "initialSearchResultsPage" in props and "listing" not in props:
+            listing["retirado"] = True
             return listing
-
-        # Title
-        m = re.search(r"<h1[^>]*>([^<]+)</h1>", html)
-        if m:
-            listing["titulo"] = m.group(1).strip()[:200]
-
-        # Price — el <title> ("Piso por 165.000 € de ...") es la fuente más fiable
-        # del precio DEL anuncio. OJO: la página incluye anuncios similares con
-        # class="sim-price" (otro piso, otro precio); hay que excluirlos.
-        precio = None
-        tt = re.search(
-            r"<title>[^<]*?\bpor\s+(\d{1,3}(?:\.\d{3})*)\b",
-            html, re.IGNORECASE,
-        )
-        if tt:
-            precio = float(tt.group(1).replace(".", ""))
-        if precio is None:
-            fc = re.search(
-                r'class="[^"]*feature-container[^"]*"[^>]*>(.*?)</(?:ul|div)>',
-                html, re.DOTALL | re.IGNORECASE,
-            )
-            if fc:
-                pm = re.search(r"(\d{1,3}(?:\.\d{3})*)\s*€(?!/)", fc.group(1))
-                if pm:
-                    precio = float(pm.group(1).replace(".", ""))
-        if precio is None:
-            # class que contenga "price" pero NO "sim" (sim-price = anuncio similar)
-            ph = re.search(
-                r'class="(?![^"]*sim)[^"]*price[^"]*"[^>]*>[\s]*(\d{1,3}(?:\.\d{3})*)\s*€',
-                html, re.IGNORECASE,
-            )
-            if ph:
-                precio = float(ph.group(1).replace(".", ""))
-        if precio is None:
-            tp = re.search(r"por\s+(\d{1,3}(?:\.\d{3})*)\s*€", html, re.IGNORECASE)
-            if tp:
-                precio = float(tp.group(1).replace(".", ""))
-        if precio is not None:
-            listing["precio"] = precio
-
-        # Rooms
-        habs = re.search(r"<li>(\d+)\s*habitacion", html, re.IGNORECASE)
-        if habs:
-            listing["habitaciones"] = int(habs.group(1))
-
-        # Size
-        m2 = re.search(r"<li>Superficie\s*(\d+)(?:&nbsp;|\s)*m", html, re.IGNORECASE)
-        if m2:
-            listing["metros"] = int(m2.group(1))
-        else:
-            m2b = re.search(r"de\s+(\d+)\s+metros", html, re.IGNORECASE)
-            if m2b:
-                listing["metros"] = int(m2b.group(1))
-
-        # Bathrooms
-        b = re.search(r"<li>(\d+)\s*Ba[ñn]o", html, re.IGNORECASE)
-        if b:
-            listing["banos"] = int(b.group(1))
-
-        # Location
-        loc = re.search(r'class="[^"]*location[^"]*"[^>]*>([^<]+)', html, re.IGNORECASE)
-        if loc:
-            listing["ubicacion"] = loc.group(1).strip()[:200]
-
-        # Description — prefer detail-description, fallback to <meta name="description">
-        descripcion = ""
-        dd = re.search(
-            r'<p[^>]*class="[^"]*detail-description[^"]*"[^>]*>(.*?)</p>',
-            html, re.DOTALL | re.IGNORECASE,
-        )
-        if dd:
-            txt = re.sub(r"<[^>]+>", "\n", dd.group(1))
-            descripcion = re.sub(r"\n+", "\n", txt).strip()
-        if not descripcion:
-            md = re.search(
-                r'<meta[^>]*name="description"[^>]*content="([^"]+)"',
-                html, re.IGNORECASE,
-            )
-            if md:
-                descripcion = md.group(1).strip()
-        if descripcion:
-            listing["descripcion"] = descripcion[:2000]
-
-        # Phone — description first, then tel: links
-        phone = _extract_phone_from_text(listing.get("descripcion", ""))
-        if not phone:
-            tl = re.search(r'href="tel:(?:\+?34)?([679]\d{8})"', html)
-            if tl:
-                phone = tl.group(1)
-        if phone:
-            listing["telefono"] = phone
-            listing["telefono_norm"] = self.normalize_phone(phone)
-
-        # Photos (habimg.com)
-        photos = re.findall(
-            r"(?:https?:)?//images\.habimg\.com/[^\"'<>\s]+\.(?:jpg|jpeg|png|webp)",
-            html, re.IGNORECASE,
-        )
-        unique: List[str] = []
-        seen = set()
-        for ph in photos:
-            if ph.startswith("//"):
-                ph = "https:" + ph
-            if "logo" in ph.lower():
-                continue
-            # El sufijo de tamano va PEGADO al uuid sin guion bajo (...971dXL.jpg).
-            # La URL base sin sufijo devuelve 200; anadir _XXL da 404.
-            idm = re.search(
-                r"/(?:imgh|thumb)/(\d+-\d+)/([^/]+?)(?:_?(?:XXL|XL|L|M|S|T))?\.(?:jpg|jpeg|png|webp)$",
-                ph, re.IGNORECASE,
-            )
-            if idm:
-                uid = f"{idm.group(1)}/{idm.group(2)}"
-                if uid not in seen:
-                    seen.add(uid)
-                    unique.append(
-                        f"https://images.habimg.com/imgh/{idm.group(1)}/{idm.group(2)}.jpg"
-                    )
-        if unique:
-            listing["fotos"] = unique[:10]
-
-        # Particular vs agency (verified on detail)
-        agency = re.search(
-            r'class="[^"]*(?:agent|agency|professional|inmobiliaria)[^"]*"',
-            html, re.IGNORECASE,
-        )
-        listing["es_particular"] = not bool(agency)
-        listing["vendedor"] = "Inmobiliaria" if agency else "Particular"
-        listing["verified"] = True
-
+        item = props.get("listing")
+        if not isinstance(item, dict):
+            return listing
+        zona = listing.get("zona_busqueda") or listing.get("zona_geografica") or ""
+        parsed = self._item_to_listing(item, zona, _norm_muni(zona))
+        if parsed:
+            listing.update({k: v for k, v in parsed.items() if v not in (None, "", [])})
         return listing
-
 
 def main():
     import argparse, os, sys

@@ -48,6 +48,8 @@ extracted AS (
         raw_data->>'banos' AS banos_text,
         COALESCE(raw_data->>'zona_busqueda', raw_data->>'zona_geografica', raw_data->>'zona') AS zona_busqueda,
         raw_data->'fotos' AS fotos_json,
+        (raw_data->>'latitud')::FLOAT AS latitud,
+        (raw_data->>'longitud')::FLOAT AS longitud,
         COALESCE((raw_data->>'es_particular')::BOOLEAN, TRUE) AS es_particular_raw,
 
         -- Store entire raw_data for reference
@@ -199,6 +201,8 @@ classified AS (
 
         -- Tipo de inmueble
         CASE
+            -- tipo del JSON de la plataforma nueva (desde Oct 2026)
+            WHEN raw_data->>'tipo_inmueble' = 'casa' THEN 'Casa'
             WHEN LOWER(url) LIKE '%piso%' OR LOWER(titulo) LIKE '%piso%' THEN 'Piso'
             WHEN LOWER(url) LIKE '%casa%' OR LOWER(titulo) LIKE '%casa%' OR LOWER(titulo) LIKE '%chalet%' THEN 'Casa'
             WHEN LOWER(url) LIKE '%local%' OR LOWER(titulo) LIKE '%local%' THEN 'Local'
@@ -230,6 +234,8 @@ final AS (
         descripcion,
         ubicacion,
         zona_clasificada,
+        latitud,
+        longitud,
         codigo_postal,
 
         -- Contact information
