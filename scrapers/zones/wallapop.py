@@ -6,10 +6,11 @@ Módulo neutro: NO depende de scrapling/camoufox.
 Wallapop es un marketplace geo-based (no usa rutas de zona por URL como los
 demás portales). Cada zona aporta:
   - nombre   : display name -> raw_data.zona_geografica
-  - slug     : ciudad para la ruta vertical /inmobiliaria/<slug> (carga el
-               contexto de inmobiliaria + cookies anti-bot del SPA)
-  - lat/lng  : coordenadas para la búsqueda geolocalizada por API
-  - radius_km: radio de búsqueda en km
+  - slug     : ciudad para la ruta vertical /inmobiliaria/<slug>. Solo la usa
+               el scraper de navegador (scrapling_wallapop); el cron
+               (scrapling_wallapop_bd) busca TODAS las zonas por API.
+  - lat/lng  : centro para la búsqueda geolocalizada por API (obligatorio)
+  - radius_km: radio de búsqueda en km (distance_in_km del API)
 
 Municipios pequeños SIN vertical SEO (la landing /inmobiliaria/<slug> devuelve
 404): slug=None. Para ellos el scraper usa el API geolocalizado

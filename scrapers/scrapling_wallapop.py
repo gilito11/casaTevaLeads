@@ -22,8 +22,9 @@ import json
 import logging
 import math
 import re
+import unicodedata
 import urllib.parse
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from scrapers.scrapling_base import ScraplingBaseScraper
 from scrapers.zones.wallapop import ZONAS_GEOGRAFICAS
@@ -49,6 +50,11 @@ _AGENCY_TEXT_RE = re.compile(
     r"financiaci[oó]n\s+a\s+medida|gestionamos\s+(su|tu)\s+hipoteca)",
     re.IGNORECASE,
 )
+
+# Id numérico estable del anuncio: sufijo del web_slug / URL (".../piso-1305188217").
+_NUM_ID_RE = re.compile(r"-(\d{6,})/?$")
+
+_PLACEHOLDER_SELLERS = {"", "particular", "profesional"}
 
 
 class ScraplingWallapop(ScraplingBaseScraper):
@@ -76,6 +82,28 @@ class ScraplingWallapop(ScraplingBaseScraper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._done_zones: set = set()
+        # id numérico -> fila ya guardada en raw (ver _load_known)
+        self._known: Optional[Dict[str, Dict[str, Any]]] = None
+        # user_id del API de vendedores ya descartados como profesionales por
+        # detalle: sus anuncios nuevos se descartan sin pagar otro detalle.
+        self._agency_users: set = set()
+
+    def build_api_url(self, zona_key: str) -> str:
+        """Feed geolocalizado de venta ordenado por fecha de creación (newest),
+        paginable con meta.next_page. OJO: con `distance` (metros) + newest el
+        API ignora la geo y devuelve toda España: hay que usar distance_in_km.
+        operation=buy filtra venta en servidor."""
+        zona = self.ZONAS[zona_key]
+        params = urllib.parse.urlencode({
+            "latitude": f"{zona['lat']:.4f}",
+            "longitude": f"{zona['lng']:.4f}",
+            "distance_in_km": str(int(math.ceil(float(zona.get("radius_km") or 4)))),
+            "category_id": "200",
+            "operation": "buy",
+            "order_by": "newest",
+            "source": "search_box",
+        })
+        return f"{self.API_SEARCH_URL}?{params}"
 
     # ------------------------------------------------------------------
     # URL building
@@ -288,8 +316,12 @@ class ScraplingWallapop(ScraplingBaseScraper):
 
     @staticmethod
     def _api_payload_items(text: str) -> List[Dict[str, Any]]:
-        """Cuerpo JSON del API; tolera JSON envuelto en <pre> si la respuesta
-        vino renderizada por un navegador."""
+        return ScraplingWallapop._api_payload(text)[0]
+
+    @staticmethod
+    def _api_payload(text: str) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """Cuerpo JSON del API -> (items, meta.next_page). Tolera JSON envuelto
+        en <pre> si la respuesta vino renderizada por un navegador."""
         raw = (text or "").strip()
         if not raw.startswith("{"):
             m = re.search(r"<pre[^>]*>(.*?)</pre>", raw, re.DOTALL)
@@ -297,22 +329,34 @@ class ScraplingWallapop(ScraplingBaseScraper):
         try:
             data = json.loads(raw)
         except Exception:
-            return []
+            return [], None
         payload = (((data.get("data") or {}).get("section") or {}).get("payload") or {})
         items = payload.get("items")
-        return items if isinstance(items, list) else []
+        next_page = (data.get("meta") or {}).get("next_page") or None
+        return (items if isinstance(items, list) else []), next_page
+
+    @staticmethod
+    def _numeric_id(value: Any) -> Optional[str]:
+        s = str(value or "").strip().split("?")[0]
+        if s.isdigit():
+            return s
+        m = _NUM_ID_RE.search(s)
+        return m.group(1) if m else None
 
     def _api_item_to_listing(self, item: Dict[str, Any], zona_key: str,
                              zona_cfg: dict) -> Optional[Dict[str, Any]]:
-        iid = str(item.get("id") or "").strip()
+        web_slug = item.get("web_slug") or ""
+        # Id numérico del slug (= el que usa la vertical SEO), no el hash del
+        # API: un mismo anuncio no debe entrar en raw con dos ids distintos.
+        iid = self._numeric_id(web_slug) or str(item.get("id") or "").strip()
         if not iid:
             return None
         if (item.get("reserved") or {}).get("flag") is True:
             return None
 
         habitaciones, metros, tipo_inmueble, operation = self._real_estate_attrs(item)
-        # El API geolocalizado mezcla venta y alquiler: solo venta.
-        if operation == "rent":
+        # Solo venta. El API localiza el valor ("Venta"/"Alquiler" con es-ES).
+        if operation in ("rent", "alquiler"):
             return None
 
         loc = item.get("location") or {}
@@ -332,7 +376,7 @@ class ScraplingWallapop(ScraplingBaseScraper):
             "ubicacion": loc.get("city") or zona_cfg.get("nombre", zona_key),
             "zona_geografica": zona_cfg.get("nombre", zona_key),
             "zona_busqueda": zona_key,
-            "url_anuncio": f"{self.BASE_URL}/item/{item.get('web_slug') or iid}",
+            "url_anuncio": f"{self.BASE_URL}/item/{web_slug or iid}",
             "es_particular": not is_pro,
             "seller_type": "professional" if is_pro else "private",
             "vendedor": "Profesional" if is_pro else "Particular",
@@ -340,19 +384,139 @@ class ScraplingWallapop(ScraplingBaseScraper):
             "habitaciones": habitaciones,
             "metros": metros,
             "fotos": [],
+            # Solo para el bucle del scraper (save_listing no los persiste)
+            "_created_at": item.get("created_at"),
+            "_user_id": item.get("user_id"),
         }
 
     @staticmethod
-    def _within_radius(loc: dict, zona_cfg: dict, slack: float = 1.6) -> bool:
+    def _distance_km(loc: dict, zona_cfg: dict) -> Optional[float]:
         try:
             lat, lng = float(loc.get("latitude")), float(loc.get("longitude"))
             zlat, zlng = float(zona_cfg.get("lat")), float(zona_cfg.get("lng"))
-            radius = float(zona_cfg.get("radius_km") or 4)
         except (TypeError, ValueError):
-            return True  # sin coordenadas no podemos juzgar: dentro
+            return None
         dx = (lng - zlng) * 111.32 * math.cos(math.radians(zlat))
         dy = (lat - zlat) * 111.32
-        return (dx * dx + dy * dy) ** 0.5 <= radius * slack
+        return (dx * dx + dy * dy) ** 0.5
+
+    @staticmethod
+    def _within_radius(loc: dict, zona_cfg: dict, slack: float = 1.6) -> bool:
+        d = ScraplingWallapop._distance_km(loc, zona_cfg)
+        if d is None:
+            return True  # sin coordenadas no podemos juzgar: dentro
+        return d <= float(zona_cfg.get("radius_km") or 4) * slack
+
+    @staticmethod
+    def _norm_place(s: Any) -> str:
+        s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode()
+        return re.sub(r"[^a-z0-9]", "", s.lower())
+
+    # ------------------------------------------------------------------
+    # Identidad estable en raw (anuncio_id mixto: numérico SEO / hash API)
+    # ------------------------------------------------------------------
+    def _load_known(self):
+        """Indexa lo ya guardado en raw por id numérico (sufijo de la URL), para
+        que un anuncio guardado antes con el hash del API o con el id SEO se
+        reconozca y se re-guarde con SU anuncio_id original (upsert, no fila
+        nueva). Incluye los descartados por detalle (es_particular=false)."""
+        self._known = {}
+        if not self.postgres_conn:
+            return
+        try:
+            self._ensure_db()
+            cur = self.postgres_conn.cursor()
+            cur.execute(
+                """
+                SELECT raw_data->>'anuncio_id', raw_data->>'url', raw_data->>'es_particular',
+                       raw_data->>'verified', raw_data->>'telefono', raw_data->>'telefono_norm',
+                       raw_data->>'vendedor', raw_data->>'descripcion',
+                       raw_data->>'zona_busqueda', raw_data->>'zona_geografica'
+                FROM raw.raw_listings
+                WHERE portal = %s AND tenant_id = %s AND raw_data->>'anuncio_id' IS NOT NULL
+                """,
+                [self.PORTAL_NAME, self.tenant_id],
+            )
+            for (aid, url, es_part, verified, tel, tel_norm, vend, desc, zb, zg) in cur.fetchall():
+                key = self._numeric_id(aid) or self._numeric_id(url) or aid
+                self._known[key] = {
+                    "anuncio_id": aid,
+                    "es_particular": es_part != "false",
+                    "verified": verified == "true",
+                    "telefono": tel or "",
+                    "telefono_norm": tel_norm or "",
+                    "vendedor": vend or "",
+                    "descripcion": desc or "",
+                    "zona_busqueda": zb or "",
+                    "zona_geografica": zg or "",
+                }
+            cur.execute(
+                """
+                SELECT DISTINCT raw_data->>'user_id' FROM raw.raw_listings
+                WHERE portal = %s AND tenant_id = %s
+                  AND raw_data->>'es_particular' = 'false' AND raw_data->>'user_id' IS NOT NULL
+                """,
+                [self.PORTAL_NAME, self.tenant_id],
+            )
+            self._agency_users = {r[0] for r in cur.fetchall() if r[0]}
+            cur.close()
+            logger.info(
+                f"[wallapop] {len(self._known)} anuncios ya conocidos en raw, "
+                f"{len(self._agency_users)} vendedores profesionales cacheados"
+            )
+        except Exception as e:
+            logger.warning(f"[wallapop] known ids load failed: {e}")
+            try:
+                self.postgres_conn.rollback()
+            except Exception:
+                pass
+
+    def known_entry(self, listing: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if self._known is None:
+            self._load_known()
+        aid = str(listing.get("anuncio_id") or "")
+        key = self._numeric_id(aid) or self._numeric_id(listing.get("url_anuncio")) or aid
+        return self._known.get(key) or self._known.get(aid)
+
+    def save_listing(self, listing: Dict[str, Any]) -> bool:
+        prev = self.known_entry(listing)
+        if prev:
+            # Un descarte verificado por detalle no se resucita con datos de card.
+            if not prev["es_particular"] and listing.get("es_particular") and not listing.get("verified"):
+                self.stats["listings_skipped"] += 1
+                return False
+            listing["anuncio_id"] = prev["anuncio_id"]
+            # El re-guardado parte de la card: conservar lo que solo trajo el
+            # detalle (teléfono, nombre real, descripción completa) y la zona.
+            # Sin teléfono cambiaría lead_unique_key (tel -> md5(url)) en dim_leads.
+            if not listing.get("telefono") and prev["telefono"]:
+                listing["telefono"] = prev["telefono"]
+                listing["telefono_norm"] = prev["telefono_norm"] or prev["telefono"]
+            if (str(listing.get("vendedor") or "").strip().lower() in _PLACEHOLDER_SELLERS
+                    and prev["vendedor"].strip().lower() not in _PLACEHOLDER_SELLERS):
+                listing["vendedor"] = prev["vendedor"]
+            if len(prev["descripcion"]) > len(listing.get("descripcion") or ""):
+                listing["descripcion"] = prev["descripcion"]
+            if prev["verified"]:
+                listing["verified"] = True
+            if prev["zona_busqueda"] in self.ZONAS:
+                listing["zona_busqueda"] = prev["zona_busqueda"]
+                listing["zona_geografica"] = prev["zona_geografica"] or listing.get("zona_geografica")
+        saved = super().save_listing(listing)
+        if saved and not prev:
+            key = self._numeric_id(listing["anuncio_id"]) or listing["anuncio_id"]
+            self._known[key] = {
+                "anuncio_id": listing["anuncio_id"],
+                "es_particular": bool(listing.get("es_particular")),
+                "verified": bool(listing.get("verified")),
+                "telefono": listing.get("telefono") or "",
+                "telefono_norm": listing.get("telefono_norm") or "",
+                "vendedor": listing.get("vendedor") or "",
+                "descripcion": listing.get("descripcion") or "",
+                "zona_busqueda": listing.get("zona_busqueda") or "",
+                "zona_geografica": listing.get("zona_geografica") or "",
+            }
+        return saved
 
     # ------------------------------------------------------------------
     # Field helpers
@@ -532,8 +696,13 @@ class ScraplingWallapop(ScraplingBaseScraper):
         ):
             listing["es_particular"] = False
             listing["seller_type"] = "professional"
-            if vendedor:
-                listing["vendedor"] = vendedor
+            # Profesional por el PERFIL (flags/nombre), no solo por el texto del
+            # anuncio: permite cachear al vendedor entero (_agency_users).
+            listing["_seller_pro"] = self._is_professional(seller, item, vendedor, "", "")
+        # El API no trae el nombre del vendedor: el del detalle sustituye al
+        # placeholder "Particular" (nombre real en el CRM, como en la vía SEO).
+        if vendedor:
+            listing["vendedor"] = vendedor
         listing["verified"] = True
         return listing
 
