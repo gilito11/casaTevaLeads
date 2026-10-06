@@ -53,27 +53,29 @@ class PortalCheck:
 PORTAL_CHECKS: Dict[str, PortalCheck] = {
     "habitaclia": PortalCheck(
         name="habitaclia",
-        url="https://www.habitaclia.com/viviendas-particulares-salou.htm",
+        # Plataforma fotocasa/Adevinta desde 15 Sep 2026: la URL antigua redirige
+        # y los anuncios van en window.__INITIAL_PROPS__ (ver scrapling_habitaclia).
+        url="https://www.habitaclia.com/viviendas-particulares-lleida.htm",
         patterns=[
             PortalPattern(
-                "listing_links",
-                "Listing href pattern",
-                r'href="[^"]*habitaclia\.com/comprar-',
+                "initial_props",
+                "JSON embebido window.__INITIAL_PROPS__",
+                r'window\.__INITIAL_PROPS__\s*=\s*JSON\.parse',
             ),
             PortalPattern(
-                "price",
-                "Price with euro symbol",
-                r'\d+\.?\d*\s*\u20ac',
+                "search_context",
+                "Resultados en initialSearchContext",
+                r'initialSearchContext',
+            ),
+            PortalPattern(
+                "listing_id",
+                "Id legacy de anuncio (legacyNumericId)",
+                r'legacyNumericId',
             ),
             PortalPattern(
                 "image_domain",
                 "Image hosting domain",
-                r'images\.habimg\.com',
-            ),
-            PortalPattern(
-                "listing_id",
-                "Listing ID pattern (-iNNNNNNNNN)",
-                r'-i\d{9,}',
+                r'static\.fotocasa\.es/images',
             ),
         ],
         blocked_indicators=[
