@@ -201,11 +201,13 @@ classified AS (
 
         -- Tipo de inmueble
         CASE
-            -- tipo del JSON de la plataforma nueva (desde Oct 2026)
-            WHEN raw_data->>'tipo_inmueble' = 'casa' THEN 'Casa'
-            WHEN LOWER(url) LIKE '%piso%' OR LOWER(titulo) LIKE '%piso%' THEN 'Piso'
-            WHEN LOWER(url) LIKE '%casa%' OR LOWER(titulo) LIKE '%casa%' OR LOWER(titulo) LIKE '%chalet%' THEN 'Casa'
-            WHEN LOWER(url) LIKE '%local%' OR LOWER(titulo) LIKE '%local%' THEN 'Local'
+            -- Plataforma nueva (Oct 2026, filas con municipio): tipo explicito del
+            -- JSON. Su URL lleva la calle ("pau-casals"): no sirve de heuristica.
+            WHEN raw_data ? 'municipio' AND raw_data->>'tipo_inmueble' = 'casa' THEN 'Casa'
+            WHEN raw_data ? 'municipio' AND raw_data->>'tipo_inmueble' = 'piso' THEN 'Piso'
+            WHEN (url ~ '-i[0-9]+\.htm' AND LOWER(url) LIKE '%piso%') OR LOWER(titulo) LIKE '%piso%' THEN 'Piso'
+            WHEN (url ~ '-i[0-9]+\.htm' AND LOWER(url) LIKE '%casa%') OR LOWER(titulo) LIKE '%casa%' OR LOWER(titulo) LIKE '%chalet%' THEN 'Casa'
+            WHEN (url ~ '-i[0-9]+\.htm' AND LOWER(url) LIKE '%local%') OR LOWER(titulo) LIKE '%local%' THEN 'Local'
             WHEN LOWER(titulo) LIKE '%garaje%' OR LOWER(titulo) LIKE '%parking%' THEN 'Garaje'
             WHEN LOWER(titulo) LIKE '%terreno%' OR LOWER(titulo) LIKE '%parcela%' THEN 'Terreno'
             WHEN LOWER(titulo) LIKE '%finca%' THEN 'Finca'

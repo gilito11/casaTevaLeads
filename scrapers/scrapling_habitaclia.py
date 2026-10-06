@@ -122,7 +122,9 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
             )
 
         zone_name = self.ZONAS.get(zona_key, {}).get("nombre", zona_key)
-        searched = _norm_muni(geo.get("name"))
+        # Solo se corrige la zona con busquedas por municipio: en una de distrito
+        # (Chamartin) el municipio del anuncio (Madrid) no es la zona buscada.
+        searched = _norm_muni(geo.get("name")) if geo.get("layer") == "municipality" else ""
         items = results.get("items") or []
         logger.info(
             f"[habitaclia] {zona_key}: {geo.get('layer')}/{geo.get('slug')} "
@@ -167,8 +169,9 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
             "precio": float(precio) if precio else None,
             "habitaciones": prop.get("rooms"),
             "banos": prop.get("bathrooms"),
-            "metros": int(prop.get("builtSurface") or prop.get("landArea") or 0) or None,
-            "tipo_inmueble": _TIPO.get(prop.get("propertyType"), "piso"),
+            "metros": int(prop.get("builtSurface") or 0) or None,
+            # None si el tipo no es vivienda conocida: dbt tira del titulo
+            "tipo_inmueble": _TIPO.get(prop.get("propertyType")),
             "direccion": ", ".join(x for x in (loc.get("displayAddressLine"), loc.get("displayZoneLine")) if x),
             "municipio": municipio or None,
             "latitud": coords.get("latitude"),
