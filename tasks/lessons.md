@@ -1,5 +1,10 @@
 # Lessons
 
+## 2026-10-06 — Un parser que no encuentra nada debe fallar, no devolver 0
+**Incidente**: habitaclia cambio de plataforma el 15 Sep; el regex devolvia 0 enlaces, el scraper logueaba "found 0" con errors=0 y el paso salia "success" durante 3 semanas. La alerta existia (ops-status, Telegram) pero llegaba a canales que nadie mira (rutina cloud borrada, Telegram sin audiencia).
+
+**Patrón**: (1) distinguir "pagina sin anuncios" de "pagina que no entiendo": si falta la estructura esperada (JSON embebido, contenedor de resultados) es `errors += 1`, nunca una lista vacia. (2) Toda alerta debe aterrizar donde el equipo ya mira (campana in-app), y verificar que el consumidor de la alerta existe de verdad (la rutina llevaba semanas sin existir). (3) Al revisar un portal, comparar contra la web real ordenada por fecha, no solo contra los logs del propio scraper: el scraper de wallapop "funcionaba" pero solo veia los 80 primeros por relevancia.
+
 ## 2026-07-11 — fecha_primera_captura no era "primera": verificar semántica antes de reportar
 **Corrección del usuario**: reporté "203 leads nuevos en 48h" usando `fecha_primera_captura`; el usuario detectó la contradicción (un lead "de hoy" ya estaba EN_PROCESO). Eran 4 nuevos reales — el resto re-scrapes.
 

@@ -1,3 +1,30 @@
+# Scrapers: habitaclia roto (15 Sep) + wallapop sin cobertura + red de seguridad muda
+
+> 6 Oct 2026. Habitaclia (mejor productor) devolvio found=0 en todas las zonas
+> 3 semanas con el paso en "success"; wallapop 10 dias sin leads; nadie se entero.
+
+## Diagnostico
+- Habitaclia migro a la plataforma de fotocasa (Adevinta): las URLs antiguas
+  redirigen (301) a /comprar/viviendas/<prov>-provincia/<muni>/particulares/s y
+  el regex de enlaces `comprar-*-i<id>.htm` ya no encuentra nada.
+- Wallapop: la pagina SEO solo da los ~80 primeros por relevancia (Lleida: 77
+  agencias de 80); torrefarrera/almenar vacias. La API admite
+  `distance_in_km` + `order_by=newest` + paginacion `next_page`.
+- Red de seguridad: ops-status SI marcaba habitaclia, pero la rutina cloud
+  "scrape watch" no existe en la cuenta (404, 0 runs) y Telegram nadie lo lee.
+- 4 zonas activas (almenar, bell_lloc, mollerussa_rural, termens) nunca
+  existieron en el dict de habitaclia ("Zone not found").
+
+## Tareas
+- [x] Habitaclia: parser de `window.__INITIAL_PROPS__` (listado + ficha), paginacion /N, sin ficha (el JSON trae tel/email/coords), municipio real como zona
+- [x] Habitaclia: 4 zonas que faltaban; lead_refresher detecta bajas (redirige al buscador)
+- [x] dbt: lat/lng + tipo casa de habitaclia hacia dim_leads
+- [x] Wallapop: API newest + distance_in_km en todas las zonas (subagente)
+- [x] scrape_health.py: found=0, caida vs media 7d, dias sin nuevos -> notificacion in-app (campana)
+- [x] scrape-neon.yml: ubuntu-24.04, fotocasa 30 min, job 120 min
+- [ ] Validar con dispatch real del workflow en la rama
+- [ ] Merge a master
+
 # Zonas descartadas: visibilidad + activacion manual del pipeline
 
 > Objetivo: el equipo ve en el dashboard las zonas que el scraping captura pero
