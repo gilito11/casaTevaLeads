@@ -99,7 +99,8 @@ classified AS (
             -- Lleida (foco obra nueva: Bordeta, Cappont, Copa d'Or)
             WHEN LOWER(ubicacion) LIKE '%bordeta%' THEN 'Lleida - La Bordeta'
             WHEN LOWER(ubicacion) LIKE '%cappont%' OR LOWER(ubicacion) LIKE '%cap pont%' THEN 'Lleida - Cappont'
-            WHEN LOWER(ubicacion) LIKE '%lleida%' OR LOWER(ubicacion) LIKE '%lerida%' THEN 'Lleida Ciudad'
+            -- Solo si EMPIEZA por Lleida: 'Puigverd/Artesa/Montoliu de Lleida' son su propia zona
+            WHEN LOWER(ubicacion) ~ '^(lleida|lerida)\M' THEN 'Lleida Ciudad'
 
             WHEN LOWER(ubicacion) LIKE '%salou%' THEN 'Costa Dorada - Salou'
             WHEN LOWER(ubicacion) LIKE '%cambrils%' THEN 'Costa Dorada - Cambrils'

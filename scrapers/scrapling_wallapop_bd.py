@@ -128,13 +128,24 @@ class ScraplingWallapopBD(ScraplingWallapop):
     # ------------------------------------------------------------------
     # Zona asignada (zonas solapadas: Lleida 12km cubre Alpicat, Alcarràs...)
     # ------------------------------------------------------------------
-    def _assign_zone(self, item: Dict[str, Any], query_zone: str) -> str:
-        """Municipio del anuncio si es una zona del run; si no, la zona del run
-        más cercana en proporción a su radio (por defecto la de la búsqueda)."""
+    # Nucleos que pertenecen a un municipio de zona (el API da el nucleo).
+    NUCLEO_A_ZONA = {"sucs": "lleida", "raimat": "lleida"}
+
+    def _assign_zone(self, item: Dict[str, Any], query_zone: str) -> Optional[str]:
+        """Municipio del anuncio si es una zona del run. Si el API da un municipio
+        que NO es zona (Balaguer, Les Borges...), None: se guarda con su nombre
+        real y la keep-list de dim_leads decide (sale en "zonas descartadas" del
+        dashboard en vez de colarse como la zona activa mas cercana). Sin
+        municipio, la zona del run mas cercana en proporcion a su radio."""
         loc = item.get("location") or {}
-        by_city = self._city_zone.get(self._norm_place(loc.get("city")))
+        city = self._norm_place(loc.get("city"))
+        by_city = self._city_zone.get(city)
+        if not by_city and city in self.NUCLEO_A_ZONA and self.NUCLEO_A_ZONA[city] in self._run_zones:
+            by_city = self.NUCLEO_A_ZONA[city]
         if by_city:
             return by_city
+        if city:
+            return None
         best, best_ratio = query_zone, None
         for z in self._run_zones:
             cfg = self.ZONAS[z]
@@ -160,8 +171,10 @@ class ScraplingWallapopBD(ScraplingWallapop):
         self._run_zones = zone_keys
         self._city_zone = {}
         for z in zone_keys:
-            for name in (z.replace("_", " "), self.ZONAS[z].get("nombre", "")):
-                self._city_zone.setdefault(self._norm_place(name), z)
+            # nombre, clave y slug: mollerussa_rural = El Palau d'Anglesola
+            for name in (z.replace("_", " "), self.ZONAS[z].get("nombre", ""), self.ZONAS[z].get("slug", "")):
+                if self._norm_place(name):
+                    self._city_zone.setdefault(self._norm_place(name), z)
 
         logger.info(
             f"[wallapop-bd] Starting scrape | tenant={self.tenant_id} zones={zone_keys} "
@@ -229,8 +242,12 @@ class ScraplingWallapopBD(ScraplingWallapop):
                 self.stats["listings_found"] += 1
 
                 zona = self._assign_zone(item, zona_key)
-                listing["zona_busqueda"] = zona
-                listing["zona_geografica"] = self.ZONAS[zona].get("nombre", zona)
+                if zona:
+                    listing["zona_busqueda"] = zona
+                    listing["zona_geografica"] = self.ZONAS[zona].get("nombre", zona)
+                else:
+                    city = (item.get("location") or {}).get("city")
+                    listing["zona_busqueda"] = listing["zona_geografica"] = city
 
                 if self.should_skip(listing):
                     self.stats["listings_skipped"] += 1

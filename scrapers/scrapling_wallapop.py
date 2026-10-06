@@ -343,6 +343,26 @@ class ScraplingWallapop(ScraplingBaseScraper):
         m = _NUM_ID_RE.search(s)
         return m.group(1) if m else None
 
+    def _is_blacklisted(self, anuncio_id: str) -> bool:
+        # La blacklist guarda el id con que se vio el anuncio (hash del API hasta
+        # Oct 2026, numerico despues): cruzar tambien por el numero de su URL.
+        if not self.postgres_conn:
+            return False
+        num = self._numeric_id(anuncio_id)
+        try:
+            cur = self.postgres_conn.cursor()
+            cur.execute(
+                "SELECT 1 FROM leads_anuncio_blacklist WHERE tenant_id = %s AND portal = %s "
+                "AND (anuncio_id = %s OR substring(url_anuncio from '-([0-9]{6,})/?$') = %s) LIMIT 1",
+                (self.tenant_id, self.PORTAL_NAME, anuncio_id, num),
+            )
+            r = cur.fetchone()
+            cur.close()
+            return r is not None
+        except Exception:
+            self.postgres_conn.rollback()
+            return False
+
     def _api_item_to_listing(self, item: Dict[str, Any], zona_key: str,
                              zona_cfg: dict) -> Optional[Dict[str, Any]]:
         web_slug = item.get("web_slug") or ""
