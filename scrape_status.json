@@ -1,0 +1,52 @@
+{
+  "run_id": "39989773690",
+  "run_url": "https://github.com/gilito11/casaTevaLeads/actions/runs/39989773690",
+  "generated_at": "2026-10-23T17:23:57+00:00",
+  "job_status": "success",
+  "bd_token": "success",
+  "portals": {
+    "wallapop": {
+      "step": "success",
+      "seen_3h": 100,
+      "new_3h": 1,
+      "zone_runs": 39,
+      "found": 817,
+      "found_avg_7d": 815,
+      "days_without_new": 0,
+      "max_days_without_new": 8
+    },
+    "habitaclia": {
+      "step": "success",
+      "seen_3h": 49,
+      "new_3h": 0,
+      "zone_runs": 39,
+      "found": 49,
+      "found_avg_7d": 49,
+      "days_without_new": 3,
+      "max_days_without_new": 14
+    },
+    "fotocasa": {
+      "step": "success",
+      "seen_3h": 89,
+      "new_3h": 3,
+      "zone_runs": 32,
+      "found": 895,
+      "found_avg_7d": 857,
+      "days_without_new": 0,
+      "max_days_without_new": 5
+    },
+    "milanuncios": {
+      "step": "success",
+      "seen_3h": 129,
+      "new_3h": 1,
+      "zone_runs": 2,
+      "found": 138,
+      "found_avg_7d": 190,
+      "days_without_new": 0,
+      "max_days_without_new": 6
+    }
+  },
+  "ok": true,
+  "problems": [],
+  "notified": 0
+}
