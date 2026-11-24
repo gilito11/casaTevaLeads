@@ -180,6 +180,8 @@ class ListingChecker:
                 return True
 
         elif portal == 'fotocasa':
+            if 'propertynotfound' in final_parsed.query:
+                return True
             # Fotocasa: listing URLs contain /d at the end with a numeric ID
             id_match = re.search(r'/(\d{7,})/d', original_url)
             if id_match and id_match.group(1) not in final_url:
@@ -232,8 +234,12 @@ class ListingChecker:
             if self._is_redirect_to_search(url, final_url, portal):
                 return False, 'redirected_to_search'
 
-            # Check HTML content for removal patterns
-            if response.status_code == 200 and portal and portal in REMOVED_PATTERNS:
+            # Check HTML content for removal patterns. Not for fotocasa: every
+            # page embeds its i18n dictionary (incl. "Anuncio no disponible"),
+            # so a text match flags active listings; removed ones 302 to the
+            # search page with ?propertyNotFound (handled above).
+            if (response.status_code == 200 and portal and portal != 'fotocasa'
+                    and portal in REMOVED_PATTERNS):
                 html_lower = response.text.lower()
                 for pattern in REMOVED_PATTERNS[portal]:
                     if re.search(pattern, html_lower):
