@@ -19,3 +19,8 @@
 **Corrección del usuario**: ante "la web de captación no funciona" empecé por la landing de fincaradar.com (formulario de demo). El usuario aclaró: "web de captaciones significa el scraper".
 
 **Patrón**: en este proyecto "captación" es captar leads (scrapers → raw → dim_leads). Ante un "no funciona" genérico, empezar SIEMPRE por la salud del pipeline (último run de scrape-neon.yml: líneas `DONE in … found= saved= errors=` por portal + `max(scraping_timestamp)` por portal en Neon) antes que por la UI. Y un workflow en "success" no significa datos: los scrapers van con `continue-on-error`, hay que leer los contadores.
+
+## 2026-11-24 — "No entran leads" = lo que VE el equipo en la app, no lo que entra en raw
+**Corrección del usuario**: ante "desde el día 17 no entran leads" analicé raw.raw_listings y dim_leads (sí entraban) y fui portal por portal en la BD. El usuario: "lo que debes buscar es qué leads ven ellos, no los que la DB en raw ha recibido".
+
+**Patrón**: medir desde el punto de vista del comercial. Empezar reproduciendo la vista real (`lead_list_view`: tenant, `exclude(es_particular=False)`, `exclude(permite_inmobiliarias=False)`, orden `-fecha_scraping`) con el ORM, y mostrar el estado efectivo (LeadEstado) y el título tal como salen en pantalla. Un lead que llega ya marcado YA_VENDIDO, o una fila sin título, para el equipo es "no ha entrado nada". Raw y los scrapers solo después, para explicar la causa.

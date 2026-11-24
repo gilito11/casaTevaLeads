@@ -23,6 +23,25 @@ _TIPO = {
 }
 
 
+_TIPO_TITULO = {"piso": "Piso", "casa": "Casa"}
+
+
+def _fallback_title(prop: dict, zone_line: str) -> str:
+    """La plataforma nueva deja summary.title vacio en ~2/3 de los anuncios de
+    particulares (y la pagina tampoco tiene <title>): sin esto la fila sale en
+    blanco en la lista del CRM. No se usa la descripcion: el filtro anti-alquiler
+    de dbt mira el titulo y una frase de reclamo tumbaria ventas."""
+    tipo = _TIPO_TITULO.get(_TIPO.get(prop.get("propertyType")), "Inmueble")
+    parts = [f"{tipo} en venta"]
+    if prop.get("rooms"):
+        parts.append(f"{prop['rooms']} hab")
+    if prop.get("builtSurface"):
+        parts.append(f"{int(prop['builtSurface'])} m²")
+    if zone_line:
+        parts.append(zone_line)
+    return " · ".join(parts)
+
+
 def _norm_muni(name: Optional[str]) -> str:
     """'Lleida Capital' / 'Albatàrrec' -> 'lleida' / 'albatarrec'."""
     if not name:
@@ -164,7 +183,8 @@ class ScraplingHabitaclia(ScraplingBaseScraper):
         listing: Dict[str, Any] = {
             "anuncio_id": anuncio_id,
             "url_anuncio": f"{self.BASE_URL}{nav}",
-            "titulo": (summary.get("title") or "").strip()[:200],
+            "titulo": ((summary.get("title") or "").strip()
+                       or _fallback_title(prop, loc.get("displayZoneLine") or municipio))[:200],
             "descripcion": descripcion,
             "precio": float(precio) if precio else None,
             "habitaciones": prop.get("rooms"),
