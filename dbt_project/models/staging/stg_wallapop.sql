@@ -261,8 +261,6 @@ final AS (
             OR LOWER(COALESCE(descripcion, '')) LIKE '%financiación a medida%'
         )
         AND NOT TRIM(COALESCE(descripcion, '')) ~ '^Ref[:.]\s*'
-        -- Descripción mínima (vacía/cortísima = poco fiable)
-        AND LENGTH(TRIM(COALESCE(descripcion, ''))) >= 20
 )
 
 SELECT * FROM final

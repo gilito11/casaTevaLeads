@@ -300,8 +300,8 @@ final AS (
             OR LOWER(COALESCE(vendedor, '')) LIKE '%administración%'
         )
         -- Note: nombre_contacto = vendedor in this model, so vendor filter above covers both
-        -- Require minimum description length (empty/short = unreliable, likely professional)
-        AND LENGTH(TRIM(COALESCE(descripcion, ''))) >= 50
+        -- Sin filtro de descripcion minima (quitado 24 Nov 2026): tiraba particulares
+        -- reales con descripciones cortas ("Totalment Reformat", "Tf 6...").
         -- Filter out agency descriptions starting with reference codes (Ref:, Ref.)
         -- Nearly all milanuncios listings with "Ref:" at the start are professional agencies
         AND NOT TRIM(COALESCE(descripcion, '')) ~ '^Ref[:.]\s*'
