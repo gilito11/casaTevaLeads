@@ -49,7 +49,7 @@ REMOVED_PATTERNS = {
 
 # CRM states to exclude from checking — these are already managed by the user
 EXCLUDED_ESTADOS = (
-    'YA_VENDIDO', 'CLIENTE', 'NO_CONTACTAR', 'INTERESADO', 'EN_PROCESO',
+    'YA_VENDIDO', 'CLIENTE', 'NO_CONTACTAR', 'INTERESADO', 'EN_PROCESO', 'EN_ESPERA',
 )
 
 # Portals safe to check via simple HTTP (no anti-bot)

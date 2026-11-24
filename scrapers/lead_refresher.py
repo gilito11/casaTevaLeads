@@ -41,7 +41,7 @@ except Exception:
 
 # Estados del CRM que NO se tocan (ya gestionados por el comercial)
 EXCLUDED_ESTADOS = (
-    "YA_VENDIDO", "CLIENTE", "NO_CONTACTAR", "INTERESADO", "EN_PROCESO",
+    "YA_VENDIDO", "CLIENTE", "NO_CONTACTAR", "INTERESADO", "EN_PROCESO", "EN_ESPERA",
 )
 
 # Portales cuya página de detalle lleva señal fiable de profesional/particular.
